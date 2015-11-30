@@ -1,0 +1,22 @@
+# Design chapter
+
+- add tab for data when first creating the ribbon tab system in the chapter after, where the user can set text encoding, and an add layer button
+- in rendering chapter, add rendering tab, where user can save current map image
+
+X layer reordering, maybe with arrows, and no more layer orange
+X dispatch waiting and finished
+X proper map image size, linked to mapview size, updates on window resize
+X change mouse cursor during map zoom, and unbind after use
+X map drag
+
+X right click layer for menu
+X add save option
+X add rename option
+X properties option window
+
+...final small thing...add proper raster render
+
+
+
+# Managment chapter
+add manager methods as options with windows

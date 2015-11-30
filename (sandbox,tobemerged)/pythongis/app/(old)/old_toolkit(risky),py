@@ -1,0 +1,254 @@
+
+# Import builtins
+import sys, os
+
+# Import GUI library
+import Tkinter as tk
+from tkFileDialog import askopenfilenames
+
+
+# The Ribbon/Tab system
+
+class Ribbon(tk.Frame):
+    """
+    Can switch between a series of logically grouped toolbar areas (tabs).
+    """
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+        # Define areas
+        self.select_area = tk.Frame(master=self)
+        self.select_area.place(relx=0, rely=0, relwidth=1, relheight=0.2)
+        self.toolbars_area = tk.Frame(master=self)
+        self.toolbars_area.place(relx=0, rely=0.2, relwidth=1, relheight=0.8)
+
+        # Add tabs
+        self.tabs = []
+        hometab = Tab(self.master, name="Home")
+        self.tabs.append( hometab )
+        self.current = self.tabs[0]
+
+    def switch(self, tabname):
+        for tab in self.tabs:
+            if tab.name = tabname:
+                self.current = tab
+                break
+        else: raise Exception("No such tabname found")
+
+        self.current.lift()
+
+class Tab(tk.Frame):
+    """
+    An area displaying a logical grouping of toolbars.
+    """
+    def __init__(self, parentwidget, name, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+        self.name = name
+
+
+# Toolbars
+
+class AnalyzeTB(tk.Frame):
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+class NavigateTB(tk.Frame):
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+
+# Panes
+
+class LayersPane(tk.Frame):
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+
+# Status Bars
+
+class StatusBar(tk.Frame):
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+
+# The Main Map
+
+class MapView(tk.Frame):
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+        # Create the maprenderer
+        self.renderer = ""
+        self.proj = kwargs.get("projection", "WGS84")
+
+    # Rendering
+    def DrawShapefile(self, shapelygeoms, projection):
+        Report("loading")
+        geomstofeature = cartopy.feature.ShapelyFeature(geometries=shapelygeoms, crs=projection)
+        Report("drawing")
+        self.ax.add_feature(geomstofeature, facecolor="pink", edgecolor='green')
+        self.ax.figure.canvas.draw()
+    def UpdateLayersView(self, layerlist):
+        if len(self.layerobjects) > 0:
+            [self.layerobjects[layername].destroy() for layername in self.layerobjects]
+            self.layerobjects.clear()
+        for layer in layerlist:
+            layerobj = Label(master=self.layersview, text=layer)
+            layerobj.pack(side="top", fill="x")
+            self.layerobjects.update( {layer:layerobj} )
+
+    # Interactive
+    def MouseMoving(self, event):
+        self.coordsdisplay["text"] = str(event.xdata)+","+str(event.ydata)
+        if event.button == 1 and self.mousepressed == True:
+            self.PanMap(event.xdata, event.ydata)
+    def MousePressed(self, event):
+        self.clickcoords = (event.xdata, event.ydata)
+        self.mousepressed = True
+        timesincelastclick = time.time()-self.clicktime
+        if timesincelastclick < 0.2:
+            self.ZoomMap(event.xdata, event.ydata, event.button)
+        self.clicktime = time.time()
+    def MouseReleased(self, event):
+        print "release"
+        self.mousepressed = False
+    def ZoomMap(self, eventx, eventy, eventbutton=0):
+        if eventbutton == 1 and self.zoomtracker > 5:
+            self.zoomtracker -= 5
+        elif eventbutton == 3 and self.zoomtracker < 100:
+            self.zoomtracker += 5
+        zoompercent = self.zoomtracker/100.0
+        xlim = (eventx/2.0-180*zoompercent, eventx/2.0+180*zoompercent)
+        ylim = (eventy/2.0-90*zoompercent, eventy/2.0+90*zoompercent)
+        self.ax.set_xlim(xlim)
+        self.ax.set_ylim(ylim)
+        self.ax.figure.canvas.draw()
+        self.zoomdisplay["text"] = "Showing "+str(int(self.zoomtracker))+"% of full extent"
+    def PanMap(self, x, y):
+        #first calc current extent
+        zoompercent = self.zoomtracker/100.0
+        current = self.ax.get_extent()
+        #then determine mousemove and set new extent (plussing is to avoid negativ nrs when deteremning movediff
+        xmoved = (self.clickcoords[0]+180)-(x+180)
+        ymoved = (self.clickcoords[1]+90)-(y+90)
+        xlim = ( current[0]+xmoved, current[1]+xmoved )
+        ylim = ( current[2]+ymoved, current[3]+ymoved )
+        self.ax.set_xlim(xlim)
+        self.ax.set_ylim(ylim)
+        self.ax.figure.canvas.draw()
+
+
+
+
+
+
+
+
+
+
+
+
+# OTHER SHIT...
+
+class MapWithHelpers(tk.Frame):
+    def __init__(self, parentwidget, **kwargs):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+        # Create mapwidget
+        self.map = MapView(self)
+        self.map.pack()
+
+        # Create bottom info and mouse coords bar at bottom
+        bottominfo = tk.Frame(master=self.master)
+        bottominfo.place(relx=0, rely=0.95, relwidth=1, relheight=0.05)
+        self.coordsdisplay = tk.Label(master=bottominfo, text="x,y", width=30)
+        self.coordsdisplay.pack(side="right", anchor="e")
+        self.zoomdisplay = tk.Label(master=bottominfo, text="Showing "+str(100.0)+"% of full extent", width=30)
+        self.zoomdisplay.pack(side="right", anchor="e")
+        self.projectiondisplay = tk.Label(master=bottominfo,
+                                          text="Map projection: %s" % self.map.proj,
+                                          width=30)
+        self.projectiondisplay.pack(side="left", anchor="w")
+
+        # Create left visual layer manager list
+        layersframe = tk.Frame(master=self.master, bg="Grey40")
+        layersframe.place(relx=0, rely=0, relwidth=0.2, relheight=0.95)
+
+        # First, the header
+        layersframe_header = tk.Label(master=layersframe, text="   Layers:", bg="black", fg="white", anchor="w")
+        layersframe_header.place(relx=0.03, rely=0.01, relwidth=0.94, relheight=0.09, anchor="nw")
+        
+        # And the Button
+        def selectfile():
+            userchoice = askopenfilenames(filetypes=[("shapefiles",".shp")])
+            for each in userchoice:
+                print each
+            #self.map.LoadShapefiles(inputshapefilepaths=userchoice)
+        button_addshapefile = tk.Button(master=layersframe_header, text="+", bg="yellow", command=selectfile)
+        button_addshapefile.pack(side="right", anchor="e", ipadx=3, padx=6)
+
+        # Then, the layer list view
+        self.layersview = tk.Frame(master=layersframe, bg="white")
+        self.layersview.place(relx=0.03, rely=0.1, relwidth=0.94, relheight=0.89)
+        self.layerobjects = dict()
+
+        # Bind interactive events like zoom, pan, and select
+##        self.zoomtracker = 100
+##        self.clicktime = time.time()
+##        self.mousepressed = False
+##        self._parent.bind('button_press_event', self.MousePressed)
+##        self._('button_release_event', self.MouseReleased)
+##        self.mapframe.canvas.mpl_connect('motion_notify_event', self.MouseMoving)
+
+
+class MapWithHelpersAndMenu(tk.Frame):
+    def __init__(self, parentwidget):
+        # Make this class a subclass of tk.Frame and add to it
+        tk.Frame.__init__(self, parentwidget)
+
+        # Create top area with buttons
+        buttonarea = Frame(master=window, bg=mainbgcolor)
+        buttonarea.place(relx=0.03, rely=0.01, relwidth=0.96, relheight=0.04)
+        button_fullextent = Button(master=buttonarea, text="O", bg="dark grey", command=MAPWIDGET.map.FullExtent)
+        button_fullextent.pack(side="left", ipadx=3)
+        MAPWIDGET.map.bottominfo.config(bg=bottominfobgcolor, fg=bottominfotxtcolor)
+        MAPWIDGET.map.coordsdisplay.config(bg=bottominfobgcolor, fg=bottominfotxtcolor)
+        MAPWIDGET.map.zoomdisplay.config(bg=bottominfobgcolor, fg=bottominfotxtcolor)
+        MAPWIDGET.map.projectiondisplay.config(bg=bottominfobgcolor, fg=bottominfotxtcolor)
+
+        
+
+
+
+if __name__ == "__main__":
+    def run(mainbgcolor="burlywood3", bottominfobgcolor="black", bottominfotxtcolor="white"):
+        # create main window
+        window = tk.Tk()
+        window.wm_title("Python GIS")
+        window.state('zoomed')
+
+        # fill window with color
+        window_colored = tk.Frame(master=window, bg=mainbgcolor)
+        window_colored.pack(fill="both", expand=True)
+
+        # pack our gui into the colored window
+        gui = MapWithHelpers(window_colored)
+        gui.pack()
+
+        # open the window
+        window.mainloop()
+
+    run()
+    
+
+
+
+
