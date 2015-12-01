@@ -4,13 +4,13 @@ from .data import *
 
 # File management
 
-def vector_crop(data, cropby):
-    #cropby is another data instance
-    #essentially same as selectbylocation
-    pass
-
-def vector_select(data, expr):
-    pass
+##def vector_crop(data, cropby):
+##    #cropby is another data instance
+##    #essentially same as selectbylocation
+##    pass
+##
+##def vector_select(data, expr):
+##    pass
 
 def split(data, splitfields):
     """

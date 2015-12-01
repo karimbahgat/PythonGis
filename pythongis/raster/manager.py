@@ -1,5 +1,5 @@
 
-import PIL, PIL.Image
+import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 
 
 def resample(raster, width=None, height=None, cellwidth=None, cellheight=None):
@@ -105,8 +105,143 @@ def mosaic(*rasters):
         
     return merged
     
+def rasterize(vectordata, cellwidth, cellheight, **options):
+    # calculate required raster size from cell dimensions
+    vectorbbox = vectordata.bbox
+    xmin,ymin,xmax,ymax = vectorbbox
+    if xmin > xmax: xmin,xmax = xmax,xmin
+    if ymin > ymax: ymin,ymax = ymax,ymin
+    oldwidth, oldheight = xmax-xmin, ymax-ymin
+    newwidth, newheight = oldwidth/float(cellwidth), oldheight/float(cellheight)
+    newwidth, newheight = int(round(newwidth)), int(round(newheight))
 
+    # create 1bit image with specified size
+    img = PIL.Image.new("1", (newwidth, newheight))
+    drawer = PIL.ImageDraw.Draw(img)
 
+    # set the coordspace to vectordata bbox
+    xoffset,yoffset = xmin,ymin
+    xscale,yscale = newwidth/float(oldwidth), newheight/float(oldheight)
+    a,b,c = xscale,0,xoffset
+    d,e,f = 0,yscale,yoffset
 
+    # draw the vector data
+    for feat in vectordata:
+        geotype = feat.geometry["type"]
 
+        # polygon, basic black fill, no outline
+        if "Polygon" in geotype:
+            coords = PIL.ImagePath.Path(feat.geometry["coordinates"])
+            coords.transform((a,b,c,d,e,f))
+            drawer.polygon(coords, fill=1, outline=None)
+        # line, 1 pixel line thickness
+        elif "LineString" in geotype:
+            coords = PIL.ImagePath.Path(feat.geometry["coordinates"])
+            coords.transform((a,b,c,d,e,f))
+            drawer.polygon(coords, fill=1, outline=None)
+        # point, 1 pixel square size
+        elif "Point" in geotype:
+            coords = PIL.ImagePath.Path(feat.geometry["coordinates"])
+            coords.transform((a,b,c,d,e,f))
+            drawer.polygon(coords, fill=1, outline=None)
 
+    # create raster from the drawn image (only first band)
+    drawer.flush()
+    raster = pg.Raster(image=img, cellwidth=cellwidth, cellheight=cellheight,
+                                         **options)
+    return raster
+
+    # OLD BELOW
+##
+##    # simply create pyagg image with specified image size
+##    canvas = pyagg.Canvas(newwidth, newheight)
+##    
+##    # set the coordspace to vectordata bbox
+##    canvas.custom_space(*vectorbbox)
+##    
+##    # draw the vector data
+##    for feat in vectordata:
+##        geotype = feat.geometry["type"]
+##        # NOTE: NEED TO MAKE SURE IS NUMBER, AND PYAGG ONLY TAKES RGB VALID NRS
+##        # FIX...
+##        value = feat[valuefield]
+##        #   polygon, basic black fill, no outline
+##        if "Polygon" in geotype:
+##            canvas.draw_geojson(feat.geometry, fillcolor=(value,0,0), outlinecolor=None)
+##        #   line, 1 pixel line thickness
+##        elif "LineString" in geotype:
+##            canvas.draw_geojson(feat.geometry, fillcolor=(value,0,0), fillsize=1)
+##        #   point, 1 pixel square size
+##        elif "Point" in geotype:
+##            canvas.draw_geojson(feat.geometry, fillcolor=(value,0,0), fillsize=1)
+##            
+##    # create raster from the drawn image (only first band)
+##    img = canvas.get_image().split()[0]
+##    raster = pg.Raster(image=img, cellwidth=cellwidth, cellheight=cellheight,
+##                                         **options)
+##    return raster
+
+def clip_keep(raster, clipdata):
+    if isinstance(clipdata, pg.GeoTable):
+        # rasterize vector data using same gridsize as main raster
+        # create blank image
+        # paste main raster onto blank image using rasterized as mask
+        pass
+
+    elif isinstance(clipdata, pg.Raster):
+        # create blank image
+        # paste raster onto blank image using clip raster as mask
+        pass
+
+def clip_nlights_version(raster, vector):
+    import PIL, PIL.Image, PIL.ImageDraw
+    orig = raster.bands[0].img
+    xleft,ytop,xright,ybottom = vector.bbox
+    pxleft,pytop = raster.geo_to_cell(xleft,ytop)
+    pxright,pybottom = raster.geo_to_cell(xright,ybottom)
+    cropped = orig.crop([pxleft,pybottom,pxright,pytop]) #ys are flipped
+    #cropped.show()
+
+    import pyagg
+    mask = pyagg.Canvas(cropped.width, cropped.height)
+    mask.custom_space(*vector.bbox)
+    mask.draw_geojson(vector.get_shapely(), fillcolor=(255,0,0), outlinecolor=None)
+    #mask.view()
+
+    clipped = PIL.Image.new("LA", cropped.size)
+    clipped.paste(cropped, (0,0)) #, mask.img.convert("1"))
+    #clipped.show()
+
+    return clipped  # PIL image, but should be another RasterData
+    
+    ##    import pyagg
+    ##    orig = pyagg.canvas.from_image(raster.bands[0].img)
+    ##    orig.geographic_space()
+    ##    cropped = orig.zoom_bbox(vector.bbox)
+    ##    cropped.view()
+        
+    ##    mask = pyagg.Canvas("%spx"%data.width, "%spx"%data.height)
+    ##    mask.draw_geojson(vector)
+    ##    pyagg
+
+def render(raster):   # PUT INTO render.py
+    # equalize and colorize
+    canv = pyagg.canvas.from_image(raster.bands[0].img)
+    canv.img = canv.img.convert("L")
+    canv = canv.equalize()
+    canv = pyagg.canvas.from_image(canv.img.convert("RGBA"))
+    canv = canv.color_remap([(0,0,55),
+                             (255,255,0)
+                             ])
+
+    # draw country outline
+    x1,y1,x2,y2 = syria.bbox
+    canv.custom_space(x1,y2,x2,y1)
+    canv.draw_geojson(syria.get_shapely(), fillcolor=None, outlinecolor=(255,0,0), outlinewidth="5px")
+
+    # title
+    canv.percent_space()
+    canv.draw_text(filename, xy=(50,5), fillcolor=(255,255,255))
+
+    # yield
+    return canv
