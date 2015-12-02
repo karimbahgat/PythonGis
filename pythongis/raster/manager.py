@@ -1,6 +1,9 @@
 
-import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
+from . import data
+##from .. import raster
+##from .. import vector
 
+import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 
 def resample(raster, width=None, height=None, cellwidth=None, cellheight=None):
     """
@@ -105,51 +108,83 @@ def mosaic(*rasters):
         
     return merged
     
-def rasterize(vectordata, cellwidth, cellheight, **options):
+def rasterize(vectordata, cellwidth, cellheight, bbox=None, **options):
+    # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
     # calculate required raster size from cell dimensions
-    vectorbbox = vectordata.bbox
-    xmin,ymin,xmax,ymax = vectorbbox
-    if xmin > xmax: xmin,xmax = xmax,xmin
-    if ymin > ymax: ymin,ymax = ymax,ymin
-    oldwidth, oldheight = xmax-xmin, ymax-ymin
-    newwidth, newheight = oldwidth/float(cellwidth), oldheight/float(cellheight)
-    newwidth, newheight = int(round(newwidth)), int(round(newheight))
+    if not bbox: bbox = vectordata.bbox
+    xmin,ymin,xmax,ymax = bbox
+    xwidth, yheight = xmax-xmin, ymax-ymin
+    pxwidth, pxheight = xwidth/float(cellwidth), yheight/float(cellheight)
+    pxwidth, pxheight = int(round(pxwidth)), int(round(pxheight))
+    if pxwidth < 0: pxwidth *= -1
+    if pxheight < 0: pxheight *= -1
 
     # create 1bit image with specified size
-    img = PIL.Image.new("1", (newwidth, newheight))
+    img = PIL.Image.new("1", (pxwidth, pxheight), 0)
     drawer = PIL.ImageDraw.Draw(img)
 
     # set the coordspace to vectordata bbox
-    xoffset,yoffset = xmin,ymin
-    xscale,yscale = newwidth/float(oldwidth), newheight/float(oldheight)
+    xoffset,yoffset = xmin,ymax
+    xscale,yscale = cellwidth,cellheight
     a,b,c = xscale,0,xoffset
     d,e,f = 0,yscale,yoffset
+    # invert
+    det = a*e - b*d
+    if det != 0:
+        idet = 1 / float(det)
+        ra = e * idet
+        rb = -b * idet
+        rd = -d * idet
+        re = a * idet
+        a,b,c,d,e,f = (ra, rb, -c*ra - f*rb,
+                       rd, re, -c*rd - f*re)
 
     # draw the vector data
     for feat in vectordata:
         geotype = feat.geometry["type"]
 
+        # make all multis so can treat all same
+        coords = feat.geometry["coordinates"]
+        if not "Multi" in geotype:
+            coords = [coords]
+
         # polygon, basic black fill, no outline
         if "Polygon" in geotype:
-            coords = PIL.ImagePath.Path(feat.geometry["coordinates"])
-            coords.transform((a,b,c,d,e,f))
-            drawer.polygon(coords, fill=1, outline=None)
+            for poly in coords:
+                # exterior
+                exterior = poly[0]
+                path = PIL.ImagePath.Path(exterior)
+                #print list(path)[:10]
+                path.transform((a,b,c,d,e,f))
+                #print list(path)[:10]
+                drawer.polygon(path, fill=1, outline=None)
+                # holes
+                if len(poly) > 1:
+                    for hole in poly[1:]:
+                        path = PIL.ImagePath.Path(hole)
+                        path.transform((a,b,c,d,e,f))
+                        drawer.polygon(path, fill=0, outline=None)
+                        
         # line, 1 pixel line thickness
         elif "LineString" in geotype:
-            coords = PIL.ImagePath.Path(feat.geometry["coordinates"])
-            coords.transform((a,b,c,d,e,f))
-            drawer.polygon(coords, fill=1, outline=None)
+            for line in coords:
+                path = PIL.ImagePath.Path(line)
+                path.transform((a,b,c,d,e,f))
+                drawer.line(path, fill=1)
+            
         # point, 1 pixel square size
         elif "Point" in geotype:
-            coords = PIL.ImagePath.Path(feat.geometry["coordinates"])
-            coords.transform((a,b,c,d,e,f))
-            drawer.polygon(coords, fill=1, outline=None)
+            path = PIL.ImagePath.Path(coords)
+            path.transform((a,b,c,d,e,f))
+            drawer.point(path, fill=1)
 
-    # create raster from the drawn image (only first band)
-    drawer.flush()
-    raster = pg.Raster(image=img, cellwidth=cellwidth, cellheight=cellheight,
-                                         **options)
+    # create raster from the drawn image    
+    raster = data.RasterData(image=img, cellwidth=cellwidth, cellheight=cellheight,
+                               xy_cell=(0,0), xy_geo=(xmin,ymax), **options)
     return raster
+
+
+
 
     # OLD BELOW
 ##
@@ -181,14 +216,47 @@ def rasterize(vectordata, cellwidth, cellheight, **options):
 ##                                         **options)
 ##    return raster
 
-def clip_keep(raster, clipdata):
-    if isinstance(clipdata, pg.GeoTable):
-        # rasterize vector data using same gridsize as main raster
-        # create blank image
-        # paste main raster onto blank image using rasterized as mask
-        pass
 
-    elif isinstance(clipdata, pg.Raster):
+
+
+def clip(raster, clipdata, bbox=None):
+    # TODO: ALSO HANDLE CLIP BY RASTER DATA
+    # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
+    
+    if True: #isinstance(clipdata, vector.data.VectorData):
+        # rasterize vector data using same gridsize as main raster
+
+        #print "orig",raster.info
+        #raster.bands[0].img.save("orig.png")
+        
+        mask = rasterize(clipdata, raster.info["cellwidth"], raster.info["cellheight"], bbox=bbox)
+
+        #print "mask", mask.bands[0].img, mask.info
+        #mask.bands[0].img.save("mask.png")
+        
+        # create blank image
+        newwidth,newheight = mask.bands[0].img.size
+        blank = PIL.Image.new(raster.bands[0].img.mode, (newwidth,newheight))
+
+        #print "blank",blank
+
+        # paste main raster onto blank image using rasterized as mask
+        raster,_posmask = raster.positioned(newwidth, newheight, mask.bbox)
+
+        #raster.bands[0].img.save("positioned.png")
+        #print "positioned",raster.bands[0].img,raster.info
+
+        blank.paste(raster.bands[0].img, (0,0), mask.bands[0].img)
+        pasted = blank
+
+        #print pasted
+        #pasted.save("testclip.png")
+
+        # make into raster
+        outrast = data.RasterData(image=pasted, **raster.info)
+        return outrast
+
+    elif isinstance(clipdata, raster.data.RasterData):
         # create blank image
         # paste raster onto blank image using clip raster as mask
         pass
