@@ -131,9 +131,17 @@ class VectorLayer:
 class RasterLayer:
     def __init__(self, data, **options):
         self.data = data
-        self.styleoptions = dict(**options)
         self.visible = True
         self.img = None
+
+        # by default, set random style color
+        rand = random.randrange
+        randomcolor = (rand(255), rand(255), rand(255), 255)
+        randomcolor2 = (rand(255), rand(255), rand(255), 255)
+        self.styleoptions = {"gradcolors": [randomcolor,randomcolor2]}
+            
+        # override default if any manually specified styleoptions
+        self.styleoptions.update(options)
 
     def render(self, width, height, coordspace_bbox):
         # position in space
@@ -143,7 +151,14 @@ class RasterLayer:
         if len(positioned.bands) == 1:
             # greyscale if one band
             band1 = positioned.bands[0]
-            img = band1.img.convert("RGB")
+            
+            # equalize and colorize
+            canv = pyagg.canvas.from_image(band1.img)
+            #canv.img = canv.img.convert("L")
+            #canv = canv.equalize()
+            canv = pyagg.canvas.from_image(canv.img.convert("RGBA"))
+            canv = canv.color_remap(self.styleoptions["gradcolors"])
+            img = canv.get_image()
         else:
             # rgb of first three bands
             bands = [band.img for band in positioned.bands[:3] ]

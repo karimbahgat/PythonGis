@@ -20,7 +20,9 @@ class Cell:
 
     @property
     def value(self):
-        return self.band.cells[self.col, self.row]
+        if not self.band._pixelaccess:
+            self.band._pixelaccess = self.img.load()
+        return self.band._pixelaccess[self.col, self.row]
 
     @property
     def neighbours(self):
@@ -36,9 +38,10 @@ class Cell:
         
 
 class Band:
-    def __init__(self, img, cells):
+    def __init__(self, img, nodataval=None):
         self.img = img
-        self.cells = cells
+        self.nodataval = nodataval
+        self._pixelaccess = None
 
     def __iter__(self):
         width,height = self.img.size
@@ -46,16 +49,60 @@ class Band:
             for col in range(width):
                 yield Cell(self,col,row)
             
+    @property
+    def width(self):
+        return self.img.size[0]
+
+    @property
+    def height(self):
+        return self.img.size[1]
+
+    @property
+    def mode(self):
+        return self.img.mode
+
     def get(self, col, row):
         return Cell(self, col, row)
 
     def set(self, col, row, value):
-        self.cells[col,row] = value
+        if not self._pixelaccess:
+            self._pixelaccess = self.img.load()
+        self._pixelaccess[col,row] = value
+
+    @getter
+    def mask(self):
+        if hasattr(self, "_cached_mask"):
+            return self._cached_mask
+
+        else:
+            nodata = self.nodataval
+            if nodata != None:
+                # mask out nodata
+                if self.mode in ("F","I"):
+                    # if 32bit float or int values, need to manually check each cell
+                    mask = PIL.Image.new("1", (self.width, self.height), 1)
+                    maskpx = mask.load()
+                    for col in xrange(self.width):
+                        for row in xrange(self.height):
+                            if self._pixelaccess[col,row] == nodata:
+                                maskpx[col,row] = 0
+                else:
+                    # use the much faster point method
+                    mask = self.img.point(lambda px: 1 if px != nodata else 0, "1")
+            else:
+                # EVEN IF NO NODATA, NEED TO CREATE ORIGINAL MASK,
+                # TO PREVENT INFINITE OUTSIDE BORDER AFTER GEOTRANSFORM
+                mask = PIL.Image.new("1", self.img.size, 1)
+            self._cached_mask = mask
+            return self._cached_mask
+
+    @setter
+    def mask(self, value):
+        self._cached_mask = value
 
     def copy(self):
         img = self.img.copy()
-        cells = img.load()
-        return Band(img, cells)
+        return Band(img)
 
 
 class RasterData:
@@ -63,21 +110,22 @@ class RasterData:
         self.filepath = filepath
         
         if filepath:
-            info, bands, crs = loader.from_file(filepath)
+            georef, nodataval, bands, crs = loader.from_file(filepath)
         elif data:
-            info, bands, crs = loader.from_lists(data, **kwargs)
+            georef, nodataval, bands, crs = loader.from_lists(data, **kwargs)
         elif image:
-            info, bands, crs = loader.from_image(image, **kwargs)
+            georef, nodataval, bands, crs = loader.from_image(image, **kwargs)
         else:
-            info, bands, crs = loader.new(**kwargs)
+            georef, nodataval, bands, crs = loader.new(**kwargs)
 
-        self.bands = [Band(img,cells) for img,cells in bands]
-
-        self.info = info
+        self.bands = [Band(img, nodataval=nodataval) for img in bands]
 
         self.crs = crs
 
-        self.update_geotransform()
+        self.set_geotransform(**georef["affine"])
+
+    def __len__(self):
+        return len(self.bands)
     
     def __iter__(self):
         for band in self.bands:
@@ -92,6 +140,24 @@ class RasterData:
         return self.bands[0].img.size[1]
 
     @property
+    def mode(self):
+        return self.bands[0].img.mode
+
+    @property
+    def nodatavals(self):
+        return [band.nodataval for band in self.bands]
+
+    @property
+    def meta(self):
+        metadict = dict(bands=len(self),
+                        mode=self.mode,
+                        width=self.width,
+                        height=self.height,
+                        nodatavals=self.nodatavals,
+                        affine=self.affine)
+        return metadict
+
+    @property
     def bbox(self):
         # get corner coordinates of raster
         xleft_coord,ytop_coord = self.cell_to_geo(0,0)
@@ -104,24 +170,40 @@ class RasterData:
         new._cached_mask = self.mask
         return new
 
-    def update_geotransform(self):
-        info = self.info
+    def add_band(self):
+        pass # ....
+
+    def set_geotransform(self, **georef):
         
         # get coefficients needed to convert from raster to geographic space
-        if info.get("transform_coeffs"):
+        if "affine" in georef:
             [xscale, xskew, xoffset,
-             yskew, yscale, yoffset] = info["transform_coeffs"]
+             yskew, yscale, yoffset] = info["affine"]
         else:
-            xcell,ycell = info["xy_cell"]
-            xgeo,ygeo = info["xy_geo"]
+            xcell,ycell = georef["xy_cell"]
+            xgeo,ygeo = georef["xy_geo"]
             xoffset,yoffset = xgeo - xcell, ygeo - ycell
-            xscale,yscale = info["cellwidth"], info["cellheight"] 
+            xscale,yscale = georef["cellwidth"], georef["cellheight"] 
             xskew,yskew = 0,0
-        self.transform_coeffs = [xscale, xskew, xoffset, yskew, yscale, yoffset]
+
+        # offset cell anchor to the center # NOT YET TESTED
+        cell_anchor = georef["cell_anchor"]
+        if cell_anchor == "center":
+            pass
+        elif "n" in cell_anchor:
+            yoffset -= cellheight/2.0
+        elif "s" in cell_anchor:
+            yoffset += cellheight/2.0
+        elif "w" in cell_anchor:
+            xoffset -= cellwidth/2.0
+        elif "e" in cell_anchor:
+            xoffset += cellwidth/2.0
+            
+        self.affine = [xscale, xskew, xoffset, yskew, yscale, yoffset]
 
         # and the inverse coefficients to go from geographic space to raster
         # taken from Sean Gillies' "affine.py"
-        a,b,c,d,e,f = self.transform_coeffs
+        a,b,c,d,e,f = self.affine
         det = a*e - b*d
         if det != 0:
             idet = 1 / float(det)
@@ -131,20 +213,20 @@ class RasterData:
             re = a * idet
             a,b,c,d,e,f = (ra, rb, -c*ra - f*rb,
                            rd, re, -c*rd - f*re)
-            self.inv_transform_coeffs = a,b,c,d,e,f
+            self.inv_affine = a,b,c,d,e,f
         else:
             raise Exception("Error with the transform matrix, \
                             a raster should not collapse upon itself")
 
     def cell_to_geo(self, column, row):
-        [xscale, xskew, xoffset, yskew, yscale, yoffset] = self.transform_coeffs
+        [xscale, xskew, xoffset, yskew, yscale, yoffset] = self.affine
         x, y = column, row
         x_coord = x*xscale + y*xskew + xoffset
         y_coord = x*yskew + y*yscale + yoffset
         return x_coord, y_coord
 
     def geo_to_cell(self, x, y, fraction=False):
-        [xscale, xskew, xoffset, yskew, yscale, yoffset] = self.inv_transform_coeffs
+        [xscale, xskew, xoffset, yskew, yscale, yoffset] = self.inv_affine
         column = x*xscale + y*xskew + xoffset
         row = x*yskew + y*yscale + yoffset
         if not fraction:
@@ -152,42 +234,26 @@ class RasterData:
             column,row = int(round(column)), int(round(row))
         return column,row
 
-    @property
+    @getter
     def mask(self):
         if hasattr(self, "_cached_mask"):
             return self._cached_mask
 
         else:
-            nodata = self.info.get("nodata_value")
-            if nodata != None:
-                # mask out nodata
-                if self.bands[0].img.mode in ("F","I"):
-                    # if 32bit float or int values, need to manually check each cell
-                    mask = PIL.Image.new("1", (self.width, self.height), 1)
-                    px = mask.load()
-                    for col in xrange(self.width):
-                        for row in xrange(self.height):
-                            value = (band.cells[col,row] for band in self.bands)
-                            # mask out only where all bands have nodata value
-                            if all((val == nodata for val in value)):
-                                px[col,row] = 0
-                else:
-                    # use the much faster point method
-                    masks = []
-                    for band in self.bands:
-                        mask = band.img.point(lambda px: 1 if px != nodata else 0, "1")
-                        masks.append(mask)
-                    # mask out where all bands have nodata value
-                    masks_namedict = dict([("mask%i"%i, mask) for i,mask in enumerate(masks) ])
-                    expr = " & ".join(masks_namedict.keys())
-                    mask = PIL.ImageMath.eval(expr, **masks_namedict).convert("1")
-            else:
-                # EVEN IF NO NODATA, NEED TO CREATE ORIGINAL MASK,
-                # TO PREVENT INFINITE OUTSIDE BORDER AFTER GEOTRANSFORM
-                nodata = 0
-                mask = PIL.Image.new("1", self.bands[0].img.size, 1)
+            if len(self) == 1:
+                mask = self.bands[0].mask
+            elif len(self) > 1:
+                # mask out where all bands have nodata value
+                masks_namedict = dict([("mask%i"%i, band.mask) for i,band in enumerate(band) ])
+                expr = " & ".join(masks_namedict.keys())
+                mask = PIL.ImageMath.eval(expr, **masks_namedict).convert("1")
+
             self._cached_mask = mask
             return self._cached_mask
+
+    @setter
+    def mask(self, value):
+        self._cached_mask = value
 
     def positioned(self, width, height, coordspace_bbox):
         # GET COORDS OF ALL 4 VIEW SCREEN CORNERS
@@ -202,10 +268,8 @@ class RasterData:
         flattened = [xory for point in viewcorners_pixels for xory in point]
         newraster = self.copy()
 
-        mask = self.mask
-
-        # make mask over 
-        masktrans = mask.transform((width,height), PIL.Image.QUAD,
+        # make mask over
+        self.mask = self.mask.transform((width,height), PIL.Image.QUAD,
                             flattened, resample=PIL.Image.NEAREST)
         
         for band in newraster.bands:
@@ -213,11 +277,10 @@ class RasterData:
                                 flattened, resample=PIL.Image.NEAREST)
             trans = PIL.Image.new(datatrans.mode, datatrans.size)
             trans.paste(datatrans, (0,0), masktrans)
-            # store image and cells
+            # store image
             band.img = trans
-            band.cells = band.img.load()
 
-        return newraster,masktrans  # TODO: WHY NOT JUST SET MASKTRANS AS NEWRASTER'S ._cached_mask?
+        return newraster 
 
     def save(self, filepath):
         saver.to_file(self.bands, self.info, filepath)
