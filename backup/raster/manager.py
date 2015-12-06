@@ -235,3 +235,24 @@ def clip(raster, clipdata, bbox=None):
         # paste raster onto blank image using clip raster as mask
         pass
 
+def render(raster):   # PUT INTO render.py
+    # equalize and colorize
+    canv = pyagg.canvas.from_image(raster.bands[0].img)
+    canv.img = canv.img.convert("L")
+    canv = canv.equalize()
+    canv = pyagg.canvas.from_image(canv.img.convert("RGBA"))
+    canv = canv.color_remap([(0,0,55),
+                             (255,255,0)
+                             ])
+
+    # draw country outline
+    x1,y1,x2,y2 = syria.bbox
+    canv.custom_space(x1,y2,x2,y1)
+    canv.draw_geojson(syria.get_shapely(), fillcolor=None, outlinecolor=(255,0,0), outlinewidth="5px")
+
+    # title
+    canv.percent_space()
+    canv.draw_text(filename, xy=(50,5), fillcolor=(255,255,255))
+
+    # yield
+    return canv
