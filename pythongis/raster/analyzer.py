@@ -96,6 +96,10 @@ def math(mathexpr, rasters):
     outraster = RasterData(image=img, **firstrast.info)
     return outraster
 
+# Interpolation
 
+def interpolate(pointdata, rasterdef, algorithm="IDW"):
+    pass
 
-
+def heatmap(**kwargs):
+    return interpolate(**kwargs)

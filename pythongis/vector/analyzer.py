@@ -66,9 +66,12 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[]):
                 if aggtype in ("sum","max","min","average"):
                     # only consider number values if numeric stats
                     values = [make_number(value) for value in values if make_number(value) != None]
-                aggregatefunc = aggfunctions[aggtype]
-                summaryvalue = aggregatefunc(values)
-                newrow.append(summaryvalue)
+                if values:
+                    aggregatefunc = aggfunctions[aggtype]
+                    summaryvalue = aggregatefunc(values)
+                    newrow.append(summaryvalue)
+                else:
+                    newrow.append("")
 
         # otherwise, add empty values
         else:

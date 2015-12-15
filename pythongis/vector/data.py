@@ -55,6 +55,13 @@ class Feature:
         self.row[i] = setvalue
 
     @property
+    def __geo_interface__(self):
+        return dict(type="Feature",
+                    geometry=self.geometry,
+                    properties=dict(zip(self._data.fields,self.row))
+                    )
+
+    @property
     def bbox(self):
         if not self._cached_bbox:
             geotype = self.geometry["type"]
