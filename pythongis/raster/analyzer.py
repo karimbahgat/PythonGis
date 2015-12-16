@@ -102,4 +102,10 @@ def interpolate(pointdata, rasterdef, algorithm="IDW"):
     pass
 
 def heatmap(**kwargs):
+    # some links
+    #http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.interpolate.RegularGridInterpolator.html
+    #https://github.com/JohannesBuchner/regulargrid
+    #http://stackoverflow.com/questions/24978052/interpolation-over-regular-grid-in-python
+    #http://www.qgistutorials.com/en/docs/creating_heatmaps.html
+    
     return interpolate(**kwargs)
