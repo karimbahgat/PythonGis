@@ -38,11 +38,14 @@ class Cell(object):
         
 
 class Band(object):
-    def __init__(self, img=None, mode=None, width=None, height=None, nodataval=None):
+    def __init__(self, img=None, mode=None, width=None, height=None, nodataval=-9999):
         """Only used internally, use instead RasterData's .add_band()"""
 
         if not img:
-            img = PIL.Image.new(mode, (width, height))
+            if all((mode,width,height)):
+                img = PIL.Image.new(mode, (width, height))
+            else:
+                raise Exception("Mode, width, and height must be specified when creating a new empty band from scratch")
         
         self.img = img
 
@@ -87,9 +90,9 @@ class Band(object):
     @nodataval.setter
     def nodataval(self, nodataval):
         if nodataval != None:
-            if img.mode == "I":
+            if self.img.mode == "I":
                 self._nodataval = int(nodataval)
-            elif img.mode == "F":
+            elif self.img.mode == "F":
                 self._nodataval = float(nodataval)
         else:
             self._nodataval = nodataval
@@ -255,7 +258,7 @@ class Band(object):
 
 class RasterData(object):
     def __init__(self, filepath=None, data=None, image=None,
-                 bbox=None, tilesize=None, tiles=None,
+                 bbox=None, mode=None, tilesize=None, tiles=None,
                  **kwargs):
         self.filepath = filepath
 
@@ -277,7 +280,10 @@ class RasterData(object):
         else:
             self.width = kwargs["width"]
             self.height = kwargs["height"]
-            self.mode = kwargs["mode"]
+            if mode:
+                self.mode = mode
+            else:
+                raise Exception("A mode must be specified when creating a new empty raster from scratch")
 
         # only extract subdata from specified colrow bbox (EXPERIMENTAL)
         # NOT DONE: should be more flexible incl via coordbbox, and updating geotransform after
@@ -340,11 +346,13 @@ class RasterData(object):
         """
         if band:
             pass
-        elif kwargs:
-            band = Band(**kwargs)
         else:
-            band = Band(mode=self.mode, width=self.width, height=self.height, nodataval=self.nodataval)
-
+            defaultargs = dict(mode=self.mode,
+                               width=self.width,
+                               height=self.height)
+            defaultargs.update(kwargs)
+            band = Band(**defaultargs)
+            
         # check constraints
         if not band.width == self.width or not band.height == self.height:
             raise Exception("Added band must have the same dimensions as the raster dataset")

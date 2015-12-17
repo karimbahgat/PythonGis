@@ -98,8 +98,40 @@ def math(mathexpr, rasters):
 
 # Interpolation
 
-def interpolate(pointdata, rasterdef, algorithm="IDW"):
-    pass
+def interpolate(pointdata, rasterdef, valuefield=None, algorithm="IDW"):
+    if algorithm.lower() == "idw":
+        dsafda
+        
+    elif algorithm.lower() == "gauss":
+        # create output raster
+        raster = RasterData(**rasterdef)
+        raster.add_band() # add empty band
+        band = raster.bands[0]
+        
+        # collect counts or sum field values
+        for feat in pointdata:
+            x,y = feat.geometry["coordinates"]
+            px,py = raster.geo_to_cell(x,y)
+            #print x,y,px,py
+            val = feat[valuefield] if valuefield else 1
+            oldval = band.get(px,py).value
+            if oldval != band.nodataval:
+                band.set(px,py, oldval+val)
+
+        # apply gaussian filter
+        import PIL, PIL.ImageOps
+        print band.img.getextrema()
+        band.img = band.img.point(lambda px: px*51)
+        print band.img.getextrema()
+        band.img.show()
+        import PIL, PIL.ImageFilter
+        filt = PIL.ImageFilter.GaussianBlur() # TODO allow setting the radius
+        # hmm, filter doesnt work on I or F images. 
+        band.img = band.img.convert("L")
+        band.img = band.img.filter(filt)
+        print band.img.getextrema()
+
+    return raster
 
 def heatmap(**kwargs):
     # some links
@@ -107,5 +139,7 @@ def heatmap(**kwargs):
     #https://github.com/JohannesBuchner/regulargrid
     #http://stackoverflow.com/questions/24978052/interpolation-over-regular-grid-in-python
     #http://www.qgistutorials.com/en/docs/creating_heatmaps.html
+
+    #see especially: http://resources.arcgis.com/en/help/main/10.1/index.html#//009z0000000v000000
     
     return interpolate(**kwargs)
