@@ -24,6 +24,12 @@ class Cell(object):
             self.band._pixelaccess = self.band.img.load()
         return self.band._pixelaccess[self.col, self.row]
 
+    @value.setter
+    def value(self, newval):
+        if not self.band._pixelaccess:
+            self.band._pixelaccess = self.band.img.load()
+        self.band._pixelaccess[self.col, self.row] = newval
+
     @property
     def neighbours(self):
         nw = Cell(self.band, self.col - 1, self.row + 1)
@@ -54,7 +60,7 @@ class Band(object):
             # maybe force convert L mode to I...?
             # ...
             raise Exception("Invalid band mode")
-                
+
         self.nodataval = nodataval
         self._pixelaccess = None
         self._cached_mask = None
@@ -90,7 +96,7 @@ class Band(object):
     @nodataval.setter
     def nodataval(self, nodataval):
         if nodataval != None:
-            if self.img.mode == "I":
+            if self.img.mode in ("I","1"):
                 self._nodataval = int(nodataval)
             elif self.img.mode == "F":
                 self._nodataval = float(nodataval)
@@ -149,7 +155,7 @@ class Band(object):
         if self.nodataval != None:
             self.img.paste(self.nodataval, (0,0), mask)
 
-    def reclassify(self, condition, newval):
+    def recode(self, condition, newval):
         """Change to a new value for those pixels that meet a condition"""
         if self.mode in ("F","I"):
             wheretrue = self.conditional(condition)
@@ -248,23 +254,25 @@ class Band(object):
 
     def convert(self, mode):
         self.img = self.img.convert(mode)
+        self._pixelaccess = None
 
     def copy(self):
         img = self.img.copy()
         band = Band(img=img, nodataval=self.nodataval)
-        band._cached_mask = self._cached_mask
+        if self._cached_mask:
+            band._cached_mask = self._cached_mask.copy()
         return band
 
 
 class RasterData(object):
     def __init__(self, filepath=None, data=None, image=None,
-                 bbox=None, mode=None, tilesize=None, tiles=None,
+                 mode=None, tilesize=None, tiles=None,
                  **kwargs):
         self.filepath = filepath
 
         # load
         if filepath:
-            georef, nodataval, bands, crs = loader.from_file(filepath)
+            georef, nodataval, bands, crs = loader.from_file(filepath, **kwargs)
         elif data:
             georef, nodataval, bands, crs = loader.from_lists(data, **kwargs)
         elif image:
@@ -287,11 +295,12 @@ class RasterData(object):
 
         # only extract subdata from specified colrow bbox (EXPERIMENTAL)
         # NOT DONE: should be more flexible incl via coordbbox, and updating geotransform after
-        if bbox:
-            bands = [img.crop(bbox) for img in bands]
+        #if bbox:
+        #    bands = [img.crop(bbox) for img in bands]
 
         # fix mode
-        if self.mode not in ("F","I"):
+        if self.mode not in ("F","I","1"):
+            # need to convert based on .getextrema()
             bands = [img.convert("I") for img in bands]
             self.mode = "I"
 
@@ -430,10 +439,12 @@ class RasterData(object):
     def mask(self, value):
         self._cached_mask = value
 
-    def positioned(self, width, height, coordspace_bbox):
+    def positioned(self, width, height, coordspace_bbox=None):
         """Positions all bands of the raster in space, relative to the specified geowindow"""
         # NOTE: Not sure if should move to resample() or warp() in manager.py
         # ...
+        if not coordspace_bbox:
+            coordspace_bbox = self.bbox
         
         # GET COORDS OF ALL 4 VIEW SCREEN CORNERS
         xleft,ytop,xright,ybottom = coordspace_bbox
@@ -445,21 +456,20 @@ class RasterData(object):
         # ON RASTER, PERFORM QUAD TRANSFORM
         #(FROM VIEW SCREEN COORD CORNERS IN PIXELS TO RASTER COORD CORNERS IN PIXELS)
         flattened = [xory for point in viewcorners_pixels for xory in point]
-        newraster = self.copy()
+        newraster = RasterData(mode=self.mode, width=width, height=height, bbox=coordspace_bbox)
 
         # make mask over
         masktrans = self.mask.transform((width,height), PIL.Image.QUAD,
                             flattened, resample=PIL.Image.NEAREST)
         
-        for band in newraster.bands:
+        for band in self.bands:
             datatrans = band.img.transform((width,height), PIL.Image.QUAD,
                                 flattened, resample=PIL.Image.NEAREST)
             #if mask
             if band.nodataval != None:
                 datatrans.paste(band.nodataval, (0,0), masktrans) 
             # store image
-            band.img = datatrans
-            band.mask = masktrans
+            newraster.add_band(img=datatrans)
 
         return newraster
 

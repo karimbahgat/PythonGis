@@ -135,37 +135,94 @@ class RasterLayer:
         self.img = None
 
         # by default, set random style color
-        rand = random.randrange
-        randomcolor = (rand(255), rand(255), rand(255), 255)
-        randomcolor2 = (rand(255), rand(255), rand(255), 255)
-        self.styleoptions = {"gradcolors": [randomcolor,randomcolor2]}
-            
-        # override default if any manually specified styleoptions
-        self.styleoptions.update(options)
+        if not "type" in options:
+            options["type"] = "colorscale"
 
-    def render(self, width, height, coordspace_bbox):
+        if options["type"] == "grayscale":
+            options["bandnum"] = options.get("bandnum", 0)
+            band = self.data.bands[options["bandnum"]]
+            
+            # retrieve min and maxvals from data
+            minval,maxval = band.img.getextrema()
+            
+            # but only use if not manually specified
+            if not "minval" in options:
+                options["minval"] = minval
+            if not "maxval" in options:
+                options["maxval"] = minval
+
+        elif options["type"] == "colorscale":
+            options["bandnum"] = options.get("bandnum", 0)
+            band = self.data.bands[options["bandnum"]]
+            
+            # retrieve min and maxvals from data
+            minval,maxval = band.img.getextrema()
+            
+            # but only use if not manually specified
+            if not "minval" in options:
+                options["minval"] = minval
+            if not "maxval" in options:
+                options["maxval"] = minval
+
+            # set random gradient
+            if not "gradcolors" in options:
+                rand = random.randrange
+                randomcolor = (rand(255), rand(255), rand(255), 255)
+                randomcolor2 = (rand(255), rand(255), rand(255), 255)
+                options["gradcolors"] = [randomcolor,randomcolor2]
+
+        elif options["type"] == "rgb":
+            options["r"] = options.get("r", 0)
+            options["g"] = options.get("g", 1)
+            options["b"] = options.get("b", 2)
+            
+        # remember style settings
+        self.styleoptions = options
+
+    def render(self, width, height, coordspace_bbox=None):
+        # NOT DONE...
         # position in space
-        positioned,mask = self.data.positioned(width, height, coordspace_bbox)
+        positioned = self.data.positioned(width, height, coordspace_bbox)
 
-        # combine all data bands into one image for visualizing
-        if len(positioned.bands) == 1:
-            # greyscale if one band
-            band1 = positioned.bands[0]
+        if self.styleoptions["type"] == "grayscale":
+            band = positioned.bands[self.styleoptions["bandnum"]]
             
-            # equalize and colorize
-            canv = pyagg.canvas.from_image(band1.img)
-            #canv.img = canv.img.convert("L")
-            #canv = canv.equalize()
-            canv = pyagg.canvas.from_image(canv.img.convert("RGBA"))
+            # equalize
+            #minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
+            #valrange = 1/float(maxval-minval)
+            img = band.img #.point(lambda px: (px - minval) * valrange * 255)
+            # colorize
+            img = img.convert("LA")
+
+        elif self.styleoptions["type"] == "colorscale":
+            band = positioned.bands[self.styleoptions["bandnum"]]
+            
+            # equalize
+            #minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
+            #valrange = 1/float(maxval-minval)
+            img = band.img #.point(lambda px: (px - minval) * valrange * 255)
+            # colorize
+            canv = pyagg.canvas.from_image(img.convert("RGBA"))
             canv = canv.color_remap(self.styleoptions["gradcolors"])
             img = canv.get_image()
-        else:
-            # rgb of first three bands
-            bands = [band.img for band in positioned.bands[:3] ]
-            img = PIL.Image.merge("RGB", bands)
+
+        elif self.styleoptions["type"] == "rgb":
+            rband = positioned.bands[self.styleoptions["r"]].img.convert("L")
+            gband = positioned.bands[self.styleoptions["g"]].img.convert("L")
+            bband = positioned.bands[self.styleoptions["b"]].img.convert("L")
+            img = PIL.Image.merge("RGB", [rband,gband,bband])
+            img = img.convert("RGBA")
 
         # make edge and nodata mask transparent
-        img.putalpha(mask)
+        #blank = PIL.Image.new("RGBA", img.size, None)
+        #blank.paste(img, mask=positioned.mask)
+        #img = blank
+        #r,g,b = img.split()[:3]
+        #a = positioned.mask.convert("L")
+        #rgba = (r,g,b,a)
+        #img = PIL.Image.merge("RGBA", rgba)
+        img.paste(0, mask=positioned.mask)
+        #img.putalpha(positioned.mask)
 
         # final
         self.img = img

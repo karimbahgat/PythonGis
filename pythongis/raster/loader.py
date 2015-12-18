@@ -6,7 +6,7 @@ import sys, os, itertools, operator
 import PIL.Image
 
 
-def from_file(filepath):
+def from_file(filepath, **georef):
 
     def check_world_file(filepath):
         worldfilepath = None
@@ -236,25 +236,34 @@ def from_file(filepath):
 
     elif filepath.lower().endswith((".jpg",".jpeg",".png",".bmp",".gif")):
         
-        # pure image, so only read if has a world file
-        meta = dict()
-        transform_coeffs = check_world_file(filepath)
-        if transform_coeffs:
-            # rearrange the param sequence to match affine transform
-            [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
-            meta["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
-            
-            # group image bands into band tuples
-            bands = [im for im in main_img.split()]
+        # pure image, so needs either manual georef args, or a world file
+        main_img = PIL.Image.open(filepath)
+        if "affine" in georef:
+            pass
 
-            # read crs
-            # normal images have no crs, so just assume default crs
-            crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
-
-            return meta, bands, crs
-
+        elif len(georef) >= 3:
+            georef["affine"] = compute_affine(**georef)
+        
         else:
-            raise Exception("Couldn't find the world file needed to position the image in space")
+            transform_coeffs = check_world_file(filepath)
+            if transform_coeffs:
+                # rearrange the param sequence to match affine transform
+                [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
+                georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
+            else:
+                raise Exception("Couldn't find the world file nor the manual georef options needed to position the image in space")
+                
+        # group image bands into band tuples
+        bands = [im for im in main_img.split()]
+
+        # nodataval
+        nodataval = None
+
+        # read crs
+        # normal images have no crs, so just assume default crs
+        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+
+        return georef, nodataval, bands, crs
     
     else:
 
@@ -269,7 +278,7 @@ def from_image(image, nodataval=-9999.0, crs=None, **georef):
 
     if "affine" in georef:
         pass
-    elif len(georef) >= 4:
+    elif len(georef) >= 3:
         georef["affine"] = compute_affine(**georef)
     else:
         raise Exception("To make a new raster from scratch, you must specify either all of xy_cell, xy_geo, cellwidth, cellheight, or the transform coefficients")
@@ -281,11 +290,11 @@ def from_image(image, nodataval=-9999.0, crs=None, **georef):
     
     return georef, nodataval, bands, crs
         
-def new(width, height, nodataval=-9999.0, crs=None, **georef):
+def new(nodataval=-9999.0, crs=None, **georef):
 
     if "affine" in georef:
         pass
-    elif len(georef) >= 4:
+    elif len(georef) >= 3:
         georef["affine"] = compute_affine(**georef)
     else:
         raise Exception("To make a new raster from scratch, you must specify either all of xy_cell, xy_geo, cellwidth, cellheight, or the transform coefficients")
@@ -297,11 +306,25 @@ def new(width, height, nodataval=-9999.0, crs=None, **georef):
         
     return georef, nodataval, bands, crs
 
-def compute_affine(xy_cell, xy_geo, cellwidth, cellheight,
+def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
+                   width=None, height=None, bbox=None,
                    cell_anchor="center"):
 
     # TODO: Allow affine set via xscale etc dict
     
+    # auto calculate if necessary
+    if not all((xy_cell,xy_geo,cellwidth,cellheight)):
+        if all((width,height,bbox)):
+            x1,y1,x2,y2 = bbox
+            xwidth,yheight = x2-x1,y2-y1
+            # set
+            xy_cell = (0,0)
+            xy_geo = x1,y1
+            cellwidth = xwidth / float(width)
+            cellheight = yheight / float(height)
+        else:
+            raise Exception("Georef affine can only be computed if given (xy_cell,xy_geo,cellwidth,cellheight) or (width,height,bbox)")
+
     # get coefficients needed to convert from raster to geographic space
     xcell,ycell = xy_cell
     xgeo,ygeo = xy_geo
