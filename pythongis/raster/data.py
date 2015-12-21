@@ -49,19 +49,14 @@ class Band(object):
 
         if not img:
             if all((mode,width,height)):
-                img = PIL.Image.new(mode, (width, height))
+                pilmode = rastmode_to_pilmode(mode)
+                img = PIL.Image.new(pilmode, (width, height))
             else:
                 raise Exception("Mode, width, and height must be specified when creating a new empty band from scratch")
         
         self.img = img
 
-        # fix mode
-        if img.mode not in ("F","I","1"):
-            # maybe force convert L mode to I...?
-            # ...
-            raise Exception("Invalid band mode")
-
-        self.nodataval = nodataval
+        self.nodataval = nodataval # calls on the setter method
         self._pixelaccess = None
         self._cached_mask = None
 
@@ -87,7 +82,7 @@ class Band(object):
 
     @property
     def mode(self):
-        return self.img.mode
+        return pilmode_to_rastmode(self.img.mode)
 
     @property
     def nodataval(self):
@@ -96,9 +91,11 @@ class Band(object):
     @nodataval.setter
     def nodataval(self, nodataval):
         if nodataval != None:
-            if self.img.mode in ("I","1"):
+            if self.mode == "1bit":
                 self._nodataval = int(nodataval)
-            elif self.img.mode == "F":
+            elif self.mode.startswith("int"):
+                self._nodataval = int(nodataval)
+            elif self.mode.startswith("float"):
                 self._nodataval = float(nodataval)
         else:
             self._nodataval = nodataval
@@ -253,7 +250,8 @@ class Band(object):
             raise Exception("Not supported for this format")
 
     def convert(self, mode):
-        self.img = self.img.convert(mode)
+        pilmode = rastmode_to_pilmode(mode)
+        self.img = self.img.convert(pilmode)
         self._pixelaccess = None
 
     def copy(self):
@@ -283,26 +281,40 @@ class RasterData(object):
         # determine dimensions
         if any((filepath,data,image)):
             self.width, self.height = bands[0].size
-            self.mode = bands[0].mode
+            self.mode = pilmode_to_rastmode(bands[0].mode)
 
         else:
+            # auto set width of new raster based on georef if needed
+            if "width" not in kwargs:
+                if "bbox" in kwargs and "xscale" in kwargs:
+                    xwidth = kwargs["bbox"][2] - kwargs["bbox"][0]
+                    kwargs["width"] = int(round( xwidth / float(kwargs["xscale"]) ))
+                    # adjust bbox based on rounded width
+                    x1,y1,x2,y2 = kwargs["bbox"]
+                    xwidth = kwargs["xscale"] * kwargs["width"]
+                    kwargs["bbox"] = x1,y1,x1+xwidth,y2
+                else:
+                    raise Exception("Either the raster width or a bbox and xscale must be set")
+
+            # auto set height of new raster based on georef if needed
+            if "height" not in kwargs:
+                if "bbox" in kwargs and "yscale" in kwargs:
+                    yheight = kwargs["bbox"][3] - kwargs["bbox"][1]
+                    kwargs["height"] = int(round( yheight / float(kwargs["yscale"]) ))
+                    # adjust bbox based on rounded width
+                    x1,y1,x2,y2 = kwargs["bbox"]
+                    yheight = kwargs["yscale"] * kwargs["height"]
+                    kwargs["bbox"] = x1,y1,x2,y1+yheight
+                else:
+                    raise Exception("Either the raster height or a bbox and yscale must be set")
+
+            # set the rest
             self.width = kwargs["width"]
             self.height = kwargs["height"]
             if mode:
                 self.mode = mode
             else:
                 raise Exception("A mode must be specified when creating a new empty raster from scratch")
-
-        # only extract subdata from specified colrow bbox (EXPERIMENTAL)
-        # NOT DONE: should be more flexible incl via coordbbox, and updating geotransform after
-        #if bbox:
-        #    bands = [img.crop(bbox) for img in bands]
-
-        # fix mode
-        if self.mode not in ("F","I","1"):
-            # need to convert based on .getextrema()
-            bands = [img.convert("I") for img in bands]
-            self.mode = "I"
 
         self.bands = [Band(img, nodataval=nodataval) for img in bands]
         self._cached_mask = None
@@ -367,7 +379,7 @@ class RasterData(object):
             raise Exception("Added band must have the same dimensions as the raster dataset")
 
         elif band.mode != self.mode:
-            raise Exception("Added band must have the mode as the raster dataset")
+            raise Exception("Added band must have the same mode as the raster dataset")
 
         self.bands.append(band)
 
@@ -482,5 +494,30 @@ class RasterData(object):
         saver.to_file(self.bands, self.meta, filepath)
 
 
+def pilmode_to_rastmode(mode):
+    rastmode = {"1":"1bit",
+                
+                "L":"int8",
+                "P":"int8",
+                
+                "I:16":"int16",
+                "I":"int32",
+                
+                "F:16":"float16",
+                "F":"float32"}[mode]
+    
+    return rastmode
 
-        
+def rastmode_to_pilmode(mode):
+    pilmode = {"1bit":"1",
+                
+                "int8":"L",
+                "int8":"L",
+                
+                "int16":"I:16",
+                "int32":"I",
+                
+                "float16":"F:16",
+                "float32":"F"}[mode]
+    
+    return pilmode

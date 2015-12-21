@@ -108,11 +108,25 @@ import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 ##        
 ##    return merged
 
-def resample(raster, rasterdef=None, algorithm="nearest"):
+def reproject(raster, rasterdef=None, algorithm="nearest"):
     algocode = {"nearest":PIL.Image.NEAREST,
                 }[algorithm.lower()]
     
     if rasterdef:
+
+
+        # wrong approach
+        # instead:
+        # for each target cell
+        #   get coord using the target's affine transform
+        #   use the source raster's inv affine transform to find matching target pixel
+        # or:
+        #   use pil's affine transform imgs with no manual python??
+        # or:
+        #   use pil's coordsequence, apply batch affine transform to coords
+        #   and then set each target pixel by mapping to source pixel
+
+        
         rasterdef["mode"] = raster.mode
         newrast = data.RasterData(**rasterdef)
         width,height = newrast.width, newrast.height
@@ -123,7 +137,6 @@ def resample(raster, rasterdef=None, algorithm="nearest"):
         xscale2,xskew2,xoffset2,yskew2,yscale2,yoffset2 = newrast.affine
         affinediff = [xscale2*xscale1, xskew1-xskew2, xoffset2-xoffset1,
                       yskew1-yskew2, yscale2*yscale1, yoffset1-yoffset2]
-        print affinediff
 
         # perform affine transform on each old band, and add to new
         for band in raster:
@@ -132,6 +145,10 @@ def resample(raster, rasterdef=None, algorithm="nearest"):
             newrast.add_band(img=trans)
 
         return newrast
+
+def resample(**kwargs):
+    # alias for reproject
+    return reproject(**kwargs)
 
 def rasterize(vectordata, cellwidth, cellheight, bbox=None, **options):
     # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION

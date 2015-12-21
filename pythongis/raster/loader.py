@@ -49,6 +49,8 @@ def from_file(filepath, **georef):
             return [xscale,yskew,xskew,yscale,xoff,yoff]
 
     if filepath.lower().endswith((".asc",".ascii")):
+        georef_orig = georef.copy()
+        
         with open(filepath) as tempfile:
             ### Step 1: check header for file georef
             georef = dict()
@@ -123,26 +125,32 @@ def from_file(filepath, **georef):
             reshaped = itertools.izip(*grouper(data, cols))
             data = [cell for row in reshaped for cell in row]
 
-        meta = dict()
+        georef = dict()
 
         # Build geotransform
-        # worldfile geotransform takes priority over file params
-        transform_coeffs = check_world_file(filepath)
-        if transform_coeffs:
-            # rearrange the world file param sequence to match affine transform
-            xscale,yskew,xskew,yscale,xoff,yoff = transform_coeffs
-            meta["affine"] = xscale,xskew,xoff,yskew,yscale,yoff
-        elif len(georef) >= 4:
-            meta["affine"] = compute_affine(**georef)
-        else:
-            raise Exception("Couldn't find the world file or other georef parameters needed to position the image in space")
+        try:
+            # first try manual override georef options
+            georef["affine"] = compute_affine(**georef_orig)
+        except:
+            # worldfile geotransform takes priority over file params
+            transform_coeffs = check_world_file(filepath)
+            if transform_coeffs:
+                # rearrange the world file param sequence to match affine transform
+                xscale,yskew,xskew,yscale,xoff,yoff = transform_coeffs
+                georef["affine"] = xscale,xskew,xoff,yskew,yscale,yoff
+            else:
+                # finally try file georef params
+                try:
+                    georef["affine"] = compute_affine(**georef)
+                except:
+                    raise Exception("Couldn't find the manual georef options, world file, or file georef parameters needed to position the image in space")
 
         # Read coordinate ref system
         # esri ascii doesnt have any crs so assume default
         crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
 
         # Nodata value
-        meta["nodataval"] = nodata
+        nodataval = nodata
         
         # load the data as an image
         tempfile.close()
@@ -151,7 +159,7 @@ def from_file(filepath, **georef):
         # make a single-band tuple
         bands = [img]
 
-        return meta, bands, crs
+        return georef, nodataval, bands, crs
 
     elif filepath.lower().endswith((".tif",".tiff",".geotiff")):
         main_img = PIL.Image.open(filepath)
@@ -208,20 +216,23 @@ def from_file(filepath, **georef):
             return crs
 
         # read geotiff georef tags
-        georef = read_georef(raw_tags)
-        if "affine" in georef:
-            pass
-        elif len(georef) >= 4:
+        try:
+            # override with manual georef options
             georef["affine"] = compute_affine(**georef)
-        else:
-            # if no geotiff tag info look for world file transform coefficients
-            transform_coeffs = check_world_file(filepath)
-            if transform_coeffs:
-                # rearrange the world file param sequence to match affine transform
-                [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
-                georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
-            else:
-                raise Exception("Couldn't find any geotiff tags or world file needed to position the image in space")
+        except:
+            try:
+                # use georef from file tags
+                georef = read_georef(raw_tags)
+                georef["affine"] = compute_affine(**georef)
+            except:
+                # if no geotiff tag info look for world file transform coefficients
+                transform_coeffs = check_world_file(filepath)
+                if transform_coeffs:
+                    # rearrange the world file param sequence to match affine transform
+                    [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
+                    georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
+                else:
+                    raise Exception("Couldn't find any georef options, geotiff tags, or world file needed to position the image in space")
 
         # read nodata
         nodataval = read_nodata(raw_tags)
@@ -238,13 +249,10 @@ def from_file(filepath, **georef):
         
         # pure image, so needs either manual georef args, or a world file
         main_img = PIL.Image.open(filepath)
-        if "affine" in georef:
-            pass
-
-        elif len(georef) >= 3:
+        try:
             georef["affine"] = compute_affine(**georef)
         
-        else:
+        except:
             transform_coeffs = check_world_file(filepath)
             if transform_coeffs:
                 # rearrange the param sequence to match affine transform
@@ -271,17 +279,15 @@ def from_file(filepath, **georef):
 
 
 def from_lists(data, nodataval=-9999.0, cell_anchor="center", **geoargs):
-    pass
+    raise Exception("Not yet implemented")
 
 
 def from_image(image, nodataval=-9999.0, crs=None, **georef):
 
     if "affine" in georef:
         pass
-    elif len(georef) >= 3:
-        georef["affine"] = compute_affine(**georef)
     else:
-        raise Exception("To make a new raster from scratch, you must specify either all of xy_cell, xy_geo, cellwidth, cellheight, or the transform coefficients")
+        georef["affine"] = compute_affine(**georef)
 
     if not crs:
         crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
@@ -294,10 +300,8 @@ def new(nodataval=-9999.0, crs=None, **georef):
 
     if "affine" in georef:
         pass
-    elif len(georef) >= 3:
-        georef["affine"] = compute_affine(**georef)
     else:
-        raise Exception("To make a new raster from scratch, you must specify either all of xy_cell, xy_geo, cellwidth, cellheight, or the transform coefficients")
+        georef["affine"] = compute_affine(**georef)
 
     if not crs:
         crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
@@ -308,29 +312,42 @@ def new(nodataval=-9999.0, crs=None, **georef):
 
 def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
                    width=None, height=None, bbox=None,
+                   xscale=None, yscale=None, xskew=0, yskew=0,
+                   xoffset=None, yoffset=None,
                    cell_anchor="center"):
 
-    # TODO: Allow affine set via xscale etc dict
-    
-    # auto calculate if necessary
-    if not all((xy_cell,xy_geo,cellwidth,cellheight)):
-        if all((width,height,bbox)):
-            x1,y1,x2,y2 = bbox
-            xwidth,yheight = x2-x1,y2-y1
-            # set
-            xy_cell = (0,0)
-            xy_geo = x1,y1
-            cellwidth = xwidth / float(width)
-            cellheight = yheight / float(height)
-        else:
-            raise Exception("Georef affine can only be computed if given (xy_cell,xy_geo,cellwidth,cellheight) or (width,height,bbox)")
+    # get scale values
+    if not xscale:
+        if cellwidth:
+            xscale = cellwidth
+        elif bbox and width:
+            xwidth = bbox[2]-bbox[0]
+            xscale = xwidth / float(width)
+    if not yscale:
+        if cellheight:
+            yscale = cellheight
+        elif bbox and height:
+            yheight = bbox[3]-bbox[1]
+            yscale = yheight / float(height)
 
-    # get coefficients needed to convert from raster to geographic space
-    xcell,ycell = xy_cell
-    xgeo,ygeo = xy_geo
-    xoffset,yoffset = xgeo - xcell, ygeo - ycell
-    xscale,yscale = cellwidth, cellheight
-    xskew,yskew = 0,0
+    # get skew values from bbox if not specified
+    # ...
+    
+    # get offset values
+    if any((xoffset == None, yoffset == None)):
+        if (xy_cell and xy_geo):
+            xcell,ycell = xy_cell
+            xgeo,ygeo = xy_geo
+            xoffset,yoffset = xgeo - xcell, ygeo - ycell
+        elif bbox:
+            xoffset,yoffset = bbox[0],bbox[1]
+
+    # test if enought information to set affine
+    if all((opt != None for opt in [xscale,yscale,xskew,yskew,xoffset,yoffset])):
+        pass
+
+    else:
+        raise Exception("Georef affine can only be computed if given (xy_cell,xy_geo,cellwidth,cellheight) or (width,height,bbox) or ...")
 
     # offset cell anchor to the center # NOT YET TESTED
     if cell_anchor == "center":
