@@ -179,50 +179,59 @@ class RasterLayer:
         # remember style settings
         self.styleoptions = options
 
-    def render(self, width, height, coordspace_bbox=None):
+    def render(self, resampling="nearest", **georef):
         # NOT DONE...
         # position in space
-        positioned = self.data.positioned(width, height, coordspace_bbox)
+        if "bbox" not in georef:
+            georef["bbox"] = self.data.bbox
+            
+        rendered = self.data.resample(algorithm=resampling, **georef)
 
         if self.styleoptions["type"] == "grayscale":
-            band = positioned.bands[self.styleoptions["bandnum"]]
+            band = rendered.bands[self.styleoptions["bandnum"]]
             
             # equalize
-            #minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            #valrange = 1/float(maxval-minval)
-            img = band.img #.point(lambda px: (px - minval) * valrange * 255)
+            minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
+            valrange = 1/float(maxval-minval) * 255
+            expr = "(val - {minval}) * {valrange}".format(minval=minval,valrange=valrange)
+            band.compute(expr)
             # colorize
-            img = img.convert("LA")
+            img = band.img.convert("LA")
 
         elif self.styleoptions["type"] == "colorscale":
-            band = positioned.bands[self.styleoptions["bandnum"]]
+            band = rendered.bands[self.styleoptions["bandnum"]]
             
             # equalize
-            #minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            #valrange = 1/float(maxval-minval)
-            img = band.img #.point(lambda px: (px - minval) * valrange * 255)
+            minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
+            valrange = 1/float(maxval-minval) * 255
+            expr = "(val - {minval}) * {valrange}".format(minval=minval,valrange=valrange)
+            band.compute(expr)
             # colorize
-            canv = pyagg.canvas.from_image(img.convert("RGBA"))
+            canv = pyagg.canvas.from_image(band.img.convert("RGBA"))
             canv = canv.color_remap(self.styleoptions["gradcolors"])
             img = canv.get_image()
 
         elif self.styleoptions["type"] == "rgb":
-            rband = positioned.bands[self.styleoptions["r"]].img.convert("L")
-            gband = positioned.bands[self.styleoptions["g"]].img.convert("L")
-            bband = positioned.bands[self.styleoptions["b"]].img.convert("L")
+            rband = rendered.bands[self.styleoptions["r"]].img.convert("L")
+            gband = rendered.bands[self.styleoptions["g"]].img.convert("L")
+            bband = rendered.bands[self.styleoptions["b"]].img.convert("L")
             img = PIL.Image.merge("RGB", [rband,gband,bband])
             img = img.convert("RGBA")
 
         # make edge and nodata mask transparent
+        
         #blank = PIL.Image.new("RGBA", img.size, None)
-        #blank.paste(img, mask=positioned.mask)
+        #blank.paste(img, mask=rendered.mask)
         #img = blank
         #r,g,b = img.split()[:3]
-        #a = positioned.mask.convert("L")
+        #a = rendered.mask.convert("L")
         #rgba = (r,g,b,a)
         #img = PIL.Image.merge("RGBA", rgba)
-        img.paste(0, mask=positioned.mask)
-        #img.putalpha(positioned.mask)
+        #img.putalpha(rendered.mask)
+        #img.show()
+        #rendered.mask.show()
+
+        img.paste(0, mask=rendered.mask) # sets all bands to 0 incl the alpha band
 
         # final
         self.img = img

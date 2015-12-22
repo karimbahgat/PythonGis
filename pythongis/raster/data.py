@@ -117,16 +117,12 @@ class Band(object):
             nodata = self.nodataval
             if nodata != None:
                 # mask out nodata
-                mask = PIL.ImageMath.eval("val == %s" %nodata, val=self.img)
-                
-                # times binary results with 255 to make a valid mask
-                mask = PIL.ImageMath.eval("val * 255", val=mask)
-                mask = mask.convert("1")
+                mask = self._conditional("val == %s" %nodata)
                 
             else:
                 # EVEN IF NO NODATA, NEED TO CREATE ORIGINAL MASK,
                 # TO PREVENT INFINITE OUTSIDE BORDER AFTER GEOTRANSFORM
-                mask = PIL.Image.new("1", self.img.size, 255)
+                mask = PIL.Image.new("1", self.img.size, 0)
                 
             self._cached_mask = mask
             return self._cached_mask
@@ -142,49 +138,85 @@ class Band(object):
             mask = self.mask
 
         # change values
-        if self.mode in ("F","I"):
-            self.img = PIL.ImageMath.eval(expr, val=self.img)
-
-        else:
-            raise Exception("Not supported for this format")
+        self._compute(expr)
 
         # use the original nodatamask to set null values again
         if self.nodataval != None:
             self.img.paste(self.nodataval, (0,0), mask)
 
+    def _compute(self, expr):
+        """Internal only"""
+        try:
+            result = PIL.ImageMath.eval(expr, val=self.img)
+            self.img = result
+        
+        except MemoryError:
+            result = self.img
+            
+            if not self._pixelaccess:
+                self._pixelaccess = self.img.load()
+                
+            for y in range(self.width):
+                for x in range(self.height):
+                    val = self._pixelaccess[x,y]
+                    newval = eval(condition, {}, {"val":val})
+                    resultpixels[x,y] = newval
+
     def recode(self, condition, newval):
         """Change to a new value for those pixels that meet a condition"""
-        if self.mode in ("F","I"):
-            wheretrue = self.conditional(condition)
-            self.img.paste(newval, (0,0), wheretrue.img)
+        if True: #self.mode in ("F","I"):
+            wheretrue = self._conditional(condition)
+            self.img.paste(newval, (0,0), wheretrue)
 
         else:
             raise Exception("Not supported for this format")
 
     def conditional(self, condition):
         """Return a binary band showing where a condition is true"""
-        if self.mode in ("F","I"):
-            # note: relational ops < > == != return only binary mask
-            result = PIL.ImageMath.eval(condition, val=self.img)
+        
+        result = self._conditional(condition)
+
+        # set conditional to false for pixels covered by nodatamask
+        if self.nodataval != None:
+            result.paste(0, (0,0), self.mask)
+
+        band = Band(result, self.nodataval)
+        return band
+
+    def _conditional(self, condition):
+        """Optimized algorithms for testing condition depending on raster type,
+        avoids recursion when calling mask"""
+        
+        try: 
+            # note: relational ops < > == != should return only binary mask, but not sure
+            _condition = "convert((%s)*255, '1')" % condition
+            result = PIL.ImageMath.eval(_condition, val=self.img)
             
             # times binary results with 255 to make a valid mask
-            result = PIL.ImageMath.eval("val * 255", val=result)
-            result = result.convert("1")
+            ####result = PIL.ImageMath.eval("convert(val * 255, '1')", val=result)
 
-            # set conditional to false for pixels covered by nodatamask
-            if self.nodataval != None:
-                result.paste(0, (0,0), self.mask)
+        except MemoryError:
+            result = PIL.Image.new("1", self.img.size, 0)
+            resultpixels = result.load()
+            
+            if not self._pixelaccess:
+                self._pixelaccess = self.img.load()
 
-            band = Band(result, self.nodataval)
-            return band
+            # Note: eval on many pixels is very slow
+            for y in range(self.width):
+                for x in range(self.height):
+                    val = self._pixelaccess[x,y]
+                    if eval(condition, {}, {"val":val}) != False:
+                        resultpixels[x,y] = 255
+                    else:
+                        resultpixels[x,y] = 0
 
-        else:
-            raise Exception("Not supported for this format")
+        return result
 
     def summarystats(self, *stattypes):
         # get all stattypes unless specified
         
-        if self.mode in ("I","F"):
+        if True: #self.mode in ("I","F"):
             # PIL.ImageStat only works for modes with values below 255
             # so instead we need manual math on all pixel values
             
@@ -451,39 +483,39 @@ class RasterData(object):
     def mask(self, value):
         self._cached_mask = value
 
-    def positioned(self, width, height, coordspace_bbox=None):
-        """Positions all bands of the raster in space, relative to the specified geowindow"""
-        # NOTE: Not sure if should move to resample() or warp() in manager.py
-        # ...
-        if not coordspace_bbox:
-            coordspace_bbox = self.bbox
-        
-        # GET COORDS OF ALL 4 VIEW SCREEN CORNERS
-        xleft,ytop,xright,ybottom = coordspace_bbox
-        viewcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
-        
-        # FIND PIXEL LOCS OF ALL THESE COORDS ON THE RASTER
-        viewcorners_pixels = [self.geo_to_cell(*point, fraction=True) for point in viewcorners]
-
-        # ON RASTER, PERFORM QUAD TRANSFORM
-        #(FROM VIEW SCREEN COORD CORNERS IN PIXELS TO RASTER COORD CORNERS IN PIXELS)
-        flattened = [xory for point in viewcorners_pixels for xory in point]
-        newraster = RasterData(mode=self.mode, width=width, height=height, bbox=coordspace_bbox)
-
-        # make mask over
-        masktrans = self.mask.transform((width,height), PIL.Image.QUAD,
-                            flattened, resample=PIL.Image.NEAREST)
-        
-        for band in self.bands:
-            datatrans = band.img.transform((width,height), PIL.Image.QUAD,
-                                flattened, resample=PIL.Image.NEAREST)
-            #if mask
-            if band.nodataval != None:
-                datatrans.paste(band.nodataval, (0,0), masktrans) 
-            # store image
-            newraster.add_band(img=datatrans)
-
-        return newraster
+##    def positioned(self, width, height, coordspace_bbox=None):
+##        """Positions all bands of the raster in space, relative to the specified geowindow"""
+##        # NOTE: Not sure if should move to resample() or warp() in manager.py
+##        # ...
+##        if not coordspace_bbox:
+##            coordspace_bbox = self.bbox
+##        
+##        # GET COORDS OF ALL 4 VIEW SCREEN CORNERS
+##        xleft,ytop,xright,ybottom = coordspace_bbox
+##        viewcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
+##        
+##        # FIND PIXEL LOCS OF ALL THESE COORDS ON THE RASTER
+##        viewcorners_pixels = [self.geo_to_cell(*point, fraction=True) for point in viewcorners]
+##
+##        # ON RASTER, PERFORM QUAD TRANSFORM
+##        #(FROM VIEW SCREEN COORD CORNERS IN PIXELS TO RASTER COORD CORNERS IN PIXELS)
+##        flattened = [xory for point in viewcorners_pixels for xory in point]
+##        newraster = RasterData(mode=self.mode, width=width, height=height, bbox=coordspace_bbox)
+##
+##        # make mask over
+##        masktrans = self.mask.transform((width,height), PIL.Image.QUAD,
+##                            flattened, resample=PIL.Image.NEAREST)
+##        
+##        for band in self.bands:
+##            datatrans = band.img.transform((width,height), PIL.Image.QUAD,
+##                                flattened, resample=PIL.Image.NEAREST)
+##            #if mask
+##            if band.nodataval != None:
+##                datatrans.paste(band.nodataval, (0,0), masktrans) 
+##            # store image
+##            newraster.add_band(img=datatrans)
+##
+##        return newraster
 
     def convert(self, mode):
         for band in self:
@@ -493,6 +525,12 @@ class RasterData(object):
     def save(self, filepath):
         saver.to_file(self.bands, self.meta, filepath)
 
+    # Methods from other modules
+
+    def resample(self, **kwargs):
+        from . import manager
+        kwargs["raster"] = self
+        return manager.resample(**kwargs)
 
 def pilmode_to_rastmode(mode):
     rastmode = {"1":"1bit",

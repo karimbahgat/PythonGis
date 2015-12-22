@@ -5,62 +5,6 @@ from . import data
 
 import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 
-##def resample(raster, width=None, height=None, cellwidth=None, cellheight=None):
-##    """
-##    The raster stays in the same geographic location and coverage, but will
-##    have lower or higher cell resolution. 
-##
-##    Either specify "width" and "height" as number of cells in each direction,
-##    or "cellwidth" and "cellheight" in geographic unit distances
-##    (defined by the raster's coordinate reference system). 
-##    """
-##    # copy the first raster and reset the cached mask for the new raster
-##    raster = raster.copy()
-##    del raster._cached_mask 
-##
-##    if width and height:
-##        # calculate new cell dimensions based on the new raster size
-##        widthfactor = raster.width / float(width)
-##        heightfactor = raster.height / float(height)
-##        oldcellwidth, oldcellheight = raster.info["cellwidth"], raster.info["cellheight"]
-##        newcellwidth, newcellheight = oldcellwidth * widthfactor, oldcellheight * heightfactor
-##        
-##        # resample each grid
-##        for band in raster:
-##            band.img = band.img.resize((width, height), PIL.Image.NEAREST)
-##            # update cells access
-##            band.cells = band.img.load()
-##            
-##        # remember new celldimensions
-##        raster.info["cellwidth"] = newcellwidth
-##        raster.info["cellheight"] = newcellheight 
-##        raster.update_geotransform()
-##        return raster
-##    
-##    elif cellwidth and cellheight:
-##        # calculate new raster size based on the new cell dimensions
-##        widthfactor = raster.info["cellwidth"] / float(cellwidth)
-##        heightfactor = raster.info["cellheight"] / float(cellheight)
-##        oldwidth, oldheight = raster.width, raster.height
-##        newwidth, newheight = int(round(oldwidth * widthfactor)), int(round(oldheight * heightfactor))
-##        if newwidth < 0: newwidth *= -1
-##        if newheight < 0: newheight *= -1
-##        
-##        # resample each grid
-##        for band in raster:
-##            band.img = band.img.resize((newwidth, newheight), PIL.Image.NEAREST)
-##            # update cells access
-##            band.cells = band.img.load()
-##            
-##        # remember new celldimensions
-##        raster.info["cellwidth"] = cellwidth
-##        raster.info["cellheight"] = cellheight 
-##        raster.update_geotransform()
-##        return raster
-##    
-##    else:
-##        raise Exception("To rescale raster, either width and height or cellwidth and cellheight must be specified.")
-
 ##def align_rasters(*rasters):
 ##    "Used internally by other functions only, not by user"
 ##    # get coord bbox containing all rasters
@@ -108,47 +52,90 @@ import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 ##        
 ##    return merged
 
-def reproject(raster, rasterdef=None, algorithm="nearest"):
+def reproject(raster, crs=None, algorithm="nearest", **rasterdef):
+    
     algocode = {"nearest":PIL.Image.NEAREST,
+                "bilinear":PIL.Image.BILINEAR,
+                "bicubic":PIL.Image.BICUBIC,
+                }[algorithm.lower()]
+
+    if not crs:
+        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+
+    if crs != raster.crs:   # need pycrs to compare crs in a smarter way
+
+        raise Exception("Conversion between crs not yet implemented")
+
+        ##        # first, create target raster based on rasterdef
+        ##        targetrast = data.RasterData(**rasterdef)
+        ##        for band in raster:
+        ##            targetrast.add_band(img=band.img)
+        ##
+        ##        # get target coordinates
+        ##        lons = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
+        ##        lats = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
+        ##
+        ##        # reproject coords using pyproj
+        ##        for row,lat in enumerate(lats):
+        ##            # convert crs coords
+        ##            reproj = PIL.ImagePath.Path([pyproj.convert(lon,lat) for lon in lons])
+        ##
+        ##            # go from reprojected target coordinates and over to source pixels
+        ##            sourcepixels = reproj.transform(raster.inv_affine)
+        ##
+        ##            # manually get and set the pixels using some algorithm
+        ##            if algorithm == "nearest":
+        ##                for sourceband,targetband in zip(raster,targetrast):
+        ##                    for col,pixel in enumerate(sourcepixels):
+        ##                        pixel = int(round(pixel[0])),int(round(pixel[1]))
+        ##                        val = sourceband.get(*pixel)
+        ##                        targetband.set(col,row,val)
+
+    else:
+        
+        # same crs, so only needs to resample between affine transforms
+        return resample(raster, algorithm, **rasterdef)
+
+def resample(raster, algorithm="nearest", **rasterdef):
+
+    algocode = {"nearest":PIL.Image.NEAREST,
+                "bilinear":PIL.Image.BILINEAR,
+                "bicubic":PIL.Image.BICUBIC,
                 }[algorithm.lower()]
     
-    if rasterdef:
+    # first, create target raster based on rasterdef
+    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    
+    # get coords of all 4 target corners
+    coordspace_bbox = targetrast.bbox
+    xleft,ytop,xright,ybottom = coordspace_bbox
+    targetcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
+    
+    # find pixel locs of all these coords in the source raster
+    targetcorners_pixels = [raster.geo_to_cell(*point, fraction=True) for point in targetcorners]
 
+    # on raster, perform quad transform
+    flattened = [xory for point in targetcorners_pixels for xory in point]
 
-        # wrong approach
-        # instead:
-        # for each target cell
-        #   get coord using the target's affine transform
-        #   use the source raster's inv affine transform to find matching target pixel
-        # or:
-        #   use pil's affine transform imgs with no manual python??
-        # or:
-        #   use pil's coordsequence, apply batch affine transform to coords
-        #   and then set each target pixel by mapping to source pixel
+    # make mask over
+    masktrans = raster.mask.transform((targetrast.width,targetrast.height),
+                                        PIL.Image.QUAD,
+                                        flattened,
+                                        resample=algocode)
 
-        
-        rasterdef["mode"] = raster.mode
-        newrast = data.RasterData(**rasterdef)
-        width,height = newrast.width, newrast.height
+    for band in raster.bands:
+        datatrans = band.img.transform((targetrast.width,targetrast.height),
+                                        PIL.Image.QUAD,
+                                        flattened,
+                                        resample=algocode)
+        #if mask
+        if band.nodataval != None:
+            datatrans.paste(band.nodataval, mask=masktrans)
+            
+        # store image
+        targetrast.add_band(img=datatrans, nodataval=band.nodataval)
 
-        # temporary affine to go from affine to the other
-        # might need to change this with actual affine calculations
-        xscale1,xskew1,xoffset1,yskew1,yscale1,yoffset1 = raster.affine
-        xscale2,xskew2,xoffset2,yskew2,yscale2,yoffset2 = newrast.affine
-        affinediff = [xscale2*xscale1, xskew1-xskew2, xoffset2-xoffset1,
-                      yskew1-yskew2, yscale2*yscale1, yoffset1-yoffset2]
-
-        # perform affine transform on each old band, and add to new
-        for band in raster:
-            trans = band.img.transform((width,height), PIL.Image.AFFINE,
-                                        affinediff, resample=algocode)
-            newrast.add_band(img=trans)
-
-        return newrast
-
-def resample(**kwargs):
-    # alias for reproject
-    return reproject(**kwargs)
+    return targetrast
 
 def rasterize(vectordata, cellwidth, cellheight, bbox=None, **options):
     # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
@@ -226,6 +213,16 @@ def rasterize(vectordata, cellwidth, cellheight, bbox=None, **options):
                                xy_cell=(0,0), xy_geo=(xmin,ymax), **options)
     return raster
 
+def vectorize(rasterdata, **kwargs):
+    # use PIL.ImageMorph.MorphOp() with an "edge" pattern.
+    # ...
+    pass
+
+def crop(raster, bbox, resampling="nearest"):
+    # either call resample directly, so just an alias
+    # or find the pixels that are closest to the bbox and just do a normal image crop, meaning no resampling/changing of data
+    pass
+
 def clip(raster, clipdata, bbox=None):
     # TODO: HANDLE VARYING BAND NRS
     # TODO: ALSO HANDLE CLIP BY RASTER DATA
@@ -260,4 +257,3 @@ def clip(raster, clipdata, bbox=None):
         # create blank image
         # paste raster onto blank image using clip raster as mask
         pass
-
