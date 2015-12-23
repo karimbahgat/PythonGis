@@ -3,15 +3,17 @@ import pythongis as pg
 
 
 # TEST RASTERIZE
-##print "\n"+"rasterize"
-##vect = pg.vector.data.VectorData(r"C:\Users\kimo\Documents\GitHub\pShapes\BaseData\ne_10m_admin_1_states_provinces.shp",
-##                                 encoding="latin")
-##vect.features = dict([(i,f) for i,f in vect.features.items()
-##                      if f["geonunit"]=="Syria"])  #filter(lambda f: f.row["geounit"]=="Syria", vect.features.values())
-##print vect.features
+print "\n"+"rasterize"
+vect = pg.vector.data.VectorData(r"C:\Users\kimo\Documents\GitHub\pShapes\BaseData\ne_10m_admin_1_states_provinces.shp",
+                                 encoding="latin")
+vect.features = dict([(i,f) for i,f in vect.features.items()
+                      if f["geonunit"]=="Syria"])  #filter(lambda f: f.row["geounit"]=="Syria", vect.features.values())
+print vect.features
 
-##rast = pg.raster.manager.rasterize(vect, 0.1, 0.1)
-##print rast
+rast = pg.raster.manager.rasterize(vect, bbox=vect.bbox, #[-180,90,180,-90],
+                                   cellwidth=0.1, cellheight=0.1)
+print rast
+
 
 
 # TEST LOADING
@@ -22,25 +24,39 @@ inp = pg.raster.data.RasterData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15
 band1 = inp.bands[0]
 print inp
 print "before", band1.summarystats()
+inp.view(1000,500)
+
+
+
+# TEST VECTOR CLIP
+print "\n"+"clipping"
+c = pg.raster.manager.clip(inp, vect, bbox=[0,40,50,0])#vect.bbox)
+print c
+c.view(1000,500)
+
 
 
 # TEST COMPUTE
 print "\n"+"TEST compute"
-inp.convert("F")
-band1.compute("val * 2")
+inp.convert("int32")
+band1.compute("val * 3")
 print inp
+print band1
 print band1.summarystats()
 
 
-# TEST RECLASSIFY
-print "\n"+"TEST reclassify"
-band1.reclassify("val < 30", 111)
+
+
+# TEST RECODE
+print "\n"+"TEST recode"
+band1.recode("val < 30", 111)
+print inp
+print band1
 print band1.summarystats()
 
-pos = inp.positioned(555,555,[-180,90,0,0])
-pos.bands[0].img.show()
+inp.view(1000,500)
 
-fdsfsdf
+
 
 
 

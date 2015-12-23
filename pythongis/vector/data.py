@@ -174,6 +174,19 @@ class VectorData:
         feature = Feature(self, row, geometry)
         self[feature.id] = feature
 
+    ### FILTERING ###
+
+    def select(self, func):
+        """Returns new filtered vectordata instance"""
+        new = VectorData()
+        new.fields = [field for field in self.fields]
+        
+        for feat in self:
+            if func(feat):
+                new.add_feature(feat.row, feat.geometry)
+
+        return new
+
     ###### SPATIAL INDEXING #######
 
     def create_spatial_index(self):
@@ -225,6 +238,11 @@ class VectorData:
         new.features = OrderedDict([ (feat.id,feat) for feat in featureobjs ])
         if hasattr(self, "spindex"): new.spindex = self.spindex.copy()
         return new
+
+    def view(self, width, height, bbox=None):
+        # dont forget to add
+        # ...
+        pass
 
 
     

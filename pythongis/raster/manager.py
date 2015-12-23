@@ -5,35 +5,6 @@ from . import data
 
 import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 
-##def align_rasters(*rasters):
-##    "Used internally by other functions only, not by user"
-##    # get coord bbox containing all rasters
-##    xlefts,ytops,xrights,ybottoms = zip(*[rast.bbox for rast in rasters])
-##    if xlefts[0] < xrights[0]:
-##        xleft,xright = min(xlefts),max(xrights)
-##    else: xleft,xright = max(xlefts),min(xrights)
-##    if ytops[0] > ybottoms[0]:
-##        ytop,ybottom = max(ytops),min(ybottoms)
-##    else: ytop,ybottom = min(ytops),max(ybottoms)
-##
-##    # get the required pixel dimensions (based on first raster, arbitrary)
-##    xs,ys = (xleft,xright),(ytop,ybottom)
-##    coordwidth,coordheight = max(xs)-min(xs), max(ys)-min(ys)
-##    rast = rasters[0]
-##    orig_xs,orig_ys = (rast.bbox[0],rast.bbox[2]),(rast.bbox[1],rast.bbox[3])
-##    orig_coordwidth,orig_coordheight = max(orig_xs)-min(orig_xs), max(orig_ys)-min(orig_ys)
-##    widthratio,heightratio = coordwidth/orig_coordwidth, coordheight/orig_coordheight
-##    reqwidth = int(round(rast.width*widthratio))
-##    reqheight = int(round(rast.height*heightratio))
-##    
-##    # position into same coordbbox
-##    aligned = []
-##    for rast in rasters:
-##        coordbbox = [xleft,ytop,xright,ybottom]
-##        positioned,mask = rast.positioned(reqwidth, reqheight, coordbbox)
-##        aligned.append((positioned,mask))
-##    return aligned
-
 ##def mosaic(*rasters):
 ##    """
 ##    Mosaic rasters covering different areas together into one file.
@@ -137,36 +108,22 @@ def resample(raster, algorithm="nearest", **rasterdef):
 
     return targetrast
 
-def rasterize(vectordata, cellwidth, cellheight, bbox=None, **options):
-    # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
-    # calculate required raster size from cell dimensions
-    if not bbox: bbox = vectordata.bbox
-    xmin,ymin,xmax,ymax = bbox
-    xwidth, yheight = xmax-xmin, ymax-ymin
-    pxwidth, pxheight = xwidth/float(cellwidth), yheight/float(cellheight)
-    pxwidth, pxheight = int(round(pxwidth)), int(round(pxheight))
-    if pxwidth < 0: pxwidth *= -1
-    if pxheight < 0: pxheight *= -1
+def rasterize(vectordata, **rasterdef):
+
+##    if "bbox" not in rasterdef:
+##        # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
+##        # ...difficult since vector coord bbox is always min,max order,
+##        # ...since no way to determine directions
+##        rasterdef["bbox"] = vectordata.bbox
+
+    raster = data.RasterData(mode="1bit", **rasterdef)
 
     # create 1bit image with specified size
-    img = PIL.Image.new("1", (pxwidth, pxheight), 0)
+    img = PIL.Image.new("1", (raster.width, raster.height), 0)
     drawer = PIL.ImageDraw.Draw(img)
 
     # set the coordspace to vectordata bbox
-    xoffset,yoffset = xmin,ymax
-    xscale,yscale = cellwidth,cellheight
-    a,b,c = xscale,0,xoffset
-    d,e,f = 0,yscale,yoffset
-    # invert
-    det = a*e - b*d
-    if det != 0:
-        idet = 1 / float(det)
-        ra = e * idet
-        rb = -b * idet
-        rd = -d * idet
-        re = a * idet
-        a,b,c,d,e,f = (ra, rb, -c*ra - f*rb,
-                       rd, re, -c*rd - f*re)
+    a,b,c,d,e,f = raster.inv_affine
 
     # draw the vector data
     for feat in vectordata:
@@ -209,8 +166,7 @@ def rasterize(vectordata, cellwidth, cellheight, bbox=None, **options):
             drawer.point(path, fill=1)
 
     # create raster from the drawn image
-    raster = data.RasterData(image=img, cellwidth=cellwidth, cellheight=cellheight,
-                               xy_cell=(0,0), xy_geo=(xmin,ymax), **options)
+    raster.add_band(img=img)
     return raster
 
 def vectorize(rasterdata, **kwargs):
@@ -218,10 +174,38 @@ def vectorize(rasterdata, **kwargs):
     # ...
     pass
 
-def crop(raster, bbox, resampling="nearest"):
-    # either call resample directly, so just an alias
-    # or find the pixels that are closest to the bbox and just do a normal image crop, meaning no resampling/changing of data
-    pass
+def crop(raster, bbox):
+    """Finds the pixels that are closest to the bbox
+    and just does a normal image crop, meaning no resampling/changing of data.
+    """
+    x1,y1,x2,y2 = bbox
+
+    # get nearest pixels of bbox coords
+    px1,py1 = raster.geo_to_cell(x1,y1)
+    px2,py2 = raster.geo_to_cell(x2,y2)
+
+    # get new dimensions
+    outrast = data.RasterData(**raster.meta)
+    width = abs(px2-px1)
+    height = abs(py2-py1)
+    outrast.width = width
+    outrast.height = height
+
+    # crop each and add as band
+    pxmin = min(px1,px2)
+    pymin = min(py1,py2)
+    pxmax = max(px1,px2)
+    pymax = max(py1,py2)
+    for band in raster.bands:
+        img = band.img.crop((pxmin,pymin,pxmax,pymax))
+        outrast.add_band(img=img, nodataval=band.nodataval)
+
+    # update output geotransform based on crop corners
+    x1,y1 = raster.cell_to_geo(px1,py1) 
+    x2,y2 = raster.cell_to_geo(px2,py2)
+    outrast.set_geotransform(width=width, height=height,
+                             bbox=[x1,y1,x2,y2])
+    return outrast
 
 def clip(raster, clipdata, bbox=None):
     # TODO: HANDLE VARYING BAND NRS
@@ -229,27 +213,26 @@ def clip(raster, clipdata, bbox=None):
     # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
     
     if True: #isinstance(clipdata, vector.data.VectorData):
+
+        # determine georef of out raster, defaults to that of the main raster
+        if bbox:
+            raster = crop(raster, bbox)
         
-        # rasterize vector data using same gridsize as main raster
-        cellwidth,cellheight = raster.affine[0], raster.affine[4]
-        mask = rasterize(clipdata, cellwidth, cellheight, bbox=bbox)
+        # rasterize vector data
+        georef = {"width":raster.width, "height":raster.height,
+                  "affine":raster.affine}
+        valid = rasterize(clipdata, **georef)
 
         # paste main raster onto blank image using rasterized as mask
-        newwidth,newheight = mask.bands[0].img.size
-        raster = raster.positioned(newwidth, newheight, mask.bbox)
-
-        # make into raster
-        outrast = data.RasterData(**raster.meta)  # not sure if correct
+        outrast = data.RasterData(mode=raster.mode, **georef)
 
         # clip and add each band
         for band in raster.bands:
             
-            # create blank image
-            blank = PIL.Image.new(band.img.mode, (newwidth,newheight), band.nodataval)
-            blank.paste(band.img, mask=mask.bands[0].img)
-            pasted = blank
-
-            outrast.add_band(img=pasted, nodataval=band.nodataval)
+            # paste data onto blank image where mask is true
+            img = PIL.Image.new(band.img.mode, band.img.size, band.nodataval)
+            img.paste(band.img, mask=valid.bands[0].img)
+            outrast.add_band(img=img, nodataval=band.nodataval)
 
         return outrast
 

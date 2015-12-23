@@ -136,33 +136,30 @@ class RasterLayer:
 
         # by default, set random style color
         if not "type" in options:
-            options["type"] = "colorscale"
+            if len(data.bands) == 3:
+                options["type"] = "rgb"
+            else:
+                options["type"] = "colorscale"
 
         if options["type"] == "grayscale":
             options["bandnum"] = options.get("bandnum", 0)
             band = self.data.bands[options["bandnum"]]
             
-            # retrieve min and maxvals from data
-            minval,maxval = band.img.getextrema()
-            
-            # but only use if not manually specified
+            # retrieve min and maxvals from data if not manually specified
             if not "minval" in options:
-                options["minval"] = minval
+                options["minval"] = band.summarystats("min")["min"]
             if not "maxval" in options:
-                options["maxval"] = minval
+                options["maxval"] = band.summarystats("max")["max"]
 
         elif options["type"] == "colorscale":
             options["bandnum"] = options.get("bandnum", 0)
             band = self.data.bands[options["bandnum"]]
             
-            # retrieve min and maxvals from data
-            minval,maxval = band.img.getextrema()
-            
-            # but only use if not manually specified
+            # retrieve min and maxvals from data if not manually specified
             if not "minval" in options:
-                options["minval"] = minval
+                options["minval"] = band.summarystats("min")["min"]
             if not "maxval" in options:
-                options["maxval"] = minval
+                options["maxval"] = band.summarystats("max")["max"]
 
             # set random gradient
             if not "gradcolors" in options:

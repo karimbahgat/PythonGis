@@ -147,20 +147,35 @@ class Band(object):
     def _compute(self, expr):
         """Internal only"""
         try:
-            result = PIL.ImageMath.eval(expr, val=self.img)
+            _expr = "convert(%s, '%s')" % (expr, self.img.mode)
+            print _expr
+            result = PIL.ImageMath.eval(_expr, val=self.img)
             self.img = result
         
         except MemoryError:
-            result = self.img
             
             if not self._pixelaccess:
                 self._pixelaccess = self.img.load()
-                
+
+            # force mode
+            if self.mode.startswith(("int","1bit")):
+                forcetype = int
+            elif self.mode.startswith("float"):
+                forcetype = float
+                                    
+            # force value range
+            if self.mode == "1bit":
+                forcerange = lambda v: min(max(v,0),1)
+            elif self.mode.endswith("8"):
+                forcerange = lambda v: min(max(v,0),255)
+            else:
+                forcerange = lambda v: v
+            
             for y in range(self.width):
                 for x in range(self.height):
                     val = self._pixelaccess[x,y]
-                    newval = eval(condition, {}, {"val":val})
-                    resultpixels[x,y] = newval
+                    newval = eval(expr, {}, {"val":val})
+                    self._pixelaccess[x,y] = forcetype(forcerange(newval))
 
     def recode(self, condition, newval):
         """Change to a new value for those pixels that meet a condition"""
@@ -215,34 +230,53 @@ class Band(object):
 
     def summarystats(self, *stattypes):
         # get all stattypes unless specified
+
+        statsdict = dict()
         
-        if True: #self.mode in ("I","F"):
+        if self.mode.endswith("8"):
             # PIL.ImageStat only works for modes with values below 255
-            # so instead we need manual math on all pixel values
-            
-            statsdict = dict()
+
+            # retrieve stats
+            valid = self.mask.point(lambda v: 1 if v==0 else 0)
+            stats = PIL.ImageStat.Stat(self.img, valid)
+            _min,_max = stats.extrema[0]
+
+            print stats.count, stats.sum
+
+            if not stattypes or "count" in stattypes:
+                statsdict["count"] = stats.count[0]
+            if not stattypes or "sum" in stattypes:
+                statsdict["sum"] = stats.sum[0]
+            if not stattypes or "mean" in stattypes:
+                try: statsdict["mean"] = stats.mean[0]
+                except ZeroDivisionError: statsdict["mean"] = None
+            if not stattypes or "min" in stattypes:
+                statsdict["min"] = _min
+            if not stattypes or "max" in stattypes:
+                statsdict["max"] = _max
+            # some more stats
+            # ...
+
+        elif self.mode.endswith(("16","32","1bit")):
             
             try:
-                # get count of all unique pixelvalues and do math on it
+                # manually get count of all unique pixelvalues and do math on it
                 # but do not include counts of nodataval
-
-                # actually, maybe if getextrema shows less than 255 values,
-                # ...temporarily convert to L and do ImageStat?
-                # ...or somehow dont use full width*height for getcolors()
                 
                 nodata = self.nodataval
-                valuecounts = [(cnt,val) for cnt,val in self.img.getcolors(self.width*self.height) if val != nodata]
+                def valuecountsgen():
+                    return ((cnt,val) for cnt,val in self.img.getcolors(self.width*self.height) if val != nodata)
                 
                 def _count():
-                    return sum((cnt for cnt,val in valuecounts))
+                    return sum((cnt for cnt,val in valuecountsgen()))
                 def _sum():
-                    return sum((cnt*val for cnt,val in valuecounts))
+                    return sum((cnt*val for cnt,val in valuecountsgen()))
                 def _mean():
                     return _sum()/float(_count())
                 def _min():
-                    return min((val for cnt,val in valuecounts))
+                    return min((val for cnt,val in valuecountsgen()))
                 def _max():
-                    return max((val for cnt,val in valuecounts))
+                    return max((val for cnt,val in valuecountsgen()))
                     
                 if not stattypes or "count" in stattypes:
                     statsdict["count"] = _count()
@@ -261,25 +295,38 @@ class Band(object):
 
                 # getcolors() resulted in too many values at once
                 # so fallback on manual iteration one pixel at a time
-                # WARNING: not done, needs to ignore nodatavals
-                
-                raise Exception("Pixel by pixel stats fallback not yet implemented")
 
-##                if not stattypes or "count" in stattypes:
-##                    statsdict["count"] = self.width*self.height
-##                if not stattypes or "sum" in stattypes:
-##                    statsdict["sum"] = sum((cell.value for cell in self))
-##                if not stattypes or "mean" in stattypes:
-##                    statsdict["mean"] = sum((cell.value for cell in self))/float(self.width*self.height)
-##                if not stattypes or "max" in stattypes:
-##                    statsdict["max"] = max((cell.value for cell in self))
-##                if not stattypes or "min" in stattypes:
-##                    statsdict["min"] = min((cell.value for cell in self))
-                
-            return statsdict
+                if not self._pixelaccess:
+                    self._pixelaccess = self.img.load()
 
-        else:
-            raise Exception("Not supported for this format")
+                nodata = self.nodataval
+                def valuecountsgen():
+                    allvals = (self._pixelaccess[x,y] for y in range(self.height) for x in range(self.width))
+                    return (val for val in allvals if val != nodata)
+
+                def _count():
+                    return sum((1 for val in valuecountsgen))
+                def _sum():
+                    return sum((val for val in valuecountsgen))
+                def _mean():
+                    return _sum()/float(_count())
+                def _min():
+                    return min(valuecountsgen)
+                def _max():
+                    return max(valuecountsgen)
+                
+                if not stattypes or "count" in stattypes:
+                    statsdict["count"] = _count()
+                if not stattypes or "sum" in stattypes:
+                    statsdict["sum"] = _sum()
+                if not stattypes or "mean" in stattypes:
+                    statsdict["mean"] = _mean()
+                if not stattypes or "max" in stattypes:
+                    statsdict["max"] = _max()
+                if not stattypes or "min" in stattypes:
+                    statsdict["min"] = _min()
+                
+        return statsdict
 
     def convert(self, mode):
         pilmode = rastmode_to_pilmode(mode)
@@ -318,9 +365,11 @@ class RasterData(object):
         else:
             # auto set width of new raster based on georef if needed
             if "width" not in kwargs:
+                if "cellwidth" in kwargs:
+                    kwargs["xscale"] = kwargs["cellwidth"]
                 if "bbox" in kwargs and "xscale" in kwargs:
                     xwidth = kwargs["bbox"][2] - kwargs["bbox"][0]
-                    kwargs["width"] = int(round( xwidth / float(kwargs["xscale"]) ))
+                    kwargs["width"] = abs(int(round( xwidth / float(kwargs["xscale"]) )))
                     # adjust bbox based on rounded width
                     x1,y1,x2,y2 = kwargs["bbox"]
                     xwidth = kwargs["xscale"] * kwargs["width"]
@@ -330,9 +379,11 @@ class RasterData(object):
 
             # auto set height of new raster based on georef if needed
             if "height" not in kwargs:
+                if "cellheight" in kwargs:
+                    kwargs["yscale"] = kwargs["cellheight"]
                 if "bbox" in kwargs and "yscale" in kwargs:
                     yheight = kwargs["bbox"][3] - kwargs["bbox"][1]
-                    kwargs["height"] = int(round( yheight / float(kwargs["yscale"]) ))
+                    kwargs["height"] = abs(int(round( yheight / float(kwargs["yscale"]) )))
                     # adjust bbox based on rounded width
                     x1,y1,x2,y2 = kwargs["bbox"]
                     yheight = kwargs["yscale"] * kwargs["height"]
@@ -483,40 +534,6 @@ class RasterData(object):
     def mask(self, value):
         self._cached_mask = value
 
-##    def positioned(self, width, height, coordspace_bbox=None):
-##        """Positions all bands of the raster in space, relative to the specified geowindow"""
-##        # NOTE: Not sure if should move to resample() or warp() in manager.py
-##        # ...
-##        if not coordspace_bbox:
-##            coordspace_bbox = self.bbox
-##        
-##        # GET COORDS OF ALL 4 VIEW SCREEN CORNERS
-##        xleft,ytop,xright,ybottom = coordspace_bbox
-##        viewcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
-##        
-##        # FIND PIXEL LOCS OF ALL THESE COORDS ON THE RASTER
-##        viewcorners_pixels = [self.geo_to_cell(*point, fraction=True) for point in viewcorners]
-##
-##        # ON RASTER, PERFORM QUAD TRANSFORM
-##        #(FROM VIEW SCREEN COORD CORNERS IN PIXELS TO RASTER COORD CORNERS IN PIXELS)
-##        flattened = [xory for point in viewcorners_pixels for xory in point]
-##        newraster = RasterData(mode=self.mode, width=width, height=height, bbox=coordspace_bbox)
-##
-##        # make mask over
-##        masktrans = self.mask.transform((width,height), PIL.Image.QUAD,
-##                            flattened, resample=PIL.Image.NEAREST)
-##        
-##        for band in self.bands:
-##            datatrans = band.img.transform((width,height), PIL.Image.QUAD,
-##                                flattened, resample=PIL.Image.NEAREST)
-##            #if mask
-##            if band.nodataval != None:
-##                datatrans.paste(band.nodataval, (0,0), masktrans) 
-##            # store image
-##            newraster.add_band(img=datatrans)
-##
-##        return newraster
-
     def convert(self, mode):
         for band in self:
             band.convert(mode)
@@ -525,12 +542,37 @@ class RasterData(object):
     def save(self, filepath):
         saver.to_file(self.bands, self.meta, filepath)
 
+    ##############################
     # Methods from other modules
 
     def resample(self, **kwargs):
         from . import manager
         kwargs["raster"] = self
         return manager.resample(**kwargs)
+
+    def view(self, width, height):
+        from .. import renderer
+        lyr = renderer.RasterLayer(self,
+                                   gradcolors=[#(0,0,55), # dark blue
+                                             #(0,0,255), # blue
+                                             #(0,255,0), # green
+                                             (255,255,0), # yellow
+                                             (255,0,0), # red
+                                             #(55,0,0), # dark red
+                                             ]
+                                   )
+        lyr.render(width=width, height=height, resampling="nearest")
+
+        import Tkinter as tk
+        import PIL.ImageTk
+        
+        app = tk.Tk()
+        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
+        lbl = tk.Label(image=tkimg)
+        lbl.tkimg = tkimg
+        lbl.pack()
+        app.mainloop()
+
 
 def pilmode_to_rastmode(mode):
     rastmode = {"1":"1bit",
