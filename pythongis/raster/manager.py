@@ -23,6 +23,14 @@ import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 ##        
 ##    return merged
 
+def morph(raster, gcp):
+    # aka georeference
+    # morph or smudge a raster in arbitrary directions based on a set of controlpoints
+    # default algorithm is splines, maybe also polynomyal
+    # ...
+    
+    raise Exception("Not yet implemented")
+
 def reproject(raster, crs=None, algorithm="nearest", **rasterdef):
     
     algocode = {"nearest":PIL.Image.NEAREST,
@@ -36,7 +44,7 @@ def reproject(raster, crs=None, algorithm="nearest", **rasterdef):
     if crs != raster.crs:   # need pycrs to compare crs in a smarter way
 
         raise Exception("Conversion between crs not yet implemented")
-
+        
         ##        # first, create target raster based on rasterdef
         ##        targetrast = data.RasterData(**rasterdef)
         ##        for band in raster:
@@ -61,6 +69,11 @@ def reproject(raster, crs=None, algorithm="nearest", **rasterdef):
         ##                        pixel = int(round(pixel[0])),int(round(pixel[1]))
         ##                        val = sourceband.get(*pixel)
         ##                        targetband.set(col,row,val)
+
+        # TODO: Potential speedup algorithm
+        # table-based reprojection, so only have to reproject 100*100 values
+        # instead of every single pixel
+        # https://caniban.files.wordpress.com/2011/04/tile-based-geospatial-information-systems.pdf
 
     else:
         
@@ -116,6 +129,10 @@ def rasterize(vectordata, **rasterdef):
 ##        # ...since no way to determine directions
 ##        rasterdef["bbox"] = vectordata.bbox
 
+    # TODO: Add option to assign pixel value based on a feature valuefield
+    # instead of just 0 and 1
+    # ...
+
     raster = data.RasterData(mode="1bit", **rasterdef)
 
     # create 1bit image with specified size
@@ -169,10 +186,48 @@ def rasterize(vectordata, **rasterdef):
     raster.add_band(img=img)
     return raster
 
-def vectorize(rasterdata, **kwargs):
-    # use PIL.ImageMorph.MorphOp() with an "edge" pattern.
+def vectorize(raster, bandnum=1):
+    # so far only experimental
     # ...
-    pass
+    
+    if raster.mode == "1bit":
+
+        raise Exception("Not yet implemented")
+
+        ##        import PIL.ImageMorph
+        ##        op = PIL.ImageMorph.MorphOp(op_name="edge")
+        ##        img = raster.bands[bandnum]
+        ##        # extend img with 1 pixel border to allow identifying edges along the edge
+        ##        # ...
+        ##        # alt1
+        ##        pixcount,outlineimg = op.apply(img)
+        ##        # alt2
+        ##        coords = op.match(img)
+        ##
+        ##        # difficult part is how to connect the edge pixels
+        ##
+        ##        # MAYBE:
+        ##        # first get pixels as coordinates via geotransform
+        ##        # start on first matching pixel
+        ##        # then examine and follow first match among neighbouring pixels in clockwise direction
+        ##        # each pixel followed is converted to coordinate via geotransform and added to a list
+        ##        # keep following until ring is closed or no more neighbours have match (deadend)
+        ##        # jump to next unprocessed pixel, and repeat until all have been processed
+        ##        # after all is done, we have one or more polygons, lines in the case of deadends, or points in the case of just one match per iteration
+        ##        # if polygons, identify if any of them are holes belonging to other polygons
+        ##
+        ##        # ALSO
+        ##        # how to connect the pixels, via centerpoint coordinate, or tracing the cell corners?
+        ##        # ...
+        ##
+        ##        # OR
+        ##        # http://cardhouse.com/computer/vector.htm
+
+    else:
+        # for each region of contiguous cells with same value
+        # assign a feature and give it that value
+        # ...
+        raise Exception("Not yet implemented")
 
 def crop(raster, bbox):
     """Finds the pixels that are closest to the bbox
@@ -211,8 +266,11 @@ def clip(raster, clipdata, bbox=None):
     # TODO: HANDLE VARYING BAND NRS
     # TODO: ALSO HANDLE CLIP BY RASTER DATA
     # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
+
+    from ..vector import VectorData
+    from ..raster import RasterData
     
-    if True: #isinstance(clipdata, vector.data.VectorData):
+    if isinstance(clipdata, VectorData):
 
         # determine georef of out raster, defaults to that of the main raster
         if bbox:
@@ -236,7 +294,7 @@ def clip(raster, clipdata, bbox=None):
 
         return outrast
 
-    elif isinstance(clipdata, raster.data.RasterData):
+    elif isinstance(clipdata, RasterData):
         # create blank image
         # paste raster onto blank image using clip raster as mask
         pass

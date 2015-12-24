@@ -12,7 +12,9 @@ print vect.features
 
 rast = pg.raster.manager.rasterize(vect, bbox=vect.bbox, #[-180,90,180,-90],
                                    cellwidth=0.1, cellheight=0.1)
+rast.view(1000,500)
 print rast
+
 
 
 

@@ -272,6 +272,33 @@ def from_file(filepath, **georef):
         crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
 
         return georef, nodataval, bands, crs
+
+    elif filepath.lower().endswith(".ncf"):
+        # netcdf format files
+        # should be simple enough with the struct and array.array modules
+        # to read the binary data
+        # see file structure at www.unidata.ucar.edu/software/netcdf/docs/netcdf/Classic-Format-Spec.html
+
+        # ALSO, once going over to class based reader,
+        # use fast memory views to access data, see see http://eli.thegreenplace.net/2011/11/28/less-copies-in-python-with-the-buffer-protocol-and-memoryviews
+        #
+        # example:
+        # fileobj = open("some/path.ncf", "rb")
+        # fileobj.seek(someoffset_tothedatawewant)
+        # buff = buffer(struct.unpack(fileobj.read(someamount)))
+        # fast_gridvalues = memoryview(buff)
+        # return fast_gridvalues  # allows fast indexing and iterating without creating copies
+
+        # OR more relevant when reading:
+        # buf = bytearray() or array.array() # empty holders of precalculated size
+        # mem = memoryview(buf)
+        # f.readinto(mem)
+
+        # ALTERN, just use:
+        # grid = array.fromfile(fileobj, chunksize)
+        # return memoryview(grid)
+        # ...
+        pass 
     
     else:
 

@@ -60,6 +60,8 @@ import math
 ##        
 ##    return zonesdict, outraster
 
+
+
 # Raster math
 
 ##def raster_math(mathexpr, rasters):
@@ -95,6 +97,9 @@ import math
 ##    firstrast,firstmask = rasters[0]
 ##    outraster = RasterData(image=img, **firstrast.info)
 ##    return outraster
+
+
+
 
 # Interpolation
 
@@ -137,6 +142,7 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="IDW", **kwargs
 
         # MANUAL GAUSS
         # algorithm 1 from http://blog.ivank.net/fastest-gaussian-blur.html
+        # TODO: implement much faster algorithm 4
         origband = newband.copy()
         raster.convert("F") # output values will be floats
         rad = kwargs.get("radius", 3)
@@ -219,6 +225,12 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="IDW", **kwargs
         # ...
         pass
 
+    elif algorithm.lower() == "spline":
+        # see C scripts at http://davis.wpi.edu/~matt/courses/morph/2d.htm
+        # looks simple enough
+        # ...
+        pass
+
     return raster
 
 def heatmap(**kwargs):
@@ -231,3 +243,33 @@ def heatmap(**kwargs):
     #see especially: http://resources.arcgis.com/en/help/main/10.1/index.html#//009z0000000v000000
     
     return interpolate(**kwargs)
+
+def densitymap():
+    # only difference being no value field contributes to heat
+    pass
+
+
+
+
+
+
+# Distance analysis
+
+def distance(vectordata, **rasterdef):
+    # aka proximity raster
+    pass
+
+
+
+
+
+
+# Path Analysis
+
+def least_cost_path(point1, point2, **options):
+    pass
+
+
+
+
+
