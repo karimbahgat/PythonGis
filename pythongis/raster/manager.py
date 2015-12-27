@@ -263,9 +263,7 @@ def crop(raster, bbox):
     return outrast
 
 def clip(raster, clipdata, bbox=None):
-    # TODO: HANDLE VARYING BAND NRS
     # TODO: ALSO HANDLE CLIP BY RASTER DATA
-    # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
 
     from ..vector import VectorData
     from ..raster import RasterData

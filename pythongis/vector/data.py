@@ -187,6 +187,11 @@ class VectorData:
 
         return new
 
+    def join(self, iterable, iterfields, condition):
+        # can be any iterable, add attributes if condition is true
+        # ...
+        pass
+
     ###### SPATIAL INDEXING #######
 
     def create_spatial_index(self):
@@ -240,9 +245,19 @@ class VectorData:
         return new
 
     def view(self, width, height, bbox=None):
-        # dont forget to add
-        # ...
-        pass
+        from .. import renderer
+        lyr = renderer.VectorLayer(self)
+        lyr.render(width=width, height=height, coordspace_bbox=bbox)
+
+        import Tkinter as tk
+        import PIL.ImageTk
+        
+        app = tk.Tk()
+        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
+        lbl = tk.Label(image=tkimg)
+        lbl.tkimg = tkimg
+        lbl.pack()
+        app.mainloop()        
 
 
     

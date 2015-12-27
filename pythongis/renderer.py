@@ -113,13 +113,18 @@ class VectorLayer:
         # override default if any manually specified styleoptions
         self.styleoptions.update(options)
 
-    def render(self, width, height, coordspace_bbox):
+    def render(self, width, height, coordspace_bbox=None):
+        if not coordspace_bbox:
+            coordspace_bbox = self.data.bbox
+        
         drawer = pyagg.Canvas(width, height, background=None)
         drawer.custom_space(*coordspace_bbox)
+
         # get features based on spatial index, for better speeds when zooming
         if not hasattr(self.data, "spindex"):
             self.data.create_spatial_index()
         spindex_features = self.data.quick_overlap(coordspace_bbox)
+
         # draw each as geojson, using same style options for all features
         for feat in spindex_features:
             drawer.draw_geojson(feat.geometry, **self.styleoptions)

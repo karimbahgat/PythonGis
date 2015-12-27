@@ -2,7 +2,7 @@
 import itertools, operator
 from .data import *
 
-import shapely
+import shapely, shapely.ops, shapely.geometry
 from shapely.prepared import prep as supershapely
 
 
@@ -14,11 +14,12 @@ def conditional_summary(groupbydata, valuedata, matchcondition,
                         groupbyfilter=None, valuedatafilter=None,
                         fieldmapping=[], keepall=True, 
                         max_n=None, prepgeom=False):
-    # prep
+    
     data1,data2 = groupbydata,valuedata
 
-    if not groupbyfilter: groupbyfilter = lambda: groupbydata
-    if not valuedatafilter: valuedatafilter = lambda: valuedata
+    # if no filter, main data is always first arg so return first item unfiltered
+    if not groupbyfilter: groupbyfilter = lambda gd,vd: gd
+    if not valuedatafilter: valuedatafilter = lambda vd,gf: vd
 
     def get_aggfunc(agg):
         if agg == "count": return len
@@ -52,11 +53,11 @@ def conditional_summary(groupbydata, valuedata, matchcondition,
             geom = supershapely(geom)
         matches = []
 
-        # get all value features that intersect
+        # get all value features that match a condition
         n = 0
         for otherfeat in valuedatafilter(data2, feat): 
             othergeom = otherfeat.get_shapely()
-            if matchcondition(geom, othergeom):
+            if matchcondition(feat, geom, otherfeat, othergeom):
                 matches.append(otherfeat)
                 n += 1
             if max_n and n >= max_n:
@@ -95,6 +96,89 @@ def conditional_summary(groupbydata, valuedata, matchcondition,
     return new
 
 
+def single_summary(data, matchcondition,
+                    key=None,
+                    fieldmapping=[],
+                    keepall=True):
+
+    def get_aggfunc(agg):
+        if agg == "count": return len
+        elif agg == "sum": return sum
+        elif agg == "max": return max
+        elif agg == "min": return min
+        elif agg == "average": return lambda seq: sum(seq)/float(len(seq))
+        else:
+            # agg is not a string, and is assumed already a function
+            return agg
+
+    if fieldmapping:
+        fieldmapping = [(aggfield,aggtype,get_aggfunc(aggtype)) for aggfield,aggtype in fieldmapping]
+        aggfields,aggtypes,aggfuncs = zip(*fieldmapping)
+
+    # create new
+    new = VectorData()
+    new.fields = list(data1.fields)
+    if fieldmapping: 
+        for aggfield,aggtype,aggfunc in fieldmapping:
+            new.fields.append(aggfield)
+
+    # group features
+    sortdata = sorted(data, key=key)
+    for keyval,feats in itertools.groupby(sortdata, key=key):
+        pass
+
+    dsfdsafsfadsfdasfsafasf
+    
+##    for i,feat in enumerate(groupbyfilter(data1, data2)):
+##        geom = feat.get_shapely()
+##        if prepgeom: # default is False, because limits operations in matchcondition to intersects method, nothing else
+##            geom = supershapely(geom)
+##        matches = []
+##
+##        # get all value features that match a condition
+##        n = 0
+##        for otherfeat in valuedatafilter(data2, feat): 
+##            othergeom = otherfeat.get_shapely()
+##            if matchcondition(feat, geom, otherfeat, othergeom):
+##                matches.append(otherfeat)
+##                n += 1
+##            if max_n and n >= max_n:
+##                break
+##
+##        # make newrow from original row
+##        newrow = list(feat.row)
+##
+##        # if any matches
+##        if matches:
+##            def make_number(value):
+##                try: return float(value)
+##                except: return None
+##                
+##            # add summary values to newrow based on fieldmapping
+##            for aggfield,aggtype,aggfunc in fieldmapping:
+##                values = [otherfeat[aggfield] for otherfeat in matches]
+##                if aggtype in ("sum","max","min","average"):
+##                    # only consider number values if numeric stats
+##                    values = [make_number(value) for value in values if make_number(value) != None]
+##                if values:
+##                    summaryvalue = aggfunc(values)
+##                    ###print "match", aggfunc, values, summaryvalue
+##                    newrow.append(summaryvalue)
+##                else:
+##                    newrow.append("")
+##
+##        # otherwise, add empty values
+##        elif keepall:
+##            ###print "no match"
+##            newrow.extend(("" for _ in fieldmapping))
+
+        # write feature to output
+        new.add_feature(newrow, feat.geometry)
+
+    return new
+
+
+
 
 
 # Overlay Analysis (transfer of values, but no clip)
@@ -115,7 +199,7 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], **kwargs):
     def _valuedatafilter(valuedata, groupfeat):
         return valuedata.quick_overlap(groupfeat.bbox)
     
-    def _matchcondition(geom, othergeom):
+    def _matchcondition(feat, geom, otherfeat, othergeom):
         return geom.intersects(othergeom)
 
     # run
@@ -154,7 +238,7 @@ def near_summary(groupbydata, valuedata,
     def _valuedatafilter(valuedata, groupfeat):
         return valuedata.quick_nearest(groupfeat.bbox) if n else valuedata
     
-    def _matchcondition(geom, othergeom):
+    def _matchcondition(feat, geom, otherfeat, othergeom):
         return geom.distance(othergeom) <= radius if radius else True
 
     # run
@@ -204,15 +288,126 @@ def travelling_salesman(points, **options):
 
 # Cut-Glue operations
 
-def glue():
+def glue(data, key=None, fieldmapping=[]):
+    # WRONG, MUST BE REDONE...
+    
     # aka dissolve
     # aggregate/glue together features in a single layer with same values
-    pass
 
-def cut():
-    # aka clip
-    # clip/cut apart a layer by another layer
-    pass
+    # for now only meant for polygons
+    # not sure how lines or points will do
+    # ...
+
+    # simply use conditional summary, with groupby and value as the same
+    # match requires neighbouring features (intersects/touches) and possibly same key value
+    # also cannot be itself
+    
+    def _matchcondition(feat, geom, otherfeat, othergeom):
+        # not same as self
+        _notsame = feat is not otherfeat
+        if not _notsame:
+            return False
+        
+        # value match
+        if key:
+            _valmatch = key(feat) == key(otherfeat)
+        else:
+            _valmatch = True
+        if not _valmatch:
+            return False
+        
+        # intersects/neighbouring
+        _intsect = geom.intersects(othergeom)
+        if not _intsect:
+            return False
+
+        # return match if all tests passed
+        return True
+        
+    new = conditional_summary(data, data, _matchcondition,
+                                groupbyfilter=None, valuedatafilter=None,
+                                fieldmapping=fieldmapping, keepall=True, 
+                                max_n=None, prepgeom=True)
+    return new
+
+def cut(data, cutter):
+    """cut apart a layer by the lines of another layer"""
+
+    # FOR NOW, only cuts poly by poly or poly by line
+    # not yet handling line by line, how to do that...?
+    # ...
+
+    outdata = VectorData()
+    outdata.fields = list(data.fields)
+
+    # point data cannot be cut or used for cutting
+    if "Point" in data.type or "Point" in cutter.type:
+        raise Exception("Point data cannot be cut or used for cutting, only polygons or lines")
+
+    # create spatial index
+    if not hasattr(data, "spindex"): data.create_spatial_index()
+    if not hasattr(cutter, "spindex"): cutter.create_spatial_index()
+
+    # cut
+    for feat in data.quick_overlap(cutter.bbox):
+        geom = feat.get_shapely()
+
+        # if polygon, main geom should be just the exterior without holes
+        if "Polygon" in geom.type:
+            geomlines = geom.boundary
+        elif "LineString" in geom.type:
+            geomlines = geom
+
+        # get and prep relevant cut lines
+        def get_as_lines(cutgeom):            
+            if "Polygon" in cutgeom.type:
+                # exterior boundary
+                lines = cutgeom.boundary
+                
+                # holes should also be used for cutting
+                if "Multi" in cutgeom.type:
+                    holes = [hole for multigeom in cutgeom.geoms for hole in multigeom.interiors]
+                else:
+                    holes = cutgeom.interiors
+                if holes:
+                    # combine with exterior
+                    holelines = MultiLineString([hole.boundary for hole in holes])
+                    lines = lines.union(holelines)
+
+            elif "LineString" in cutgeom.type:
+                lines = cutgeom
+                
+            return lines
+
+        cutgeoms = (cutfeat.get_shapely() for cutfeat in cutter.quick_overlap(feat.bbox))
+        cutgeoms = (cutgeom for cutgeom in cutgeoms if cutgeom.intersects(geom))
+        cutgeoms_lines = [get_as_lines(cutgeom) for cutgeom in cutgeoms]
+        cutunion = shapely.ops.cascaded_union(cutgeoms_lines)
+
+        # union main and cutter and make into new polygons
+        result = shapely.ops.polygonize(geomlines.union(cutunion))
+        polys = list(result)
+        if len(polys) == 1:
+            newgeom = polys[0]
+        else:
+            newgeom = shapely.geometry.MultiPolygon(polys)
+
+        # the above only cut from the exterior of the main data,
+        # so subtract main data's holes from the results
+        if "Polygon" in geom.type:
+            if "Multi" in cutgeom.type:
+                holes = [hole for multigeom in cutgeom.geoms for hole in multigeom.interiors]
+            else:
+                holes = cutgeom.interiors
+            if holes:
+                # subtract from the exterior
+                holes = MultiPolygon(holes)
+                newgeom = newgeom.difference(holes)
+
+        # add feature
+        outdata.add_feature(feat.row, newgeom.__geo_interface__)
+        
+    return outdata
 
 
 
@@ -221,28 +416,61 @@ def cut():
 
 # Select extract operations
 
-def crop():
-    # aka intersects(), aka select()
-    # keeps only those that intersect with other layer
-    # similar to intersection() except doesnt alter any geometries
+##def crop():
+##    # aka intersects(), aka select()
+##    # keeps only those that intersect with other layer
+##    # similar to intersection() except doesnt alter any geometries
+##    pass
+
+def clip():
+    # aka intersection without attribute joining
     pass
 
 
 
 
 # Geometrics
+# but if handling multiple datas, not sure which attr to keep and when.
+# ...
 
-def intersection(*datas):
-    pass
+##def intersection(*datas):
+##    # aka raster clip
+##    pass
+##
+##    ##    import itertools
+##    ##    zip = itertools.izip
+##    ##    
+##    ##    new = VectorData()
+##    ##    new.fields = list((d.fields for d in datas))
+##    ##
+##    ##    for feat in datas[0]:
+##    ##        # get the cumulative intersection of all feats
+##    ##        geom = feats[0].get_shapely()
+##    ##        for feat in feats[1:]:
+##    ##            geom = geom.intersection(feat.get_shapely())
+##    ##
+##    ##        # collect the rows too maybe?
+##    ##        # ...
+##    ##        
+##    ##        if not geom.is_empty:
+##    ##            geojson = geom.__geo_interface__
+##    ##            geojson["type"] = geom.type
+##    ##            new.add_feature([], geojson)
+##    ##
+##    ##    # change data type to minimum dimension
+##    ##    new.type = "Polygon" 
+##    ##    return new
+##
+##def union(*datas):
+##    pass
+##
+##def unique(*datas):
+##    """Those parts of the geometries that are unique(nonintersecting) for each layer.
+##    Aka symmetrical difference.
+##    """
+##    pass
 
-def union(*datas):
-    pass
-
-def unique(*datas):
-    """Those parts of the geometries that are unique(nonintersecting) for each layer"""
-    pass
-
-def buffer(data, dist_expression):
+def buffer(data, dist_expression, join_style="round", cap_style="round", mitre_limit=1.0):
     """
     Buffering the data by a positive distance grows the geometry,
     while a negative distance shrinks it. Distance units should be given in
@@ -251,13 +479,19 @@ def buffer(data, dist_expression):
     Distance is an expression written in Python syntax, where it is possible
     to access the attributes of each feature by writing: feat['fieldname'].
     """
+    joincode = {"round":1,
+                "flat":2,
+                "square":3}[join_style]
+    capcode = {"round":1,
+                "mitre":2,
+                "bevel":3}[cap_style]
     # buffer and change each geojson dict in-place
     new = VectorData()
     new.fields = list(data.fields)
     for feat in data:
         geom = feat.get_shapely()
         dist = eval(dist_expression)
-        buffered = geom.buffer(dist)
+        buffered = geom.buffer(dist, join_style=joincode, cap_style=capcode, mitre_limit=mitre_limit)
         if not buffered.is_empty:
             geojson = buffered.__geo_interface__
             geojson["type"] = buffered.type

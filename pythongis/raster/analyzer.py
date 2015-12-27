@@ -253,7 +253,7 @@ def densitymap():
 
 
 
-# Distance analysis
+# Distance Analysis
 
 def distance(vectordata, **rasterdef):
     # aka proximity raster
@@ -268,6 +268,19 @@ def distance(vectordata, **rasterdef):
 
 def least_cost_path(point1, point2, **options):
     pass
+
+
+
+
+
+# Terrain Analysis
+
+def viewshed(point, direction, height, raster, **kwargs):
+    pass
+
+def slope(raster):
+    pass
+
 
 
 
