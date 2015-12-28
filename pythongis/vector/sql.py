@@ -18,6 +18,10 @@ def aggreg(iterable, aggregfuncs, geomfunc):
         elif agg == "sum": return sum
         elif agg == "max": return max
         elif agg == "min": return min
+        elif agg == "first": return lambda seq: seq.__getitem__(0)
+        elif agg == "last": return lambda seq: seq.__getitem__(-1)
+        elif agg == "majority": notyet
+        elif agg == "minority": notyet
         elif agg == "average": return lambda seq: sum(seq)/float(len(seq))
         else:
             # agg is not a string, and is assumed already a function
@@ -44,6 +48,8 @@ def aggreg(iterable, aggregfuncs, geomfunc):
             aggval = "" # or best with None
             
         row.append(aggval)
+
+    print "row",row
         
     geom = geomfunc(iterable)
 
@@ -74,13 +80,13 @@ def limit(iterable, n):
             break
 
 def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
-##    """Takes a series of sql generator components, runs them, and iterates over the resulting feature-geom tuples.
-##
-##    Arg _from must be a sequence of one or more iterables.
-##    All combinations of items from the iterables are then tupled together and passed to the remaining _select, _where_, and _groupby args.
-##    This allows us to involve items from all the iterables in the functions that define our queries.
-##    The final _select function should return a row list, and the _geomselect should return a geojson dictionary.
-##    """
+    """Takes a series of sql generator components, runs them, and iterates over the resulting feature-geom tuples.
+
+    Arg _from must be a sequence of one or more iterables.
+    All combinations of items from the iterables are then tupled together and passed to the remaining _select, _where_, and _groupby args.
+    This allows us to involve items from all the iterables in the functions that define our queries.
+    The final _select function should return a row list, and the _geomselect should return a geojson dictionary.
+    """
     # INSTEAD MAKE INTO CLASS
     # WITH .fields attr
     # AND .__iter__()
@@ -89,7 +95,7 @@ def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
     # THIS WAY ALLOWING CHAINED QUERIES
 
     # parse args
-    iterable = _from
+    iterables = _from
     columnfuncs = _select
     geomfunc = _geomselect
     condition = _where
@@ -99,6 +105,9 @@ def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
     # first yield header as list of column names
     colnames = [each[0] for each in columnfuncs]
     yield colnames
+
+    # make an iterable that yields every combinaion of all input iterables' items
+    iterable = itertools.product(*iterables)
 
     # iterate and add
     if key:
@@ -114,7 +123,7 @@ def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
                 items = where(items, condition)
                 
             # aggregate
-            # NOTE: when using a groupby query, columnfuncs and geomfunc must expect an iterable as input and return a single row,geom pair
+            # NOTE: columnfuncs and geomfunc must expect an iterable as input and return a single row,geom pair
             row,geom = aggreg(items, columnfuncs, geomfunc)
             yield row,geom
             
@@ -139,6 +148,7 @@ def query_to_data(_query):
 
     # add each feature
     for row,geom in _query:
-        out.add_feature(row, geom)
+        if geom: # hack, should find a way to add empty geoms
+            out.add_feature(row, geom)
 
     return out

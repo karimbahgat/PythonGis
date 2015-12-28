@@ -96,87 +96,6 @@ def conditional_summary(groupbydata, valuedata, matchcondition,
     return new
 
 
-def single_summary(data, matchcondition,
-                    key=None,
-                    fieldmapping=[],
-                    keepall=True):
-
-    def get_aggfunc(agg):
-        if agg == "count": return len
-        elif agg == "sum": return sum
-        elif agg == "max": return max
-        elif agg == "min": return min
-        elif agg == "average": return lambda seq: sum(seq)/float(len(seq))
-        else:
-            # agg is not a string, and is assumed already a function
-            return agg
-
-    if fieldmapping:
-        fieldmapping = [(aggfield,aggtype,get_aggfunc(aggtype)) for aggfield,aggtype in fieldmapping]
-        aggfields,aggtypes,aggfuncs = zip(*fieldmapping)
-
-    # create new
-    new = VectorData()
-    new.fields = list(data1.fields)
-    if fieldmapping: 
-        for aggfield,aggtype,aggfunc in fieldmapping:
-            new.fields.append(aggfield)
-
-    # group features
-    sortdata = sorted(data, key=key)
-    for keyval,feats in itertools.groupby(sortdata, key=key):
-        pass
-
-    dsfdsafsfadsfdasfsafasf
-    
-##    for i,feat in enumerate(groupbyfilter(data1, data2)):
-##        geom = feat.get_shapely()
-##        if prepgeom: # default is False, because limits operations in matchcondition to intersects method, nothing else
-##            geom = supershapely(geom)
-##        matches = []
-##
-##        # get all value features that match a condition
-##        n = 0
-##        for otherfeat in valuedatafilter(data2, feat): 
-##            othergeom = otherfeat.get_shapely()
-##            if matchcondition(feat, geom, otherfeat, othergeom):
-##                matches.append(otherfeat)
-##                n += 1
-##            if max_n and n >= max_n:
-##                break
-##
-##        # make newrow from original row
-##        newrow = list(feat.row)
-##
-##        # if any matches
-##        if matches:
-##            def make_number(value):
-##                try: return float(value)
-##                except: return None
-##                
-##            # add summary values to newrow based on fieldmapping
-##            for aggfield,aggtype,aggfunc in fieldmapping:
-##                values = [otherfeat[aggfield] for otherfeat in matches]
-##                if aggtype in ("sum","max","min","average"):
-##                    # only consider number values if numeric stats
-##                    values = [make_number(value) for value in values if make_number(value) != None]
-##                if values:
-##                    summaryvalue = aggfunc(values)
-##                    ###print "match", aggfunc, values, summaryvalue
-##                    newrow.append(summaryvalue)
-##                else:
-##                    newrow.append("")
-##
-##        # otherwise, add empty values
-##        elif keepall:
-##            ###print "no match"
-##            newrow.extend(("" for _ in fieldmapping))
-##
-##        # write feature to output
-##        new.add_feature(newrow, feat.geometry)
-
-    return new
-
 
 
 
@@ -288,18 +207,143 @@ def travelling_salesman(points, **options):
 
 # Cut-Glue operations
 
-def glue(data, key=None, fieldmapping=[]):   
+def glue(data, key=None, fieldmapping=[], contig=True):   
     # aka dissolve
     # aggregate/glue together features in a single layer with same values
 
-    # for now only meant for polygons
+    # for now only designed for polygons
     # not sure how lines or points will do
     # ...
 
     # match requires neighbouring features (intersects/touches) and possibly same key value
     # also cannot be itself
 
+    # TODO: allow two versions, one where only contiguous areas with same key are considered a stats group
+    # and one considering where all areas with same key regardless of contiguous
+    # ALSO use much faster algorithm if no key, since just need cascaded union on all followed by groupby stats on all
+
     from . import sql
+    iterable = ((feat,feat.get_shapely()) for feat in data)
+
+    if contig:        
+        # contiguous dissolve
+        # requires two combi items in funcs
+        iterable2 = ((feat,feat.get_shapely()) for feat in data)
+
+        raise Exception("Contiguous dissolve not yet implemented")
+
+        # old version
+        # not yet correct, includes all pairs that are contiguous but not guaranteed within same group
+        # ...
+        
+##        if not key: key = lambda x: True # groups together all items
+##
+##        def _where(itemcombi):
+##            (feat,geom),(feat2,geom2) = itemcombi
+##            
+##            _notsame = feat != feat2
+##            if not _notsame: return False
+##
+##            _bothkey = key([(feat,geom),(feat2,geom2)]) == key([(feat2,geom2),(feat,geom)])
+##            if not _bothkey: return False
+##
+##            _intsec = geom.intersects(geom2)
+##            if not _intsec: return False
+##            
+##            print "madeit",feat["CNTRY_NAME"],feat2["CNTRY_NAME"]
+##            return True
+##
+##        def _geomselect(itemcombis):
+##            geoms = []
+##            for (f,g),(f2,g2) in itemcombis:
+##                ##print f["CNTRY_NAME"],f2["CNTRY_NAME"]
+##                geoms.append(g)
+##            
+##            union = shapely.ops.cascaded_union(geoms)
+##            if not union.is_empty:
+##                return union.__geo_interface__
+##        
+##        q = sql.query(_from=[iterable,iterable2],
+##                     _groupby=key,
+##                     _where=_where,
+##                     _select=fieldmapping,
+##                     _geomselect=_geomselect,
+##                    )
+##
+##        res = sql.query_to_data(q)
+##
+##        return res
+
+
+
+        # try manual sql component approach
+        # not yet done
+        # ...
+        
+##        if not key: key = lambda x: True # groups together all items
+##
+##        # rename args
+##        iterables = [iterable1,iterable2]
+##        columnfuncs = _fieldmapping
+##        condition = _where
+##        geomfunc = _geomselect
+##        condition = _where
+##        key = key
+##
+##        # make an iterable that yields every combinaion of all input iterables' items
+##        iterable = itertools.product(*iterables)
+##
+##        # iterate and add
+##        groups = groupby(iterable, key)
+##        
+##        for items in groups:
+##            # filter
+##            items = where(items, condition)
+##                
+##            # aggregate
+##            # NOTE: columnfuncs and geomfunc must expect an iterable as input and return a single row,geom pair
+##            row,geom = aggreg(items, columnfuncs, geomfunc)
+##
+##            # add feat
+##            # ...
+
+
+
+        # cheating approach
+        # cascade union on all with same key
+        # then for each single poly in result (ie contiguous),
+        # ...find overlapping orig geoms and aggregate stats
+        # ...and expand single poly by unioning with orig geoms that are multipoly (since those should also be part of the contiguous poly)
+        # just an idea so far
+        # ...
+
+    else:
+        # noncontiguous dissolve
+        # much easier and faster
+        # requires only one combi item in funcs
+
+        if not key: key = lambda x: True # groups together all items
+
+        def _geomselect(itemcombis):
+            geoms = []
+            for combi in itemcombis:
+                f,g = combi[0]
+                ###print f["CNTRY_NAME"]
+                geoms.append(g)
+            
+            union = shapely.ops.cascaded_union(geoms)
+            if not union.is_empty:
+                return union.__geo_interface__
+        
+        q = sql.query(_from=[iterable],
+                     _groupby=key,
+                     _select=fieldmapping,
+                     _geomselect=_geomselect,
+                    )
+
+        res = sql.query_to_data(q)
+
+        return res
 
     
 
