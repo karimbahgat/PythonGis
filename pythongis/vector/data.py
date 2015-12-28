@@ -244,9 +244,9 @@ class VectorData:
         if hasattr(self, "spindex"): new.spindex = self.spindex.copy()
         return new
 
-    def view(self, width, height, bbox=None):
+    def view(self, width, height, bbox=None, **styleoptions):
         from .. import renderer
-        lyr = renderer.VectorLayer(self)
+        lyr = renderer.VectorLayer(self, **styleoptions)
         lyr.render(width=width, height=height, coordspace_bbox=bbox)
 
         import Tkinter as tk

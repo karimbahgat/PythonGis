@@ -25,6 +25,19 @@ import pythongis as pg
 
 
 
+# clip test
+conv = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_convexes.shp")
+tess = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_triangles.shp")
+
+conv.view(1000,500)
+tess.view(1000,500)
+
+res = pg.vector.analyzer.clip(conv, tess)
+print res
+res.view(1000,500)
+
+
+
 # dissolve test
 conv = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_convexes.shp")
 conv.view(1000,500)

@@ -6,6 +6,8 @@ import shapely, shapely.ops, shapely.geometry
 from shapely.prepared import prep as supershapely
 
 
+# TODO: when multiple input, uses all possible combinations, but need a way to use spatial indexes etc
+
 
 # SQL components
 
@@ -20,14 +22,21 @@ def aggreg(iterable, aggregfuncs, geomfunc):
         elif agg == "min": return min
         elif agg == "first": return lambda seq: seq.__getitem__(0)
         elif agg == "last": return lambda seq: seq.__getitem__(-1)
-        elif agg == "majority": notyet
-        elif agg == "minority": notyet
+        elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))
+        elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))
         elif agg == "average": return lambda seq: sum(seq)/float(len(seq))
-        else:
-            # agg is not a string, and is assumed already a function
+        elif hasattr(agg, "__call__"):
+            # agg is not a string but a function
             return agg
+        else:
+            raise Exception("aggfunc must be a callable function or a valid statistics string name")
 
-    aggregfuncs = [(name,valfunc,aggname,lookup_aggfunc(aggname)) for name,valfunc,aggname in aggregfuncs]
+    def check_valfunc(valfunc):
+        if not hasattr(valfunc,"__call__"):
+            raise Exception("valfunc for field '%s' must be a callable function"%name)
+        return valfunc
+    
+    aggregfuncs = [(name,check_valfunc(valfunc),aggname,lookup_aggfunc(aggname)) for name,valfunc,aggname in aggregfuncs]
 
     def make_number(value):
         try: return float(value)
@@ -48,8 +57,6 @@ def aggreg(iterable, aggregfuncs, geomfunc):
             aggval = "" # or best with None
             
         row.append(aggval)
-
-    print "row",row
         
     geom = geomfunc(iterable)
 

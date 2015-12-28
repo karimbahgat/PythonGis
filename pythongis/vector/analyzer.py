@@ -6,6 +6,8 @@ import shapely, shapely.ops, shapely.geometry
 from shapely.prepared import prep as supershapely
 
 
+
+# TODO: REDO OVERLAP AND NEAREST SUMMARY USING SQL FUNCS
         
 # Spatial relations summary
 # (somewhat lowlevel but provided for advanced and flexible use-cases)
@@ -207,7 +209,7 @@ def travelling_salesman(points, **options):
 
 # Cut-Glue operations
 
-def glue(data, key=None, fieldmapping=[], contig=True):   
+def glue(data, key=None, fieldmapping=[], contig=False):   
     # aka dissolve
     # aggregate/glue together features in a single layer with same values
 
@@ -225,7 +227,7 @@ def glue(data, key=None, fieldmapping=[], contig=True):
     from . import sql
     iterable = ((feat,feat.get_shapely()) for feat in data)
 
-    if contig:        
+    if contig: 
         # contiguous dissolve
         # requires two combi items in funcs
         iterable2 = ((feat,feat.get_shapely()) for feat in data)
@@ -250,14 +252,37 @@ def glue(data, key=None, fieldmapping=[], contig=True):
 ##            _intsec = geom.intersects(geom2)
 ##            if not _intsec: return False
 ##            
-##            print "madeit",feat["CNTRY_NAME"],feat2["CNTRY_NAME"]
 ##            return True
 ##
 ##        def _geomselect(itemcombis):
 ##            geoms = []
-##            for (f,g),(f2,g2) in itemcombis:
-##                ##print f["CNTRY_NAME"],f2["CNTRY_NAME"]
-##                geoms.append(g)
+##
+##            # part of contiguous if intersects any previous pairs
+##            for (f11,g11),(f12,g12) in itemcombis:
+##                for (f21,g21),(f22,g22) in itemcombis:
+##                    _leftleft = g11 != g21 and g11.intersects(g21)
+##                    if _leftleft:
+##                        geoms.append(g11)
+##                        print f11["CNTRY_NAME"]
+##                        break
+##
+##                    _leftright = g11 != g22 and g11.intersects(g22)
+##                    if _leftright:
+##                        geoms.append(g11)
+##                        print f11["CNTRY_NAME"]
+##                        break
+##
+##                    _rightleft = g12 != g21 and g12.intersects(g21)
+##                    if _rightleft:
+##                        geoms.append(g12)
+##                        print f12["CNTRY_NAME"]
+##                        break
+##
+##                    _rightright = g12 != g22 and g12.intersects(g22)
+##                    if _rightright:
+##                        geoms.append(g12)
+##                        print f12["CNTRY_NAME"]
+##                        break
 ##            
 ##            union = shapely.ops.cascaded_union(geoms)
 ##            if not union.is_empty:
@@ -308,7 +333,6 @@ def glue(data, key=None, fieldmapping=[], contig=True):
 ##            # ...
 
 
-
         # cheating approach
         # cascade union on all with same key
         # then for each single poly in result (ie contiguous),
@@ -316,6 +340,8 @@ def glue(data, key=None, fieldmapping=[], contig=True):
         # ...and expand single poly by unioning with orig geoms that are multipoly (since those should also be part of the contiguous poly)
         # just an idea so far
         # ...
+
+
 
     else:
         # noncontiguous dissolve
@@ -334,7 +360,7 @@ def glue(data, key=None, fieldmapping=[], contig=True):
             union = shapely.ops.cascaded_union(geoms)
             if not union.is_empty:
                 return union.__geo_interface__
-        
+
         q = sql.query(_from=[iterable],
                      _groupby=key,
                      _select=fieldmapping,
@@ -345,43 +371,6 @@ def glue(data, key=None, fieldmapping=[], contig=True):
 
         return res
 
-    
-
-    # WRONG, MUST BE REDONE...
-
-    # simply use conditional summary, with groupby and value as the same
-    
-##    def _matchcondition(feat, geom, otherfeat, othergeom):
-##        # not same as self
-##        _notsame = feat is not otherfeat
-##        if not _notsame:
-##            return False
-##        
-##        # value match
-##        if key:
-##            _valmatch = key(feat) == key(otherfeat)
-##        else:
-##            _valmatch = True
-##        if not _valmatch:
-##            return False
-##        
-##        # intersects/neighbouring
-##        _intsect = geom.intersects(othergeom)
-##        if not _intsect:
-##            return False
-##
-##        # return match if all tests passed
-##        return True
-##        
-##    new = conditional_summary(data, data, _matchcondition,
-##                                groupbyfilter=None, valuedatafilter=None,
-##                                fieldmapping=fieldmapping, keepall=True, 
-##                                max_n=None, prepgeom=True)
-##    return new
-
-    # NEWEST
-    # just group by value, for each doing cascade union and aggregate their values
-    # ...
 
 def cut(data, cutter):
     """cut apart a layer by the lines of another layer"""
@@ -412,7 +401,7 @@ def cut(data, cutter):
             geomlines = geom
 
         # get and prep relevant cut lines
-        def get_as_lines(cutgeom):            
+        def get_as_lines(cutgeom):
             if "Polygon" in cutgeom.type:
                 # exterior boundary
                 lines = cutgeom.boundary
@@ -475,9 +464,29 @@ def cut(data, cutter):
 ##    # similar to intersection() except doesnt alter any geometries
 ##    pass
 
-def clip():
+def clip(data, clipper):
     # aka intersection without attribute joining
-    pass
+    # how to behave if data is polygon and clipper is linestring
+    # perhaps use the cut algorithm, ie merge the two
+    # ...
+
+
+    # create spatial index
+    if not hasattr(data, "spindex"): data.create_spatial_index()
+    if not hasattr(clipper, "spindex"): clipper.create_spatial_index()
+
+    out = VectorData()
+    out.fields = list(data.fields)
+
+    iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
+    for feat,geom in iterable:
+        iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
+        for clipfeat,clipgeom in iterable2:
+            if geom.intersects(clipgeom):
+                intsec = geom.intersection(clipgeom)
+                out.add_feature(feat.row, intsec.__geo_interface__)
+
+    return out
 
 
 
