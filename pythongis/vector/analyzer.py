@@ -6,7 +6,7 @@ import shapely, shapely.ops, shapely.geometry
 from shapely.prepared import prep as supershapely
 
 
-
+        
 # Spatial relations summary
 # (somewhat lowlevel but provided for advanced and flexible use-cases)
 
@@ -171,9 +171,9 @@ def single_summary(data, matchcondition,
 ##        elif keepall:
 ##            ###print "no match"
 ##            newrow.extend(("" for _ in fieldmapping))
-
-        # write feature to output
-        new.add_feature(newrow, feat.geometry)
+##
+##        # write feature to output
+##        new.add_feature(newrow, feat.geometry)
 
     return new
 
@@ -288,9 +288,7 @@ def travelling_salesman(points, **options):
 
 # Cut-Glue operations
 
-def glue(data, key=None, fieldmapping=[]):
-    # WRONG, MUST BE REDONE...
-    
+def glue(data, key=None, fieldmapping=[]):   
     # aka dissolve
     # aggregate/glue together features in a single layer with same values
 
@@ -298,37 +296,48 @@ def glue(data, key=None, fieldmapping=[]):
     # not sure how lines or points will do
     # ...
 
-    # simply use conditional summary, with groupby and value as the same
     # match requires neighbouring features (intersects/touches) and possibly same key value
     # also cannot be itself
-    
-    def _matchcondition(feat, geom, otherfeat, othergeom):
-        # not same as self
-        _notsame = feat is not otherfeat
-        if not _notsame:
-            return False
-        
-        # value match
-        if key:
-            _valmatch = key(feat) == key(otherfeat)
-        else:
-            _valmatch = True
-        if not _valmatch:
-            return False
-        
-        # intersects/neighbouring
-        _intsect = geom.intersects(othergeom)
-        if not _intsect:
-            return False
 
-        # return match if all tests passed
-        return True
-        
-    new = conditional_summary(data, data, _matchcondition,
-                                groupbyfilter=None, valuedatafilter=None,
-                                fieldmapping=fieldmapping, keepall=True, 
-                                max_n=None, prepgeom=True)
-    return new
+    from . import sql
+
+    
+
+    # WRONG, MUST BE REDONE...
+
+    # simply use conditional summary, with groupby and value as the same
+    
+##    def _matchcondition(feat, geom, otherfeat, othergeom):
+##        # not same as self
+##        _notsame = feat is not otherfeat
+##        if not _notsame:
+##            return False
+##        
+##        # value match
+##        if key:
+##            _valmatch = key(feat) == key(otherfeat)
+##        else:
+##            _valmatch = True
+##        if not _valmatch:
+##            return False
+##        
+##        # intersects/neighbouring
+##        _intsect = geom.intersects(othergeom)
+##        if not _intsect:
+##            return False
+##
+##        # return match if all tests passed
+##        return True
+##        
+##    new = conditional_summary(data, data, _matchcondition,
+##                                groupbyfilter=None, valuedatafilter=None,
+##                                fieldmapping=fieldmapping, keepall=True, 
+##                                max_n=None, prepgeom=True)
+##    return new
+
+    # NEWEST
+    # just group by value, for each doing cascade union and aggregate their values
+    # ...
 
 def cut(data, cutter):
     """cut apart a layer by the lines of another layer"""
