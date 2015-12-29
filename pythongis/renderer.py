@@ -6,9 +6,11 @@ import PIL, PIL.Image
 
 
 class MapCanvas:
-    def __init__(self, layers, width, height, background=None, *args, **kwargs):
+    def __init__(self, width, height, background=None, layers=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
+        if not layers:
+            layers = LayerGroup()
         self.layers = layers
         layers.connected_maps.append(self)
 
@@ -55,7 +57,7 @@ class MapCanvas:
             if layer.visible:
                 layer.render(width=self.drawer.width,
                              height=self.drawer.height,
-                             coordspace_bbox=self.drawer.coordspace_bbox)
+                             bbox=self.drawer.coordspace_bbox)
         self.update_draworder()
 
     def update_draworder(self):
@@ -131,17 +133,17 @@ class VectorLayer:
                 else:
                     self.styleoptions[key] = val
 
-    def render(self, width, height, coordspace_bbox=None):
-        if not coordspace_bbox:
-            coordspace_bbox = self.data.bbox
+    def render(self, width, height, bbox=None):
+        if not bbox:
+            bbox = self.data.bbox
         
         drawer = pyagg.Canvas(width, height, background=None)
-        drawer.custom_space(*coordspace_bbox)
+        drawer.custom_space(*bbox)
 
         # get features based on spatial index, for better speeds when zooming
         if not hasattr(self.data, "spindex"):
             self.data.create_spatial_index()
-        features = self.data.quick_overlap(coordspace_bbox)
+        features = self.data.quick_overlap(bbox)
 
         # custom draworder (sortorder is only used with sortkey)
         if "sortkey" in self.styleoptions:

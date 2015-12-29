@@ -550,16 +550,10 @@ class RasterData(object):
         kwargs["raster"] = self
         return manager.resample(**kwargs)
 
-    def view(self, width, height):
+    def view(self, width, height, **options):
         from .. import renderer
         lyr = renderer.RasterLayer(self,
-                                   gradcolors=[#(0,0,55), # dark blue
-                                             #(0,0,255), # blue
-                                             #(0,255,0), # green
-                                             (255,255,0), # yellow
-                                             (255,0,0), # red
-                                             #(55,0,0), # dark red
-                                             ]
+                                   **options
                                    )
         lyr.render(width=width, height=height, resampling="nearest")
 
