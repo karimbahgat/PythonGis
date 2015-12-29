@@ -108,10 +108,28 @@ class VectorLayer:
         # by default, set random style color
         rand = random.randrange
         randomcolor = (rand(255), rand(255), rand(255), 255)
-        self.styleoptions = {"fillcolor": randomcolor}
+        self.styleoptions = {"fillcolor": randomcolor,
+                             "sortorder": "incr"}
             
         # override default if any manually specified styleoptions
         self.styleoptions.update(options)
+
+        # set up classifier
+        features = self.data
+        import classipy as cp
+        for key,val in self.styleoptions.copy().items():
+            if key in "fillcolor fillsize outlinecolor outlinewidth".split():
+                if isinstance(val, dict):
+                    # cache precalculated values in id dict
+                    # more memory friendly alternative is to only calculate breakpoints
+                    # and then find classvalue for feature when rendering,
+                    # which is likely slower
+                    classifier = cp.Classifier(features, **val)
+                    self.styleoptions[key] = dict(classifier=classifier,
+                                                   symbols=dict((id(f),classval) for f,classval in classifier)
+                                                   )
+                else:
+                    self.styleoptions[key] = val
 
     def render(self, width, height, coordspace_bbox=None):
         if not coordspace_bbox:
@@ -123,11 +141,30 @@ class VectorLayer:
         # get features based on spatial index, for better speeds when zooming
         if not hasattr(self.data, "spindex"):
             self.data.create_spatial_index()
-        spindex_features = self.data.quick_overlap(coordspace_bbox)
+        features = self.data.quick_overlap(coordspace_bbox)
 
-        # draw each as geojson, using same style options for all features
-        for feat in spindex_features:
-            drawer.draw_geojson(feat.geometry, **self.styleoptions)
+        # custom draworder (sortorder is only used with sortkey)
+        if "sortkey" in self.styleoptions:
+            features = sorted(features, key=self.styleoptions["sortkey"],
+                              reverse=self.styleoptions["sortorder"].lower() == "decr")
+
+        # draw each as geojson
+        for feat in features:
+            
+            # get symbols
+            rendict = dict()
+            for key in "fillcolor fillsize outlinecolor outlinewidth".split():
+                if key in self.styleoptions:
+                    val = self.styleoptions[key]
+                    if isinstance(val, dict):
+                        # lookup self in precomputed symboldict
+                        rendict[key] = val["symbols"][id(feat)]
+                    else:
+                        rendict[key] = val
+
+            # draw
+            drawer.draw_geojson(feat.geometry, **rendict)
+            
         self.img = drawer.get_image()
 
 
