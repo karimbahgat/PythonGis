@@ -159,3 +159,27 @@ def query_to_data(_query):
             out.add_feature(row, geom)
 
     return out
+
+
+
+##########
+# EXPERIMENTAL
+
+class Iterable(object):
+    def __init__(self, iterable):
+        self.it = iterable
+
+    def __iter__(self):
+        for item in self.it:
+            yield item
+
+    def intersects(self, othercol):
+        for item in self.quick_overlap(othercol.bbox):
+            for otheritem in othercol.quick_overlap(self.bbox):
+                if item.intersects(otheritem):
+                    yield item
+
+
+
+
+

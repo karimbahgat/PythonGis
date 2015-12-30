@@ -188,7 +188,7 @@ class VectorData:
         return new
 
     def join(self, iterable, iterfields, condition):
-        # can be any iterable, add attributes if condition is true
+        # can be any iterable, adds attributes if condition is true
         # ...
         pass
 
