@@ -21,7 +21,7 @@ def crop(data, bbox):
     out = VectorData()
     out.fields = list(data.fields)
 
-    bboxgeom = shapely.geometry.box(bbox)
+    bboxgeom = shapely.geometry.box(*bbox)
     iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(bbox))
     for feat,geom in iterable:
         intsec = geom.intersection(bboxgeom)
@@ -47,7 +47,7 @@ def select(data, other, condition, **kwargs):
     if condition in ("distance",):
         maxdist = kwargs.get("radius")
         if not maxdist:
-            raise Exception("The 'distance' select condition requires a radius arg")
+            raise Exception("The 'distance' select condition requires a 'radius' arg")
 
         for feat in data:
             geom = feat.get_shapely()

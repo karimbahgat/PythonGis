@@ -229,6 +229,10 @@ class RasterLayer:
         rendered = self.data.resample(algorithm=resampling, **georef)
 
         if self.styleoptions["type"] == "grayscale":
+            
+            # Note: Maybe remove and instead must specify white and black in colorscale type...?
+            # ...
+            
             band = rendered.bands[self.styleoptions["bandnum"]]
             
             # equalize
@@ -258,6 +262,11 @@ class RasterLayer:
             bband = rendered.bands[self.styleoptions["b"]].img.convert("L")
             img = PIL.Image.merge("RGB", [rband,gband,bband])
             img = img.convert("RGBA")
+
+        elif self.styleoptions["type"] == "3d surface":
+            import matplotlib as mpl
+            # ...
+            pass
 
         # make edge and nodata mask transparent
         

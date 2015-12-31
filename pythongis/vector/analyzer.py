@@ -155,26 +155,63 @@ def near_summary(groupbydata, valuedata,
     # NOTE: also watch out, quick_nearest with limit can lead to wrong results, since not all of those will be within exact distance
     # TODO: instead, always consider all nearest, but instead make efficient algo for stopping
     #       or perhaps multiple expanding quick_nearest...
-    def _groupbyfilter(groupbydata, valuedata):
-        return groupbydata
+    # See eg http://www.cs.umd.edu/~hjs/pubs/incnear2.pdf
 
-    def _valuedatafilter(valuedata, groupfeat):
-        return valuedata.quick_nearest(groupfeat.bbox) if n else valuedata
-    
-    def _matchcondition(feat, geom, otherfeat, othergeom):
-        return geom.distance(othergeom) <= radius if radius else True
+    from . import sql
 
-    # run
-    if n: kwargs["max_n"] = n
-    
-    summarized = conditional_summary(groupbydata, valuedata,
-                                     matchcondition=_matchcondition,
-                                     groupbyfilter=_groupbyfilter,
-                                     valuedatafilter=_valuedatafilter,
-                                     fieldmapping=fieldmapping,
-                                     **kwargs)
+    out = pg.vector.data.VectorData()
 
-    return summarized
+    # insert groupby data fields into fieldmapping
+    basefm = [(name,lambda f:f[name],"first") for name in groupbydata.fields]
+    fieldmapping = basefm + fieldmapping
+    out.fields = [name for name,valfunc,aggfunc in fieldmapping]
+
+    # group by each groupby feature
+    iterable = ([(feat,feat.get_shapely()),(otherfeat,otherfeat.get_shapely())]
+                for feat in groupbydata for otherfeat in valuedata)
+    for group in sql.groupby(iterable, lambda([(f,g),(of,og)]): id(f)):
+
+        # precalc all distances
+        group = ([(f,g),(of,og),g.distance(og)] for (f,g),(of,og) in group)
+
+        # sort by nearest dist dirst
+        group = sorted(group, key=lambda([(f,g),(of,og),d]): d)
+
+        # filter to only those within radius
+        if radius: 
+            group = sql.where(group, lambda([(f,g),(of,og),d]): d <= radius)
+
+        # filter ro only n nearest
+        if n:
+            group = sql.limit(group, n)
+
+        # aggregate and add
+        # (not sure if will be correct, in terms of args expected by fieldmapping...?)
+        row,geom = sql.aggreg(group, fieldmapping, lambda([(f,g),(of,og)]): g)
+        out.add_feature(row, geom)
+
+
+##    def _groupbyfilter(groupbydata, valuedata):
+##        return groupbydata
+##
+##    def _valuedatafilter(valuedata, groupfeat):
+##        return valuedata.quick_nearest(groupfeat.bbox) if n else valuedata
+##    
+##    def _matchcondition(feat, geom, otherfeat, othergeom):
+##        return geom.distance(othergeom) <= radius if radius else True
+##
+##    # run
+##    if n: kwargs["max_n"] = n
+##    
+##    summarized = conditional_summary(groupbydata, valuedata,
+##                                     matchcondition=_matchcondition,
+##                                     groupbyfilter=_groupbyfilter,
+##                                     valuedatafilter=_valuedatafilter,
+##                                     fieldmapping=fieldmapping,
+##                                     **kwargs)
+##
+##    return summarized
+
 
 def nearest_identity(groupbydata, valuedata,
                      radius=None,   # only those within radius dist

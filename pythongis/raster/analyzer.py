@@ -267,6 +267,7 @@ def distance(vectordata, **rasterdef):
 # Path Analysis
 
 def least_cost_path(point1, point2, **options):
+    # use https://github.com/elemel/python-astar
     pass
 
 

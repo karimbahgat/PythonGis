@@ -247,7 +247,7 @@ class VectorData:
     def view(self, width, height, bbox=None, **styleoptions):
         from .. import renderer
         lyr = renderer.VectorLayer(self, **styleoptions)
-        lyr.render(width=width, height=height, coordspace_bbox=bbox)
+        lyr.render(width=width, height=height, bbox=bbox)
 
         import Tkinter as tk
         import PIL.ImageTk

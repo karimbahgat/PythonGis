@@ -179,12 +179,8 @@ class Band(object):
 
     def recode(self, condition, newval):
         """Change to a new value for those pixels that meet a condition"""
-        if True: #self.mode in ("F","I"):
-            wheretrue = self._conditional(condition)
-            self.img.paste(newval, (0,0), wheretrue)
-
-        else:
-            raise Exception("Not supported for this format")
+        wheretrue = self._conditional(condition)
+        self.img.paste(newval, (0,0), wheretrue)
 
     def conditional(self, condition):
         """Return a binary band showing where a condition is true"""
