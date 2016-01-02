@@ -23,62 +23,56 @@ import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 ##        
 ##    return merged
 
-def morph(raster, gcp):
+def warp(raster, tiepoints):
     # aka georeference
     # morph or smudge a raster in arbitrary directions based on a set of controlpoints
     # default algorithm is splines, maybe also polynomyal
+    # prob first prep the tiepoints then call on analyzer.interpolate with splines method
     # ...
     
     raise Exception("Not yet implemented")
 
-def reproject(raster, crs=None, algorithm="nearest", **rasterdef):
+def reproject(raster, crs, algorithm="nearest", **rasterdef):
+
+    raise Exception("Not yet implemented")
     
-    algocode = {"nearest":PIL.Image.NEAREST,
-                "bilinear":PIL.Image.BILINEAR,
-                "bicubic":PIL.Image.BICUBIC,
-                }[algorithm.lower()]
+    ##    algocode = {"nearest":PIL.Image.NEAREST,
+    ##                "bilinear":PIL.Image.BILINEAR,
+    ##                "bicubic":PIL.Image.BICUBIC,
+    ##                }[algorithm.lower()]
+    ##
+    ##    if crs == raster.crs:   # need pycrs to compare crs in a smarter way
+    ##        raise Exception("The from and to crs are the same, so no need to reproject.")
 
-    if not crs:
-        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+    ##    # first, create target raster based on rasterdef
+    ##    targetrast = data.RasterData(**rasterdef)
+    ##    for band in raster:
+    ##        targetrast.add_band(img=band.img)
+    ##
+    ##    # get target coordinates
+    ##    lons = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
+    ##    lats = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
+    ##
+    ##    # reproject coords using pyproj
+    ##    for row,lat in enumerate(lats):
+    ##        # convert crs coords
+    ##        reproj = PIL.ImagePath.Path([pyproj.convert(lon,lat) for lon in lons])
+    ##
+    ##        # go from reprojected target coordinates and over to source pixels
+    ##        sourcepixels = reproj.transform(raster.inv_affine)
+    ##
+    ##        # manually get and set the pixels using some algorithm
+    ##        if algorithm == "nearest":
+    ##            for sourceband,targetband in zip(raster,targetrast):
+    ##                for col,pixel in enumerate(sourcepixels):
+    ##                    pixel = int(round(pixel[0])),int(round(pixel[1]))
+    ##                    val = sourceband.get(*pixel)
+    ##                    targetband.set(col,row,val)
 
-    if crs != raster.crs:   # need pycrs to compare crs in a smarter way
-
-        raise Exception("Conversion between crs not yet implemented")
-        
-        ##        # first, create target raster based on rasterdef
-        ##        targetrast = data.RasterData(**rasterdef)
-        ##        for band in raster:
-        ##            targetrast.add_band(img=band.img)
-        ##
-        ##        # get target coordinates
-        ##        lons = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
-        ##        lats = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
-        ##
-        ##        # reproject coords using pyproj
-        ##        for row,lat in enumerate(lats):
-        ##            # convert crs coords
-        ##            reproj = PIL.ImagePath.Path([pyproj.convert(lon,lat) for lon in lons])
-        ##
-        ##            # go from reprojected target coordinates and over to source pixels
-        ##            sourcepixels = reproj.transform(raster.inv_affine)
-        ##
-        ##            # manually get and set the pixels using some algorithm
-        ##            if algorithm == "nearest":
-        ##                for sourceband,targetband in zip(raster,targetrast):
-        ##                    for col,pixel in enumerate(sourcepixels):
-        ##                        pixel = int(round(pixel[0])),int(round(pixel[1]))
-        ##                        val = sourceband.get(*pixel)
-        ##                        targetband.set(col,row,val)
-
-        # TODO: Potential speedup algorithm
-        # table-based reprojection, so only have to reproject 100*100 values
-        # instead of every single pixel
-        # https://caniban.files.wordpress.com/2011/04/tile-based-geospatial-information-systems.pdf
-
-    else:
-        
-        # same crs, so only needs to resample between affine transforms
-        return resample(raster, algorithm, **rasterdef)
+    # TODO: Potential speedup algorithm
+    # table-based reprojection, so only have to reproject 100*100 values
+    # instead of every single pixel
+    # https://caniban.files.wordpress.com/2011/04/tile-based-geospatial-information-systems.pdf
 
 def resample(raster, algorithm="nearest", **rasterdef):
 
@@ -112,7 +106,7 @@ def resample(raster, algorithm="nearest", **rasterdef):
                                         PIL.Image.QUAD,
                                         flattened,
                                         resample=algocode)
-        #if mask
+        # if mask
         if band.nodataval != None:
             datatrans.paste(band.nodataval, mask=masktrans)
             
@@ -121,22 +115,21 @@ def resample(raster, algorithm="nearest", **rasterdef):
 
     return targetrast
 
-def rasterize(vectordata, **rasterdef):
+def rasterize(vectordata, valuekey=None, **rasterdef):
+    # TODO: When using valuekey, how to choose between/aggregate
+    # overlapping or nearby features? Now just overwrites and uses value of
+    # the last feature. Maybe provide aggfunc option?
+    # See further below.
 
-##    if "bbox" not in rasterdef:
-##        # TODO: HANDLE FLIPPED COORDSYS AND/OR INTERPRETING VECTORDATA COORDSYS DIRECTION
-##        # ...difficult since vector coord bbox is always min,max order,
-##        # ...since no way to determine directions
-##        rasterdef["bbox"] = vectordata.bbox
+    if valuekey:
+        raise Exception("Rasterizing with valuekey not yet implemented")
 
-    # TODO: Add option to assign pixel value based on a feature valuefield
-    # instead of just 0 and 1
-    # ...
-
-    raster = data.RasterData(mode="1bit", **rasterdef)
+    mode = "float32" if valuekey else "1bit"
+    raster = data.RasterData(mode=mode, **rasterdef)
 
     # create 1bit image with specified size
-    img = PIL.Image.new("1", (raster.width, raster.height), 0)
+    mode = "F" if valuekey else "1"
+    img = PIL.Image.new(mode, (raster.width, raster.height), 0)
     drawer = PIL.ImageDraw.Draw(img)
 
     # set the coordspace to vectordata bbox
@@ -144,6 +137,7 @@ def rasterize(vectordata, **rasterdef):
 
     # draw the vector data
     for feat in vectordata:
+        val = float(valuekey(feat)) if valuekey else 1.0
         geotype = feat.geometry["type"]
 
         # make all multis so can treat all same
@@ -160,7 +154,7 @@ def rasterize(vectordata, **rasterdef):
                 #print list(path)[:10]
                 path.transform((a,b,c,d,e,f))
                 #print list(path)[:10]
-                drawer.polygon(path, fill=1, outline=None)
+                drawer.polygon(path, fill=val, outline=None)
                 # holes
                 if len(poly) > 1:
                     for hole in poly[1:]:
@@ -174,13 +168,21 @@ def rasterize(vectordata, **rasterdef):
             for line in coords:
                 path = PIL.ImagePath.Path(line)
                 path.transform((a,b,c,d,e,f))
-                drawer.line(path, fill=1)
+                drawer.line(path, fill=val)
             
         # point, 1 pixel square size
         elif "Point" in geotype:
             path = PIL.ImagePath.Path(coords)
             path.transform((a,b,c,d,e,f))
-            drawer.point(path, fill=1)
+            drawer.point(path, fill=val)
+
+    # if valuekey mode,
+    #    find self intersections,
+    #    aggregate their values,
+    #    and draw over those parts with the new aggval
+    # OR maybe not,
+    #    instead must test multiple overlap per cell?
+    # ...
 
     # create raster from the drawn image
     raster.add_band(img=img)
@@ -262,37 +264,40 @@ def crop(raster, bbox):
                              bbox=[x1,y1,x2,y2])
     return outrast
 
-def clip(raster, clipdata, bbox=None):
-    # TODO: ALSO HANDLE CLIP BY RASTER DATA
+def clip(raster, clipdata, bbox=None, bandnum=0):
+    """Clips a raster by the areas containing data in a vector or raster data instance.
+    If clipdata is a raster instance, the valid area is determined from the specified
+    bandnum arg (default is 0). 
+    """
 
     from ..vector import VectorData
     from ..raster import RasterData
-    
+
+
+    # limit to bbox area
+    if bbox:
+        raster = crop(raster, bbox)
+
+    # determine georef of out raster, defaults to that of the main raster
+    georef = {"width":raster.width, "height":raster.height,
+              "affine":raster.affine}
+    outrast = data.RasterData(mode=raster.mode, **georef)
+
+    # get raster of valid areas
     if isinstance(clipdata, VectorData):
-
-        # determine georef of out raster, defaults to that of the main raster
-        if bbox:
-            raster = crop(raster, bbox)
-        
         # rasterize vector data
-        georef = {"width":raster.width, "height":raster.height,
-                  "affine":raster.affine}
         valid = rasterize(clipdata, **georef)
+    elif isinstance(clipdata, RasterData):
+        # get boolean raster where nodatavals
+        valid = clipdata.bands[bandnum].conditional("val != %s" % clipdata.nodataval)
 
-        # paste main raster onto blank image using rasterized as mask
-        outrast = data.RasterData(mode=raster.mode, **georef)
-
-        # clip and add each band
-        for band in raster.bands:
-            
-            # paste data onto blank image where mask is true
-            img = PIL.Image.new(band.img.mode, band.img.size, band.nodataval)
-            img.paste(band.img, mask=valid.bands[0].img)
-            outrast.add_band(img=img, nodataval=band.nodataval)
+    # clip and add each band
+    for band in raster.bands:
+        
+        # paste data onto blank image where 'valid' is true
+        img = PIL.Image.new(band.img.mode, band.img.size, band.nodataval)
+        img.paste(band.img, mask=valid.bands[0].img)
+        outrast.add_band(img=img, nodataval=band.nodataval)
 
         return outrast
 
-    elif isinstance(clipdata, RasterData):
-        # create blank image
-        # paste raster onto blank image using clip raster as mask
-        pass

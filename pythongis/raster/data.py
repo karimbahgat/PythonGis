@@ -128,7 +128,13 @@ class Band(object):
             return self._cached_mask
 
     @mask.setter
-    def mask(self, value):
+    def mask(self, newmask):
+        """Note, newmask must be PIL image and match band dimensions"""
+        
+        # paste nodatavals where mask is true
+        self.img.paste(self.nodataval, mask=newmask)
+        
+        # cache it
         self._cached_mask = value
 
     def compute(self, expr):
