@@ -104,10 +104,20 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
 
 # Interpolation
 
-def interpolate(pointdata, rasterdef, valuefield=None, algorithm="IDW", **kwargs):
-    """Advanced interpolation between point data values. 
-    """
-    
+def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs):
+    """Interpolation between point data values. Bins and aggregates point data
+    values, followed by simple value smearing to produce a smooth surface raster"""
+
+    # some links
+    #http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.interpolate.RegularGridInterpolator.html
+    #https://github.com/JohannesBuchner/regulargrid
+    #http://stackoverflow.com/questions/24978052/interpolation-over-regular-grid-in-python
+    #http://www.qgistutorials.com/en/docs/creating_heatmaps.html
+    #see especially: http://resources.arcgis.com/en/help/main/10.1/index.html#//009z0000000v000000
+
+    if rasterdef["mode"] == "1bit":
+        raise Exception("Cannot do interpolation to a 1bit raster")
+
     algorithm = algorithm.lower()
     
     if algorithm == "idw":
@@ -155,6 +165,12 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="IDW", **kwargs
         ##
         ##        # finish off
         ##        # ...
+
+    elif algorithm == "kdtree":
+        # https://github.com/stefankoegl/kdtree
+        # http://rosettacode.org/wiki/K-d_tree
+        
+        raise Exception("Not yet implemented")
         
     elif algorithm == "spline":
         # see C scripts at http://davis.wpi.edu/~matt/courses/morph/2d.htm
@@ -163,25 +179,12 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="IDW", **kwargs
 
         raise Exception("Not yet implemented")
 
-    return raster
+    elif algorithm == "kriging":
+        # ...?
+        
+        raise Exception("Not yet implemented")
 
-def heatmap(pointdata, rasterdef, valuefield, algorithm="basic", aggfunc="sum", **kwargs):
-    # some links
-    #http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.interpolate.RegularGridInterpolator.html
-    #https://github.com/JohannesBuchner/regulargrid
-    #http://stackoverflow.com/questions/24978052/interpolation-over-regular-grid-in-python
-    #http://www.qgistutorials.com/en/docs/creating_heatmaps.html
-    #see especially: http://resources.arcgis.com/en/help/main/10.1/index.html#//009z0000000v000000
-
-    """Binning and aggregating of point data values, followed by
-    simple value smearing to produce a smooth surface raster"""
-
-    if rasterdef["mode"] == "1bit":
-        raise Exception("Cannot do smoothing on a 1bit raster")
-
-    algorithm = algorithm.lower()
-
-    if algorithm == "basic":
+    elif algorithm == "radial":
         # create output raster
         raster = RasterData(**rasterdef)
         raster.add_band() # add empty band
@@ -192,7 +195,7 @@ def heatmap(pointdata, rasterdef, valuefield, algorithm="basic", aggfunc="sum", 
             pointdata.create_spatial_index()
         raster.convert("F") # output will be floats
         if not "radius" in kwargs:
-            raise Exception("Radius must be set for 'basic' method")
+            raise Exception("Radius must be set for 'radial' method")
         rad = float(kwargs["radius"])
         c = None
         for cell in band:
@@ -282,20 +285,23 @@ def heatmap(pointdata, rasterdef, valuefield, algorithm="basic", aggfunc="sum", 
                     #print j,i,newval
                     newband.set(j,i, newval)
 
-    elif algorithm == "boxsum":
+    elif algorithm == "box":
         # http://stackoverflow.com/questions/6652671/efficient-method-of-calculating-density-of-irregularly-spaced-points
         # ...
         pass
 
-def density(pointdata, rasterdef, algorithm="basic", **kwargs):
-    """Density of point data values, followed by
-    simple value smearing to produce a smooth density raster"""
+    return raster
+
+def density(pointdata, rasterdef, algorithm="radial", **kwargs):
+    """Creates a raster of the density of points, ie the frequency of their occurance
+    without thinking about the values of each point. Same as using the interpolate method
+    without setting the valuefield."""
     
     # only difference being no value field contributes to heat
     # TODO: allow density of linear and polygon features too,
     # maybe by counting nearby features
     
-    return heatmap(pointdata, rasterdef, valuefield=None, algorithm=algorithm, **kwargs)
+    return interpolate(pointdata, rasterdef, valuefield=None, algorithm=algorithm, **kwargs)
 
 
 

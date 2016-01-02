@@ -11,7 +11,7 @@ from shapely.prepared import prep as supershapely
 
 # SQL components
 
-def aggreg(iterable, aggregfuncs, geomfunc):
+def aggreg(iterable, aggregfuncs, geomfunc=None):
     """Each func must be able to take an iterable and return a single item.
     Aggregfuncs is a series of 3-tuples: an output column name, a value function on which to base the aggregation, and a valid string or custom function for aggregating the retieved values.
     """
@@ -57,17 +57,27 @@ def aggreg(iterable, aggregfuncs, geomfunc):
             aggval = "" # or best with None
             
         row.append(aggval)
-        
-    geom = geomfunc(iterable)
 
-    return row,geom
+    if geomfunc:    
+        geom = geomfunc(iterable)
+        return row,geom
 
-def select(iterable, columnfuncs, geomfunc):
-    # iterate and yield rows and geoms
-    for item in iterable:
-        row = [func(item) for name,func in columnfuncs]
-        geom = geomfunc(item)
-        yield row,geom
+    else:
+        return row
+
+def select(iterable, columnfuncs, geomfunc=None):
+    if geomfunc:
+        # iterate and yield rows and geoms
+        for item in iterable:
+            row = [func(item) for name,func in columnfuncs]
+            geom = geomfunc(item)
+            yield row,geom
+
+    else:
+        # iterate and yield rows
+        for item in iterable:
+            row = [func(item) for name,func in columnfuncs]
+            yield row
 
 def where(iterable, condition):
     for item in iterable:
@@ -86,7 +96,7 @@ def limit(iterable, n):
         else:
             break
 
-def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
+def query(_from, _select, _geomselect=None, _where=None, _groupby=None, _limit=None):
     """Takes a series of sql generator components, runs them, and iterates over the resulting feature-geom tuples.
 
     Arg _from must be a sequence of one or more iterables.
@@ -131,8 +141,8 @@ def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
                 
             # aggregate
             # NOTE: columnfuncs and geomfunc must expect an iterable as input and return a single row,geom pair
-            row,geom = aggreg(items, columnfuncs, geomfunc)
-            yield row,geom
+            item = aggreg(items, columnfuncs, geomfunc)
+            yield item
             
     else:
         # filter
@@ -144,8 +154,8 @@ def query(_from, _select, _geomselect, _where=None, _groupby=None, _limit=None):
             iterable = limit(iterable, n)
 
         # select
-        for row,geom in select(iterable, columnfuncs, geomfunc):
-            yield row,geom
+        for item in select(iterable, columnfuncs, geomfunc):
+            yield item
 
 def query_to_data(_query):
     # create table and columns
