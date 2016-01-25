@@ -26,41 +26,40 @@ import pythongis as pg
 
 
 # clip test
+print("\n"+"clip test")
 conv = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_convexes.shp")
 tess = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_triangles.shp")
 
 conv.view(1000,500)
 tess.view(1000,500)
 
-res = pg.vector.analyzer.clip(conv, tess)
+res = pg.vector.manager.intersection(conv, tess)
 print res
 res.view(1000,500)
 
 
 
 # dissolve test
+print("\n"+"dissolve test")
 conv = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_convexes.shp")
-conv.view(1000,500)
-print conv.fields
 
-key = lambda combi: combi[0][0]["CNTRY_NAME"][0] # first char of country
+key = lambda combi: combi[0][0]["CNTRY_NAME"][-1] # last char of country
 fieldmapping = [("avgendyr", lambda combi: combi[0][0]["GWEYEAR"], "average"),
                 ("key",key,"first")]
 
-res = pg.vector.analyzer.glue(conv, key=key, fieldmapping=fieldmapping, contig=False)
+res = pg.vector.manager.collapse(conv, key=key, fieldmapping=fieldmapping, contig=False)
 res.view(1000,500)
 
-fdsfas
 
 
 
 # cut test
+print("\n"+"cut test")
 conv = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_convexes.shp")
 tess = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\country_triangles.shp")
 
 conv.view(1000,500)
 tess.view(1000,500)
 
-res = pg.vector.analyzer.cut(conv, tess)
-print res
+res = pg.vector.manager.cut(conv, tess)
 res.view(1000,500)

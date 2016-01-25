@@ -193,7 +193,7 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
         # calculate for each cell
         if not hasattr(pointdata, "spindex"):
             pointdata.create_spatial_index()
-        raster.convert("F") # output will be floats
+        raster.convert("float32") # output will be floats
         if not "radius" in kwargs:
             raise Exception("Radius must be set for 'radial' method")
         rad = float(kwargs["radius"])
@@ -218,10 +218,11 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
 
             from ..vector import sql
             valfunc = lambda(v): v
+            aggfunc = kwargs.get("aggfunc", "sum")
             fieldmapping = [("aggval",valfunc,aggfunc)]
-            aggval = sql.aggreg(weights, fieldmapping)
+            aggval = sql.aggreg(weights(), fieldmapping)[0]
         
-            if aggval != None:
+            if aggval or aggval == 0:
                 cell.value = aggval
 
     elif algorithm == "gauss":
@@ -260,7 +261,7 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
             # TODO: implement much faster algorithm 4
             
             origband = newband.copy()
-            raster.convert("F") # output values will be floats
+            raster.convert("float32") # output values will be floats
             rad = kwargs.get("radius", 3)
             rs = int(rad*2.57+1) # significant radius
             
@@ -289,6 +290,9 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
         # http://stackoverflow.com/questions/6652671/efficient-method-of-calculating-density-of-irregularly-spaced-points
         # ...
         pass
+
+    else:
+        raise Exception("Not a valid interpolation algorithm")
 
     return raster
 

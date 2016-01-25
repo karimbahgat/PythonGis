@@ -285,13 +285,15 @@ def collapse(data, key=None, fieldmapping=[], contig=False):
         # much easier and faster
         # requires only one combi item in funcs
 
+        # TODO: redo so key and fieldmapping funcs only have to expect the feat obj
+        # maybe by switching away from full sql approach...
+
         if not key: key = lambda x: True # groups together all items
 
         def _geomselect(itemcombis):
             geoms = []
             for combi in itemcombis:
                 f,g = combi[0]
-                ###print f["CNTRY_NAME"]
                 geoms.append(g)
             
             union = shapely.ops.cascaded_union(geoms)

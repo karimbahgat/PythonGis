@@ -270,8 +270,8 @@ def clip(raster, clipdata, bbox=None, bandnum=0):
     bandnum arg (default is 0). 
     """
 
-    from ..vector import VectorData
-    from ..raster import RasterData
+    from ..vector.data import VectorData
+    from ..raster.data import RasterData
 
 
     # limit to bbox area

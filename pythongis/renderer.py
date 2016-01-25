@@ -71,6 +71,15 @@ class MapCanvas:
         # Special image format needed by Tkinter to display it in the GUI
         return self.drawer.get_tkimage()
 
+    def view(self):
+        import Tkinter as tk
+        
+        app = tk.Tk()
+        tkimg = self.get_tkimage()
+        lbl = tk.Label(image=tkimg)
+        lbl.tkimg = tkimg
+        lbl.pack()
+        app.mainloop() 
 
         
 

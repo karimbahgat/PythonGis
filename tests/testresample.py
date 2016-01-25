@@ -11,7 +11,7 @@ print d
 
 # crop test
 
-c = pg.raster.manager.crop(d, [-80,35,0,0])
+c = pg.raster.manager.crop(d, [-150,55,0,0])
 print c
 c.view(1000,500)
 

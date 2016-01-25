@@ -2,7 +2,7 @@ import pythongis as pg
 
 
 ###
-print("\n"+"canvas test")
+print("\n"+"canvas layers test")
 mapp = pg.renderer.MapCanvas(1000, 500)
 
 rast = pg.raster.data.RasterData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\geotiff\TrueMarble.16km.2700x1350.tif")
@@ -34,9 +34,7 @@ mapp.layers.add_layer(pg.renderer.VectorLayer(vect,
 mapp.zoom_factor(4)
 
 mapp.render_all()
-mapp.img.show()
-
-fsdfsdf
+mapp.view() 
 
 
 ###
