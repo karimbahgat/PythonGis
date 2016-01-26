@@ -142,12 +142,12 @@ class VectorLayer:
                 else:
                     self.styleoptions[key] = val
 
-    def render(self, width, height, bbox=None):
+    def render(self, width, height, bbox=None, lock_ratio=True):
         if not bbox:
             bbox = self.data.bbox
         
         drawer = pyagg.Canvas(width, height, background=None)
-        drawer.custom_space(*bbox)
+        drawer.custom_space(*bbox, lock_ratio=lock_ratio)
 
         # get features based on spatial index, for better speeds when zooming
         if not hasattr(self.data, "spindex"):
@@ -229,13 +229,16 @@ class RasterLayer:
         # remember style settings
         self.styleoptions = options
 
-    def render(self, resampling="nearest", **georef):
+    def render(self, resampling="nearest", lock_ratio=True, **georef):
         # NOT DONE...
         # position in space
         if "bbox" not in georef:
             georef["bbox"] = self.data.bbox
-            
+
         rendered = self.data.resample(algorithm=resampling, **georef)
+
+        # TODO: Instead of resample need to somehow honor lock_ratio, maybe by not using from_image()
+        # ...
 
         if self.styleoptions["type"] == "grayscale":
             
@@ -246,7 +249,7 @@ class RasterLayer:
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            valrange = 1/float(maxval-minval) * 255
+            valrange = 1/float(maxval-minval) * 255 if maxval-minval != 0 else 0
             expr = "(val - {minval}) * {valrange}".format(minval=minval,valrange=valrange)
             band.compute(expr)
             # colorize
@@ -257,7 +260,7 @@ class RasterLayer:
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            valrange = 1/float(maxval-minval) * 255
+            valrange = 1/float(maxval-minval) * 255 if maxval-minval != 0 else 0
             expr = "(val - {minval}) * {valrange}".format(minval=minval,valrange=valrange)
             band.compute(expr)
             # colorize

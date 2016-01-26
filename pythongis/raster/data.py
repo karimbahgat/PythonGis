@@ -14,9 +14,48 @@ class Cell(object):
     def __init__(self, band, col, row):
         self.band = band
         self.col, self.row = col, row
+        self._x = None
+        self._y = None
 
     def __repr__(self):
         return "Cell(col=%s, row=%s, value=%s)" %(self.col, self.row, self.value)
+
+    def __geo_interface__(self):
+        return self.poly
+    
+    @property
+    def point(self):
+        return {"type":"Point",
+                "coordinates": (self.x, self.y)}
+
+    @property
+    def poly(self):
+        trans = self.band._rast.cell_to_geo
+        return {"type":"Polygon",
+                "coordinates": [[trans(self.col-0.5, self.row-0.5),
+                                 trans(self.col-0.5, self.row+0.5),
+                                 trans(self.col+0.5, self.row+0.5),
+                                 trans(self.col+0.5, self.row-0.5),
+                                 ]]}
+
+    @property
+    def bbox(self):
+        trans = self.band._rast.cell_to_geo
+        corners = self.poly["coordinates"][0]
+        xs,ys = zip(*corners)
+        return min(xs),min(ys),max(xs),max(ys)
+
+    @property
+    def x(self):
+        if None in (self._x,self._y):
+            self._x, self._y = self.band._rast.cell_to_geo(self.col, self.row)
+        return self._x
+
+    @property
+    def y(self):
+        if None in (self._x,self._y):
+            self._x, self._y = self.band._rast.cell_to_geo(self.col, self.row)
+        return self._y
 
     @property
     def value(self):
@@ -59,6 +98,7 @@ class Band(object):
         self.nodataval = nodataval # calls on the setter method
         self._pixelaccess = None
         self._cached_mask = None
+        self._rast = None  # reference to owning raster, internal only
 
     def __iter__(self):
         width,height = self.img.size
@@ -154,7 +194,6 @@ class Band(object):
         """Internal only"""
         try:
             _expr = "convert(%s, '%s')" % (expr, self.img.mode)
-            print _expr
             result = PIL.ImageMath.eval(_expr, val=self.img)
             self.img = result
         
@@ -243,8 +282,6 @@ class Band(object):
             stats = PIL.ImageStat.Stat(self.img, valid)
             _min,_max = stats.extrema[0]
 
-            print stats.count, stats.sum
-
             if not stattypes or "count" in stattypes:
                 statsdict["count"] = stats.count[0]
             if not stattypes or "sum" in stattypes:
@@ -257,7 +294,15 @@ class Band(object):
             if not stattypes or "max" in stattypes:
                 statsdict["max"] = _max
             # some more stats
-            # ...
+            if not stattypes or "median" in stattypes:
+                sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[1]))
+                statsdict["median"] = sortedvals[len(sortedvals)//2][1]
+            if not stattypes or "majority" in stattypes:
+                sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
+                statsdict["majority"] = sortedvals[0][1]
+            if not stattypes or "minority" in stattypes:
+                sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
+                statsdict["minority"] = sortedvals[-1][1]
 
         elif self.mode.endswith(("16","32","1bit")):
             
@@ -291,7 +336,15 @@ class Band(object):
                 if not stattypes or "max" in stattypes:
                     statsdict["max"] = _max()
                 # some more stats
-                # ...
+                if not stattypes or "median" in stattypes:
+                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[1]))
+                    statsdict["median"] = sortedvals[len(sortedvals)//2][1]
+                if not stattypes or "majority" in stattypes:
+                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
+                    statsdict["majority"] = sortedvals[-1][1]
+                if not stattypes or "minority" in stattypes:
+                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
+                    statsdict["minority"] = sortedvals[0][1]
                 
             except MemoryError:
 
@@ -307,15 +360,15 @@ class Band(object):
                     return (val for val in allvals if val != nodata)
 
                 def _count():
-                    return sum((1 for val in valuecountsgen))
+                    return sum((1 for val in valuecountsgen()))
                 def _sum():
-                    return sum((val for val in valuecountsgen))
+                    return sum((val for val in valuecountsgen()))
                 def _mean():
                     return _sum()/float(_count())
                 def _min():
-                    return min(valuecountsgen)
+                    return min(valuecountsgen())
                 def _max():
-                    return max(valuecountsgen)
+                    return max(valuecountsgen())
                 
                 if not stattypes or "count" in stattypes:
                     statsdict["count"] = _count()
@@ -327,8 +380,24 @@ class Band(object):
                     statsdict["max"] = _max()
                 if not stattypes or "min" in stattypes:
                     statsdict["min"] = _min()
+                # some more stats
+                if not stattypes or "median" in stattypes:
+                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[1]))
+                    statsdict["median"] = sortedvals[len(sortedvals)//2][1]
+                if not stattypes or "majority" in stattypes:
+                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
+                    statsdict["majority"] = sortedvals[-1][1]
+                if not stattypes or "minority" in stattypes:
+                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
+                    statsdict["minority"] = sortedvals[0][1]
                 
         return statsdict
+
+    def clear(self):
+        # not fully tested yet...
+        na = self.nodataval
+        if na is None: na = 0
+        self.img.paste(na)
 
     def convert(self, mode):
         pilmode = rastmode_to_pilmode(mode)
@@ -404,6 +473,10 @@ class RasterData(object):
         self.bands = [Band(img, nodataval=nodataval) for img in bands]
         self._cached_mask = None
 
+        # store reference to raster to enable pixel convenience methods
+        for b in self.bands:
+            b._rast = self
+
         # set metadata
         self.crs = crs
         self.set_geotransform(**georef)
@@ -435,9 +508,9 @@ class RasterData(object):
 
     @property
     def bbox(self):
-        # get corner coordinates of raster
-        xleft_coord,ytop_coord = self.cell_to_geo(0,0)
-        xright_coord,ybottom_coord = self.cell_to_geo(self.width, self.height)
+        # get corner coordinates of raster (including cell area corners, not just centroids)
+        xleft_coord,ytop_coord = self.cell_to_geo(0-0.5, 0-0.5)
+        xright_coord,ybottom_coord = self.cell_to_geo(self.width-1+0.5, self.height-1+0.5)
         return [xleft_coord,ytop_coord,xright_coord,ybottom_coord]
 
     def copy(self):
@@ -465,6 +538,9 @@ class RasterData(object):
 
         elif band.mode != self.mode:
             raise Exception("Added band must have the same mode as the raster dataset")
+
+        # store reference to raster to enable pixel convenience methods
+        band._rast = self
 
         self.bands.append(band)
 
@@ -552,12 +628,16 @@ class RasterData(object):
         kwargs["raster"] = self
         return manager.resample(**kwargs)
 
-    def view(self, width, height, **options):
+    def render(self, width, height, **options):
         from .. import renderer
         lyr = renderer.RasterLayer(self,
                                    **options
                                    )
         lyr.render(width=width, height=height, resampling="nearest")
+        return lyr
+
+    def view(self, width, height, **options):
+        lyr = self.render(width, height, **options)
 
         import Tkinter as tk
         import PIL.ImageTk

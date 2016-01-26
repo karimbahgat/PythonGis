@@ -244,11 +244,15 @@ class VectorData:
         if hasattr(self, "spindex"): new.spindex = self.spindex.copy()
         return new
 
-    def view(self, width, height, bbox=None, **styleoptions):
+    def render(self, width, height, bbox=None, **styleoptions):
         from .. import renderer
         lyr = renderer.VectorLayer(self, **styleoptions)
         lyr.render(width=width, height=height, bbox=bbox)
+        return lyr
 
+    def view(self, width, height, bbox=None, **styleoptions):
+        lyr = self.render(width, height, bbox, **styleoptions)
+        
         import Tkinter as tk
         import PIL.ImageTk
         

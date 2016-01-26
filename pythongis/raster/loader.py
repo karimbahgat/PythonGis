@@ -178,15 +178,20 @@ def from_file(filepath, **georef):
                     info["cell_anchor"] = "nw"
             if raw_tags.has_key(34264):
                 # ModelTransformationTag, aka 4x4 transform coeffs...
-                a,b,c,d,
-                e,f,g,h,
-                i,j,k,l,
-                m,n,o,p = raw_tags.get(34264)
+                [a,b,c,d,
+                 e,f,g,h,
+                 i,j,k,l,
+                 m,n,o,p] = raw_tags.get(34264)
                 # But we don't want to meddle with 3-D transforms,
                 # ...so for now only get the 2-D affine parameters
                 xscale,xskew,xoff = a,b,d
                 yskew,yscale,yoff = e,f,h
-                info["affine"] = xscale,xskew,xoff,yskew,yscale,yoff
+                info.update(xscale=xscale,
+                            xskew=xskew,
+                            xoffset=xoff,
+                            yskew=yskew,
+                            yscale=yscale,
+                            yoffset=yoff)
             else:
                 if raw_tags.has_key(33922):
                     # ModelTiepointTag

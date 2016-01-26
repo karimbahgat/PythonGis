@@ -2,6 +2,7 @@
 from . import data
 ##from .. import raster
 ##from .. import vector
+from ..vector import sql
 
 import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath
 
@@ -76,44 +77,161 @@ def reproject(raster, crs, algorithm="nearest", **rasterdef):
 
 def resample(raster, algorithm="nearest", **rasterdef):
 
-    algocode = {"nearest":PIL.Image.NEAREST,
+    algocodes = {"nearest":PIL.Image.NEAREST,
                 "bilinear":PIL.Image.BILINEAR,
                 "bicubic":PIL.Image.BICUBIC,
-                }[algorithm.lower()]
+                }
     
     # first, create target raster based on rasterdef
     targetrast = data.RasterData(mode=raster.mode, **rasterdef)
-    
-    # get coords of all 4 target corners
-    coordspace_bbox = targetrast.bbox
-    xleft,ytop,xright,ybottom = coordspace_bbox
-    targetcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
-    
-    # find pixel locs of all these coords in the source raster
-    targetcorners_pixels = [raster.geo_to_cell(*point, fraction=True) for point in targetcorners]
 
-    # on raster, perform quad transform
-    flattened = [xory for point in targetcorners_pixels for xory in point]
+    # fast PIL transform methods
+    if algorithm in algocodes:
+        algocode = algocodes[algorithm.lower()] # resampling code used by PIL
+        
+        # get coords of all 4 target corners
+        coordspace_bbox = targetrast.bbox
+        xleft,ytop,xright,ybottom = coordspace_bbox
+        targetcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
+        
+        # find pixel locs of all these coords in the source raster
+        targetcorners_pixels = [raster.geo_to_cell(*point, fraction=True) for point in targetcorners]
+        # on raster, perform quad transform
+        flattened = [xory for point in targetcorners_pixels for xory in point]
 
-    # make mask over
-    masktrans = raster.mask.transform((targetrast.width,targetrast.height),
-                                        PIL.Image.QUAD,
-                                        flattened,
-                                        resample=algocode)
+        # make mask over
+        masktrans = raster.mask.transform((targetrast.width,targetrast.height),
+                                            PIL.Image.QUAD,
+                                            flattened,
+                                            resample=algocode)
 
-    for band in raster.bands:
-        datatrans = band.img.transform((targetrast.width,targetrast.height),
-                                        PIL.Image.QUAD,
-                                        flattened,
-                                        resample=algocode)
-        # if mask
-        if band.nodataval != None:
-            datatrans.paste(band.nodataval, mask=masktrans)
-            
-        # store image
-        targetrast.add_band(img=datatrans, nodataval=band.nodataval)
+        for band in raster.bands:
+            datatrans = band.img.transform((targetrast.width,targetrast.height),
+                                            PIL.Image.QUAD,
+                                            flattened,
+                                            resample=algocode)
+            # if mask
+            if band.nodataval != None:
+                datatrans.paste(band.nodataval, mask=masktrans)
+                
+            # store image
+            targetrast.add_band(img=datatrans, nodataval=band.nodataval)
+
+    else:
+        raise Exception("Not yet implemented")
 
     return targetrast
+
+def upscale(raster, stat="sum", **rasterdef):
+    # either use focal stats followed by nearest resampling to match target raster
+    # or use zonal stats where zone values are determined by col/row to form squares
+    # for various approaches, see: https://gis.stackexchange.com/questions/27838/resample-binary-raster-to-give-proportion-within-new-cell-window/27849#27849
+
+    # validate that in fact upscaling
+    # ...
+    
+    # first resample to coincide with rasterdef
+    targetrast = data.RasterData(mode="float32", **rasterdef)
+    xscale,_,_, _,yscale,_ = targetrast.affine
+    targetrast.bands = []
+    for _ in raster:
+        targetrast.add_band()
+
+    # maybe align the valueraster to rasterdef by rounding the xoff and yoff to georef
+    # ...
+
+    # run moving focal window to group cells
+    tilesize = (abs(xscale),abs(yscale))
+    print tilesize
+    for tile in tiled(raster, tilesize=tilesize, worldcoords=True):
+        tilecenter = (tile.bbox[0]+tile.bbox[2])/2.0, (tile.bbox[1]+tile.bbox[3])/2.0
+        targetpx = targetrast.geo_to_cell(*tilecenter)
+
+        # for each tile band
+        for bandnum,tileband in enumerate(tile.bands):
+            
+            # aggregate tile stats
+            aggval = tileband.summarystats(stat)[stat]
+            
+            # set corresponding targetrast band cell value
+            cell = targetrast.bands[bandnum].get(*targetpx)
+            try:
+                cell.value = aggval
+            except IndexError:
+                # HMMMMM.....
+                ###print "Warning: upscale tile somehow spilling out of range..."
+                ###tile.view(500,500)
+                pass
+
+    # visual inspection
+##    from .. import renderer as r
+##    m = r.MapCanvas(1000,1000)
+##    m.zoom_bbox(*targetrast.bbox)
+##    m.zoom_factor(-1.3)
+##    m.layers.add_layer(r.RasterLayer(targetrast))
+##    m.render_all()
+##    for tile in tiled(raster, tilesize=tilesize, worldcoords=True):
+##        tilecenter = (tile.bbox[0]+tile.bbox[2])/2.0, (tile.bbox[1]+tile.bbox[3])/2.0
+##        m.drawer.draw_circle(tilecenter, fillsize="3px", fillcolor=None)
+##    m.view()
+
+    return targetrast
+    
+
+def downscale(raster, stat="spread", **rasterdef):
+    # first, create target raster based on rasterdef
+    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    
+# Accurate vector geometric approach (WARNING: extremely slow)
+##def accuresample(raster, algorithm="sum", **rasterdef):
+##    # first, create target raster based on rasterdef
+##    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+##    
+##    def point_in_poly(x,y,poly):
+##        # taken from http://stackoverflow.com/questions/16625507/python-checking-if-point-is-inside-a-polygon
+##        n = len(poly)
+##        inside = False
+##        p1x,p1y = poly[0]
+##        for i in range(n+1):
+##            p2x,p2y = poly[i % n]
+##            if y > min(p1y,p2y):
+##                if y <= max(p1y,p2y):
+##                    if x <= max(p1x,p2x):
+##                        if p1y != p2y:
+##                            xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+##                        if p1x == p2x or x <= xints:
+##                            inside = not inside
+##            p1x,p1y = p2x,p2y
+##        return inside
+##
+##    # ensure correct outdatatype
+##    if (raster.mode.startswith("float") and algorithm != "count") or (algorithm in "average stddev".split()):
+##        targetrast.convert("float32")
+##
+##    # add empty bands
+##    for band in raster:
+##        targetrast.add_band()
+##
+##    # aggregate overlapping
+##    def find_overlapping_cells(cell, band):
+##        cellcorners = cell.poly["coordinates"][0]
+##        for othercell in band:
+##            if point_in_poly(othercell.x, othercell.y, cellcorners):
+##                yield othercell
+##
+##    for band in targetrast.bands:
+##        prevrow = None
+##        for cell in band:
+##            if cell.value != band.nodataval:
+##                if cell.row != prevrow:
+##                    print prevrow
+##                    prevrow = cell.row
+##                croppedvals = crop(raster, cell.bbox) # same as a quick spatial index of possibly relevant cells
+##                for valband in croppedvals.bands:
+##                    overlapping = find_overlapping_cells(cell, valband) # TODO: optimize so dont have to repeat for each band
+##                    aggval = sql.aggreg(overlapping, [("aggval",lambda c: c.value, algorithm)])[0]
+##                    ###print aggval
+##                    cell.value = aggval
 
 def rasterize(vectordata, valuekey=None, **rasterdef):
     # TODO: When using valuekey, how to choose between/aggregate
@@ -231,20 +349,26 @@ def vectorize(raster, bandnum=1):
         # ...
         raise Exception("Not yet implemented")
 
-def crop(raster, bbox):
-    """Finds the pixels that are closest to the bbox
+def crop(raster, bbox, worldcoords=True):
+    """Finds the pixels that are closest to the coordinate bbox
     and just does a normal image crop, meaning no resampling/changing of data.
     """
     x1,y1,x2,y2 = bbox
 
-    # get nearest pixels of bbox coords
-    px1,py1 = raster.geo_to_cell(x1,y1)
-    px2,py2 = raster.geo_to_cell(x2,y2)
+    if worldcoords:
+        # get nearest pixels of bbox coords
+        px1,py1 = raster.geo_to_cell(x1,y1)
+        px2,py2 = raster.geo_to_cell(x2,y2)
+    else:
+        # already in pixels
+        px1,py1,px2,py2 = x1,y1,x2,y2
 
     # get new dimensions
     outrast = data.RasterData(**raster.meta)
     width = abs(px2-px1)
     height = abs(py2-py1)
+    if width == 0 or height == 0:
+        raise Exception("Cropping bbox was too small, resulting in 0 pixels")
     outrast.width = width
     outrast.height = height
 
@@ -258,11 +382,49 @@ def crop(raster, bbox):
         outrast.add_band(img=img, nodataval=band.nodataval)
 
     # update output geotransform based on crop corners
-    x1,y1 = raster.cell_to_geo(px1,py1) 
+    x1,y1 = raster.cell_to_geo(px1,py1)
     x2,y2 = raster.cell_to_geo(px2,py2)
     outrast.set_geotransform(width=width, height=height,
                              bbox=[x1,y1,x2,y2])
     return outrast
+
+def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False):
+    """Yields raster as a series of subtile rasters"""
+    if tilesize:
+        tw,th = tilesize
+
+    elif tiles:
+        tw,th = raster.width // tiles[0], raster.height // tiles[1]
+        worldcoords = False
+
+    else:
+        raise Exception("Either tiles or tilesize must be specified")
+
+    if worldcoords:
+        x1,y1,x2,y2 = raster.bbox
+        xfrac,yfrac = tw / abs(x2-x1), th / abs(y2-y1) 
+        tw,th = int(round(raster.width*xfrac)), int(round(raster.height*yfrac))
+
+    minw,minh = 0,0
+    maxw,maxh = raster.width,raster.height
+
+    def _floatrange(fromval,toval,step):
+        # handles both ints and flots
+        val = fromval
+        while val <= toval:
+            yield val
+            val += step
+    
+    for row in _floatrange(minh, maxh, th):
+        row2 = row+th if row+th <= maxh else maxh
+        for col in _floatrange(minw, maxw, tw):
+            col2 = col+tw if col+tw <= maxw else maxw
+            try:
+                tile = crop(raster, [col,row,col2,row2], False)
+                yield tile
+            except:
+                # HMMM, tile was too small...
+                pass
 
 def clip(raster, clipdata, bbox=None, bandnum=0):
     """Clips a raster by the areas containing data in a vector or raster data instance.
