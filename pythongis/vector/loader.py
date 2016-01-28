@@ -7,7 +7,7 @@ import shapefile as pyshp
 import pygeoj
 
 
-def from_file(filepath, encoding="utf8"):
+def from_file(filepath, encoding="utf8", **kwargs):
 
     def decode(value):
         if isinstance(value, str): 
@@ -16,14 +16,14 @@ def from_file(filepath, encoding="utf8"):
     
     # shapefile
     if filepath.endswith(".shp"):
-        shapereader = pyshp.Reader(filepath)
+        shapereader = pyshp.Reader(filepath, **kwargs) # TODO: does pyshp take kwargs?
         
         # load fields, rows, and geometries
         fields = [decode(fieldinfo[0]) for fieldinfo in shapereader.fields[1:]]
         rows = [ [decode(value) for value in record] for record in shapereader.iterRecords()]
         def getgeoj(obj):
             geoj = obj.__geo_interface__
-            if hasattr(obj, "bbox"): geoj["bbox"] = obj.bbox
+            if hasattr(obj, "bbox"): geoj["bbox"] = list(obj.bbox)
             return geoj
         geometries = [getgeoj(shape) for shape in shapereader.iterShapes()]
         
@@ -36,11 +36,11 @@ def from_file(filepath, encoding="utf8"):
 
     # geojson file
     elif filepath.endswith((".geojson",".json")):
-        geojfile = pygeoj.load(filepath)
+        geojfile = pygeoj.load(filepath, encoding=encoding, **kwargs)
 
         # load fields, rows, and geometries
-        fields = [decode(field) for field in geojfile.common_attributes]
-        rows = [[decode(feat.properties[field]) for field in fields] for feat in geojfile]
+        fields = [field for field in geojfile.common_attributes]
+        rows = [[feat.properties[field] for field in fields] for feat in geojfile]
         geometries = [feat.geometry.__geo_interface__ for feat in geojfile]
 
         # load crs

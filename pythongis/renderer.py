@@ -135,6 +135,10 @@ class VectorLayer:
                     # more memory friendly alternative is to only calculate breakpoints
                     # and then find classvalue for feature when rendering,
                     # which is likely slower
+                    if val["breaks"] == "unique" and "valuestops" not in val:
+                        rand = random.randrange
+                        val["valuestops"] = [(rand(255), rand(255), rand(255))
+                                             for _ in range(20)] 
                     classifier = cp.Classifier(features, **val)
                     self.styleoptions[key] = dict(classifier=classifier,
                                                    symbols=dict((id(f),classval) for f,classval in classifier)
@@ -142,9 +146,12 @@ class VectorLayer:
                 else:
                     self.styleoptions[key] = val
 
-    def render(self, width, height, bbox=None, lock_ratio=True):
+    def render(self, width, height, bbox=None, lock_ratio=True, flipy=False):
         if not bbox:
             bbox = self.data.bbox
+
+        if flipy:
+            bbox = bbox[0],bbox[3],bbox[2],bbox[1]
         
         drawer = pyagg.Canvas(width, height, background=None)
         drawer.custom_space(*bbox, lock_ratio=lock_ratio)

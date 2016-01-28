@@ -89,7 +89,7 @@ class Feature:
         return self._cached_bbox
 
     def get_shapely(self):
-        return geojson2shapely(self.geometry)
+        return geojson2shapely(self.geometry)                
 
     def copy(self):
         geoj = self.geometry
@@ -244,14 +244,22 @@ class VectorData:
         if hasattr(self, "spindex"): new.spindex = self.spindex.copy()
         return new
 
-    def render(self, width, height, bbox=None, **styleoptions):
+    def inspect(self, maxvals=30):
+        """Returns a dict of all fields and unique values for each."""
+        cols = dict(zip(self.fields, zip(*self)))
+        for field,vals in cols.items():
+            uniqvals = set(vals)
+            cols[field] = list(sorted(uniqvals))[:maxvals]
+        return cols
+    
+    def render(self, width, height, bbox=None, flipy=False, **styleoptions):
         from .. import renderer
         lyr = renderer.VectorLayer(self, **styleoptions)
-        lyr.render(width=width, height=height, bbox=bbox)
+        lyr.render(width=width, height=height, bbox=bbox, flipy=flipy)
         return lyr
 
-    def view(self, width, height, bbox=None, **styleoptions):
-        lyr = self.render(width, height, bbox, **styleoptions)
+    def view(self, width, height, bbox=None, flipy=False, **styleoptions):
+        lyr = self.render(width, height, bbox, flipy, **styleoptions)
         
         import Tkinter as tk
         import PIL.ImageTk
