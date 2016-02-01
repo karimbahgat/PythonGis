@@ -65,39 +65,44 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
 
 # Raster math
 
-##def raster_math(mathexpr, rasters):
-##    print rasters
-##    
-##    rasters = align_rasters(*rasters)
-##
-##    # convert all nullvalues to zero before doing any math
-##    for rast,mask in rasters:
-##        nodata = rast.info.get("nodata_value")
-##        for band in rast:
-##            print 111,band.img
-##            if nodata != None:
-##                band.img = PIL.Image.eval(band.img, lambda px: 0 if px == nodata else px)
-##
-##    # calculate math
-##    # basic math + - * / ** %
-##    # note: logical ops ~ & | ^ makes binary mask and return the pixel value where mask is valid
-##    # note: relational ops < > == != return only binary mask
-##    # note: other useful is min() and max(), equiv to (r1 < r2) | r2
-##    rastersdict = dict([("raster%i"%(i+1),rast.bands[0].img)#.convert("F"))
-##                        for i,(rast,mask) in enumerate(rasters)])
-##    print [img.mode for img in rastersdict.values()]
-##    #img = PIL.ImageChops.logical_xor(*rastersdict.values()[:2])
-##    img = PIL.ImageMath.eval(mathexpr, **rastersdict)
-##
-##    # should maybe create a combined mask of nullvalues for all rasters
-##    # and filter away those nullcells from math result
-##    # ...
-##
-##    # return result
-##    print img.mode
-##    firstrast,firstmask = rasters[0]
-##    outraster = RasterData(image=img, **firstrast.info)
-##    return outraster
+def algebra(mathexpr, rasters):
+    print rasters
+    
+    # align all to same affine
+    rasters = (rast for rast in rasters)
+    reference = next(rasters)
+    def _aligned():
+        yield reference
+        for rast in rasters:
+            if rast.affine != reference.affine:
+                rast = manager.resample(rast, width=reference.width, height=reference.height, affine=reference.affine)
+            yield rast
+
+    # convert all nullvalues to zero before doing any math
+    def _nulled():
+        for rast in _aligned():
+            for band in rast:
+                # TODO: recode here somehow blanks out everything...
+                #band.recode("val == %s"%band.nodataval, 0.0)
+                pass
+            yield rast
+            
+    # calculate math
+    # basic math + - * / ** %
+    # note: logical ops ~ & | ^ makes binary mask and return the pixel value where mask is valid
+    # note: relational ops < > == != return only binary mask
+    # note: other useful is min() and max(), equiv to (r1 < r2) | r2
+    rastersdict = dict([("rast%i"%(i+1),rast.bands[0].img)#.convert("F"))
+                        for i,rast in enumerate(_nulled())])
+    img = PIL.ImageMath.eval(mathexpr, **rastersdict)
+
+    # should maybe create a combined mask of nullvalues for all rasters
+    # and filter away those nullcells from math result
+    # ...
+
+    # return result
+    outraster = RasterData(image=img, **reference.meta)
+    return outraster
 
 
 

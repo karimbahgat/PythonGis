@@ -304,6 +304,102 @@ def from_file(filepath, **georef):
         # return memoryview(grid)
         # ...
         pass 
+
+    elif filepath.lower().endswith(".txt"):
+        # cell by cell table format
+        with open(filepath) as reader:
+            nodataval = georef.pop("nodataval", None)
+            crs = georef.pop("crs", None)
+            
+            fields = georef.pop("fields", None)
+            if not fields:
+                fields = next(reader).split()
+
+            delimiter = georef.pop("delimiter", None)
+
+            xfield,yfield = georef.pop("xfield", None),georef.pop("yfield", None)
+            colfield,rowfield = georef.pop("colfield", None),georef.pop("rowfield", None)
+            
+            if xfield and yfield:
+                
+                lines = [line.split(delimiter) for line in reader]
+                xfieldindex, yfieldindex = fields.index(xfield), fields.index(yfield)
+
+                valuefield = georef.pop("valuefield", None)
+                if not valuefield:
+                    raise Exception("Valuefield must be specified")
+                valuefieldindex = fields.index(valuefield)
+
+                bbox = georef.get("bbox")
+                if not bbox:
+                    xs,ys = [line[xfieldindex] for line in lines],[line[yfieldindex] for line in lines]
+                    bbox = min(xs),min(ys),max(xs),max(ys)
+                    georef["bbox"] = bbox
+
+                width,height = georef.get("width"),georef.get("height")
+                if not (width and height):
+                    # TODO: how to auto figure out from data...
+                    pass
+
+                georef["affine"] = compute_affine(**georef)
+
+                firstval = lines[0][valuefieldindex]
+                if firstval.isdigit():
+                    cast = lambda v: int(float(v))
+                    mode = "int32"
+                elif firstval.replace('.','').isdigit():
+                    cast = lambda v: float(v)
+                    mode = "float32"
+
+                # slight cheating to easily calculate col and row
+                from .data import RasterData
+                temprast = RasterData(mode=mode, **georef)
+                band = temprast.add_band(nodataval=nodataval)
+                for line in lines:
+                    x,y = float(line[xfieldindex]), float(line[yfieldindex])
+                    col,row = temprast.geo_to_cell(x,y)
+                    val = cast(line[valuefieldindex])
+                    band.set(col,row,val)
+
+                band = band.img
+
+                return georef, nodataval, [band], crs
+
+            elif colfield and rowfield:
+                
+                lines = [line.split(delimiter) for line in reader]
+                colfieldindex, rowfieldindex = fields.index(colfield), fields.index(rowfield)
+
+                valuefield = georef.pop("valuefield", None)
+                if not valuefield:
+                    raise Exception("Valuefield must be specified")
+                valuefieldindex = fields.index(valuefield)
+
+                width,height = georef.get("width"),georef.get("height")
+                if not (width and height):
+                    width,height = max((line[colfieldindex] for line in lines)), max((line[rowfieldindex] for line in lines))
+                    georef.update(width=width, height=height)
+
+                georef["affine"] = compute_affine(**georef)
+
+                firstval = lines[0][valuefieldindex]
+                if firstval.isdigit():
+                    band = PIL.Image.new("I", (width,height), nodataval)
+                    cast = lambda v: int(float(v))
+                elif firstval.replace('.','').isdigit():
+                    band = PIL.Image.new("F", (width,height), nodataval)
+                    cast = lambda v: float(v)
+
+                pixelaccess = band.load()
+                for line in lines:
+                    x,y = line[colfieldindex], line[rowfieldindex]
+                    val = cast(line[valuefieldindex])
+                    pixelaccess[x,y] = val
+
+                return georef, nodataval, [band], crs
+
+            else:
+                raise Exception("Either xfield and yfield or colfield and rowfield must be specified to figure out where each cell belongs")
     
     else:
 

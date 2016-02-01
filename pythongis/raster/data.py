@@ -411,6 +411,27 @@ class Band(object):
             band._cached_mask = self._cached_mask.copy()
         return band
 
+    def render(self, width, height, **options):
+        if self._rast:
+            rast = self._rast
+            options.update(bandnum=rast.bands.index(self))
+        else:
+            rast = RasterData(mode=self.mode, width=width, height=height, xoffset=0, yoffset=0, xscale=1, yscale=1)
+            rast.add_band()
+        return rast.render(width, height, **options)
+
+    def view(self, width, height, **options):
+        lyr = self.render(width, height, **options)
+
+        import Tkinter as tk
+        import PIL.ImageTk
+        
+        app = tk.Tk()
+        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
+        lbl = tk.Label(image=tkimg)
+        lbl.tkimg = tkimg
+        lbl.pack()
+        app.mainloop()
 
 class RasterData(object):
     def __init__(self, filepath=None, data=None, image=None,
@@ -433,7 +454,7 @@ class RasterData(object):
             self.width, self.height = bands[0].size
             self.mode = pilmode_to_rastmode(bands[0].mode)
 
-        else:
+        else:            
             # auto set width of new raster based on georef if needed
             if "width" not in kwargs:
                 if "cellwidth" in kwargs:
@@ -543,6 +564,8 @@ class RasterData(object):
         band._rast = self
 
         self.bands.append(band)
+
+        return band
 
     def set_geotransform(self, **georef):
         

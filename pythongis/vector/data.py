@@ -25,21 +25,26 @@ class Feature:
         "geometry must be a geojson dictionary"
         self._data = data
         self.row  = list(row)
-        
-        bbox = geometry.get("bbox")
-        self._cached_bbox = bbox
 
-        self.geometry = geometry.copy()
+        if geometry:
+            geometry = geometry.copy()
+            bbox = geometry.get("bbox")
+            self._cached_bbox = bbox
+        else:
+            self._cached_bbox = None
+
+        self.geometry = geometry
 
         # ensure it is same geometry type as parent
-        geotype = self.geometry["type"]
-        if self._data.type: 
-            if "Point" in geotype and self._data.type == "Point": pass
-            elif "LineString" in geotype and self._data.type == "LineString": pass
-            elif "Polygon" in geotype and self._data.type == "Polygon": pass
-            else:
-                raise TypeError("Each feature geometry must be of the same type as the file it is attached to")
-        else: self._data.type = self.geometry["type"].replace("Multi", "")
+        if self.geometry:
+            geotype = geometry["type"]
+            if self._data.type: 
+                if "Point" in geotype and self._data.type == "Point": pass
+                elif "LineString" in geotype and self._data.type == "LineString": pass
+                elif "Polygon" in geotype and self._data.type == "Polygon": pass
+                else:
+                    raise TypeError("Each feature geometry must be of the same type as the file it is attached to")
+            else: self._data.type = self.geometry["type"].replace("Multi", "")
         
         if id == None: id = next(self._data._id_generator)
         self.id = id
@@ -63,6 +68,8 @@ class Feature:
 
     @property
     def bbox(self):
+        if not self.geometry:
+            raise Exception("Cannot get bbox of null geometry")
         if not self._cached_bbox:
             geotype = self.geometry["type"]
             coords = self.geometry["coordinates"]
@@ -89,11 +96,13 @@ class Feature:
         return self._cached_bbox
 
     def get_shapely(self):
+        if not self.geometry:
+            raise Exception("Cannot get shapely object of null geometry")
         return geojson2shapely(self.geometry)                
 
     def copy(self):
         geoj = self.geometry
-        if self._cached_bbox: geoj["bbox"] = self._cached_bbox
+        if self.geometry and self._cached_bbox: geoj["bbox"] = self._cached_bbox
         return Feature(self._data, self.row, geoj)
 
 
@@ -162,7 +171,7 @@ class VectorData:
 
     @property
     def bbox(self):
-        xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self))
+        xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self if feat.geometry))
         xmin, xmax = min(xmins), max(xmaxs)
         ymin, ymax = min(ymins), max(ymaxs)
         bbox = (xmin, ymin, xmax, ymax)
@@ -170,9 +179,15 @@ class VectorData:
 
     ### DATA ###
 
-    def add_feature(self, row, geometry):
+    def add_feature(self, row, geometry=None):
         feature = Feature(self, row, geometry)
         self[feature.id] = feature
+
+    def convert_field(self, field, valfunc):
+        fieldindex = self.fields.index(field)
+        for feat in self:
+            val = feat.row[fieldindex]
+            feat.row[fieldindex] = valfunc(val)
 
     ### FILTERING ###
 
@@ -187,10 +202,66 @@ class VectorData:
 
         return new
 
-    def join(self, iterable, iterfields, condition):
-        # can be any iterable, adds attributes if condition is true
-        # ...
-        pass
+    def join(self, other, condition, fieldmapping=[]):        
+        out = VectorData()
+
+        from . import sql
+
+        groupbydata = self
+        valuedata = other
+        def _condition(item):
+            f1,f2 = item
+            return condition(f1,f2)
+
+        if not fieldmapping:
+            fieldmapping = [ (field, lambda (f1,f2),field=field: f2[field], "first")
+                            for field in other.fields
+                             if field not in self.fields]
+
+        # add fields
+        out.fields = list(groupbydata.fields)
+        out.fields.extend([name for name,valfunc,aggfunc in fieldmapping])
+
+        # loop
+        for groupfeat in groupbydata:
+            newrow = list(groupfeat.row)
+            geoj = groupfeat.geometry
+
+            # aggregate
+            combinations = ((groupfeat,valfeat) for valfeat in valuedata)
+            matches = sql.where(combinations, _condition)
+            newrow.extend( sql.aggreg(matches, fieldmapping) )
+
+            # add
+            out.add_feature(newrow, geoj)
+
+        return out
+
+
+
+                
+            
+##        outvec.fields = self.fields + other.fields
+##        
+##        for feat1 in self:
+##            anymatch = False
+##            
+##            for feat2 in other:
+##                match = condition(feat1,feat2)
+##                
+##                if match:
+##                    anymatch = True
+##                    row = feat1.row + feat2.row
+##                    outvec.add_feature(row=row, geometry=feat1.geometry)
+##
+##            if not anymatch and keepall:
+##                row = feat1.row + ["" for _ in range(len(feat2.row))]
+##                outvec.add_feature(row=row, geometry=feat1.geometry)
+
+
+
+        return outvec
+                
 
     ###### SPATIAL INDEXING #######
 
@@ -198,7 +269,8 @@ class VectorData:
         """Allows quick overlap search methods"""
         self.spindex = rtree.index.Index()
         for feat in self:
-            self.spindex.insert(feat.id, feat.bbox)
+            if feat.geometry:
+                self.spindex.insert(feat.id, feat.bbox)
     
     def quick_overlap(self, bbox):
         """

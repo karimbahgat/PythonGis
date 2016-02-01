@@ -306,48 +306,79 @@ def rasterize(vectordata, valuekey=None, **rasterdef):
     raster.add_band(img=img)
     return raster
 
-def vectorize(raster, bandnum=1):
+def vectorize(raster, mergecells=False, metavars=False, bandnum=0):
     # so far only experimental
     # ...
-    
-    if raster.mode == "1bit":
 
-        raise Exception("Not yet implemented")
+    from ..vector.data import VectorData
 
-        ##        import PIL.ImageMorph
-        ##        op = PIL.ImageMorph.MorphOp(op_name="edge")
-        ##        img = raster.bands[bandnum]
-        ##        # extend img with 1 pixel border to allow identifying edges along the edge
-        ##        # ...
-        ##        # alt1
-        ##        pixcount,outlineimg = op.apply(img)
-        ##        # alt2
-        ##        coords = op.match(img)
-        ##
-        ##        # difficult part is how to connect the edge pixels
-        ##
-        ##        # MAYBE:
-        ##        # first get pixels as coordinates via geotransform
-        ##        # start on first matching pixel
-        ##        # then examine and follow first match among neighbouring pixels in clockwise direction
-        ##        # each pixel followed is converted to coordinate via geotransform and added to a list
-        ##        # keep following until ring is closed or no more neighbours have match (deadend)
-        ##        # jump to next unprocessed pixel, and repeat until all have been processed
-        ##        # after all is done, we have one or more polygons, lines in the case of deadends, or points in the case of just one match per iteration
-        ##        # if polygons, identify if any of them are holes belonging to other polygons
-        ##
-        ##        # ALSO
-        ##        # how to connect the pixels, via centerpoint coordinate, or tracing the cell corners?
-        ##        # ...
-        ##
-        ##        # OR
-        ##        # http://cardhouse.com/computer/vector.htm
+    if mergecells:
+        
+        # merge/union cells of same values
+        
+        if raster.mode == "1bit":
+
+            raise Exception("Not yet implemented")
+
+            ##        import PIL.ImageMorph
+            ##        op = PIL.ImageMorph.MorphOp(op_name="edge")
+            ##        img = raster.bands[bandnum]
+            ##        # extend img with 1 pixel border to allow identifying edges along the edge
+            ##        # ...
+            ##        # alt1
+            ##        pixcount,outlineimg = op.apply(img)
+            ##        # alt2
+            ##        coords = op.match(img)
+            ##
+            ##        # difficult part is how to connect the edge pixels
+            ##
+            ##        # MAYBE:
+            ##        # first get pixels as coordinates via geotransform
+            ##        # start on first matching pixel
+            ##        # then examine and follow first match among neighbouring pixels in clockwise direction
+            ##        # each pixel followed is converted to coordinate via geotransform and added to a list
+            ##        # keep following until ring is closed or no more neighbours have match (deadend)
+            ##        # jump to next unprocessed pixel, and repeat until all have been processed
+            ##        # after all is done, we have one or more polygons, lines in the case of deadends, or points in the case of just one match per iteration
+            ##        # if polygons, identify if any of them are holes belonging to other polygons
+            ##
+            ##        # ALSO
+            ##        # how to connect the pixels, via centerpoint coordinate, or tracing the cell corners?
+            ##        # ...
+            ##
+            ##        # OR
+            ##        # http://cardhouse.com/computer/vector.htm
+
+        else:
+            # for each region of contiguous cells with same value
+            # assign a feature and give it that value
+            # ...
+            raise Exception("Not yet implemented")
 
     else:
-        # for each region of contiguous cells with same value
-        # assign a feature and give it that value
-        # ...
-        raise Exception("Not yet implemented")
+        
+        # separate feature and geometry for each cell
+        
+        outvec = VectorData()
+
+        if metavars:
+            outvec.fields = ["col","row","x","y","val"]
+            band = raster.bands[bandnum]
+            nodataval = band.nodataval
+            for cell in band:
+                if cell.value != nodataval:
+                    row = [cell.col, cell.row, cell.x, cell.y, cell.value]
+                    outvec.add_feature(row=row, geometry=cell.poly)
+        else:
+            outvec.fields = ["val"]
+            band = raster.bands[bandnum]
+            nodataval = band.nodataval
+            for cell in band:
+                if cell.value != nodataval:
+                    row = [cell.value]
+                    outvec.add_feature(row=row, geometry=cell.poly)
+
+        return outvec
 
 def crop(raster, bbox, worldcoords=True):
     """Finds the pixels that are closest to the coordinate bbox

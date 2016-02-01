@@ -247,6 +247,9 @@ class RasterLayer:
         # TODO: Instead of resample need to somehow honor lock_ratio, maybe by not using from_image()
         # ...
 
+        # TODO: binary 1bit rasters dont show correctly
+        # ...
+
         if self.styleoptions["type"] == "grayscale":
             
             # Note: Maybe remove and instead must specify white and black in colorscale type...?

@@ -47,6 +47,24 @@ def from_file(filepath, encoding="utf8", **kwargs):
         crs = geojfile.crs
         
         return fields, rows, geometries, crs
+
+    # normal table file without geometry
+    elif filepath.endswith((".txt",".csv")):
+        import csv, codecs
+        delimiter = kwargs.get("delimiter")
+        with codecs.open(filepath, encoding=encoding) as fileobj:
+            if delimiter is None:
+                dialect = csv.Sniffer().sniff(fileobj.read())
+                fileobj.seek(0)
+                rows = csv.reader(fileobj, dialect)
+            else:
+                rows = csv.reader(fileobj, delimiter=delimiter)
+            rows = list(rows)
+        fields = rows.pop(0)
+        geometries = [None for _ in rows]
+        crs = None
+
+        return fields, rows, geometries, crs
     
     else:
         raise Exception("Could not create vector data from the given filepath: the filetype extension is either missing or not supported")
