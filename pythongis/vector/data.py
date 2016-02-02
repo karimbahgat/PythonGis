@@ -202,44 +202,68 @@ class VectorData:
 
         return new
 
-    def join(self, other, condition, fieldmapping=[]):        
+    def join(self, other, k1, k2, fieldmapping=[]):        
         out = VectorData()
 
-        from . import sql
+        # taken from http://rosettacode.org/wiki/Hash_join#Python
+     
+        def hashJoin(table1, key1, table2, key2):
+            h = dict() 
+            # hash phase
+            for s in table1:
+                val = key1(s)
+                if val in h:
+                    h[val].append(s)
+                else:
+                    h[val] = [s]
+            # join phase
+            return ((s, r) for r in table2 for s in h.get(key2(r),[]))
 
-        groupbydata = self
-        valuedata = other
-        def _condition(item):
-            f1,f2 = item
-            return condition(f1,f2)
-
-        if not fieldmapping:
-            fieldmapping = [ (field, lambda (f1,f2),field=field: f2[field], "first")
-                            for field in other.fields
-                             if field not in self.fields]
-
-        # add fields
-        out.fields = list(groupbydata.fields)
-        out.fields.extend([name for name,valfunc,aggfunc in fieldmapping])
-
-        # loop
-        for groupfeat in groupbydata:
-            newrow = list(groupfeat.row)
-            geoj = groupfeat.geometry
-
-            # aggregate
-            combinations = ((groupfeat,valfeat) for valfeat in valuedata)
-            matches = sql.where(combinations, _condition)
-            newrow.extend( sql.aggreg(matches, fieldmapping) )
-
-            # add
-            out.add_feature(newrow, geoj)
+        if len(self) <= len(other):
+            for pair in hashJoin(self, k1, other, k2):
+                f1,f2 = pair
+                row = f1.row + f2.row
+                out.add_feature(row=row, geometry=f1.geometry)
+        else:
+            for pair in hashJoin(other, k2, self, k1):
+                f2,f1 = pair
+                row = f1.row + f2.row
+                out.add_feature(row=row, geometry=f1.geometry)
 
         return out
+    
 
-
-
-                
+##        from . import sql
+##
+##        groupbydata = self
+##        valuedata = other
+##        def _condition(item):
+##            f1,f2 = item
+##            return condition(f1,f2)
+##
+##        if not fieldmapping:
+##            fieldmapping = [ (field, lambda (f1,f2),field=field: f2[field], "first")
+##                            for field in other.fields
+##                             if field not in self.fields]
+##
+##        # add fields
+##        out.fields = list(groupbydata.fields)
+##        out.fields.extend([name for name,valfunc,aggfunc in fieldmapping])
+##
+##        # loop
+##        for groupfeat in groupbydata:
+##            newrow = list(groupfeat.row)
+##            geoj = groupfeat.geometry
+##
+##            # aggregate
+##            combinations = ((groupfeat,valfeat) for valfeat in valuedata)
+##            matches = sql.where(combinations, _condition)
+##            newrow.extend( sql.aggreg(matches, fieldmapping) )
+##
+##            # add
+##            out.add_feature(newrow, geoj)
+##
+##        return out        
             
 ##        outvec.fields = self.fields + other.fields
 ##        
@@ -257,10 +281,8 @@ class VectorData:
 ##            if not anymatch and keepall:
 ##                row = feat1.row + ["" for _ in range(len(feat2.row))]
 ##                outvec.add_feature(row=row, geometry=feat1.geometry)
-
-
-
-        return outvec
+##
+##        return outvec
                 
 
     ###### SPATIAL INDEXING #######

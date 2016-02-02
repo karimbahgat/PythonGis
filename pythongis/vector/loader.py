@@ -1,6 +1,8 @@
 
 # import builtins
 import os
+import csv
+import codecs
 
 # import fileformat modules
 import shapefile as pyshp
@@ -50,7 +52,6 @@ def from_file(filepath, encoding="utf8", **kwargs):
 
     # normal table file without geometry
     elif filepath.endswith((".txt",".csv")):
-        import csv, codecs
         delimiter = kwargs.get("delimiter")
         with codecs.open(filepath, encoding=encoding) as fileobj:
             if delimiter is None:
@@ -61,7 +62,27 @@ def from_file(filepath, encoding="utf8", **kwargs):
                 rows = csv.reader(fileobj, delimiter=delimiter)
             rows = list(rows)
         fields = rows.pop(0)
-        geometries = [None for _ in rows]
+        
+        geokey = kwargs.get("geokey")
+        xfield = kwargs.get("xfield")
+        yfield = kwargs.get("yfield")
+        
+        if geokey:
+            geometries = [geokey(dict(zip(fields,row))) for row in rows]
+            
+        elif xfield and yfield:
+            def xygeoj(row):
+                rowdict = dict(zip(fields,row))
+                x,y = rowdict[xfield],rowdict[yfield]
+                try: x,y = float(x),float(y)
+                except: x,y = float(x.replace(",",".")),float(y.replace(",","."))
+                geoj = {"type":"Point", "coordinates":(x,y)}
+                return geoj
+            geometries = [xygeoj(row) for row in rows]
+            
+        else:
+            geometries = [None for _ in rows]
+            
         crs = None
 
         return fields, rows, geometries, crs
