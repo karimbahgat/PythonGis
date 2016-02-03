@@ -221,23 +221,22 @@ def from_file(filepath, **georef):
             return crs
 
         # read geotiff georef tags
+        georef_orig = georef.copy()
         try:
+            # use georef from file tags
+            georef = read_georef(raw_tags)
             # override with manual georef options
+            georef.update(georef_orig)
             georef["affine"] = compute_affine(**georef)
         except:
-            try:
-                # use georef from file tags
-                georef = read_georef(raw_tags)
-                georef["affine"] = compute_affine(**georef)
-            except:
-                # if no geotiff tag info look for world file transform coefficients
-                transform_coeffs = check_world_file(filepath)
-                if transform_coeffs:
-                    # rearrange the world file param sequence to match affine transform
-                    [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
-                    georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
-                else:
-                    raise Exception("Couldn't find any georef options, geotiff tags, or world file needed to position the image in space")
+            # if no geotiff tag info look for world file transform coefficients
+            transform_coeffs = check_world_file(filepath)
+            if transform_coeffs:
+                # rearrange the world file param sequence to match affine transform
+                [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
+                georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
+            else:
+                raise Exception("Couldn't find any georef options, geotiff tags, or world file needed to position the image in space")
 
         # read nodata
         nodataval = read_nodata(raw_tags)

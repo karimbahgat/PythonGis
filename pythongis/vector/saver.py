@@ -18,6 +18,8 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8"):
         elif isinstance(value, unicode):
             # unicode is custom encoded into bytestring
             return value.encode(encoding)
+        elif value is None:
+            return value
         else:
             # brute force anything else to string representation
             return bytes(value)

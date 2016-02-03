@@ -202,33 +202,45 @@ class VectorData:
 
         return new
 
-    def join(self, other, k1, k2, fieldmapping=[]):        
+    def join(self, other, k1, k2, fieldmapping=[], keepall=True): 
         out = VectorData()
+        out.fields = list(self.fields)
+        out.fields += (field for field in other.fields if field not in self.fields)
 
-        # taken from http://rosettacode.org/wiki/Hash_join#Python
-     
-        def hashJoin(table1, key1, table2, key2):
-            h = dict() 
-            # hash phase
-            for s in table1:
-                val = key1(s)
-                if val in h:
-                    h[val].append(s)
-                else:
-                    h[val] = [s]
-            # join phase
-            return ((s, r) for r in table2 for s in h.get(key2(r),[]))
+        from . import sql
+        
+        _fieldmapping = [(field,lambda f,field=field:f[field],"first") for field in other.fields if field not in self.fields]
+        fs,vfs,afs = zip(*fieldmapping) or [[],[],[]]
+        
+        def getfm(item):
+            if item[0] in fs:
+                return fieldmapping[fs.index(item[0])]
+            else:
+                return item
+        fieldmapping = [getfm(item) for item in _fieldmapping]
 
-        if len(self) <= len(other):
-            for pair in hashJoin(self, k1, other, k2):
-                f1,f2 = pair
-                row = f1.row + f2.row
-                out.add_feature(row=row, geometry=f1.geometry)
-        else:
-            for pair in hashJoin(other, k2, self, k1):
-                f2,f1 = pair
-                row = f1.row + f2.row
-                out.add_feature(row=row, geometry=f1.geometry)
+        def grouppairs(data1, key1, data2, key2):
+            # create hash table
+            # inspired by http://rosettacode.org/wiki/Hash_join#Python
+            hsh = dict()
+            for keyval,f2s in itertools.groupby(sorted(data2,key=key2), key=key2):
+                aggval = sql.aggreg(f2s, aggregfuncs=fieldmapping)
+                hsh[keyval] = aggval
+            # iterate join
+            for f1 in data1:
+                keyval = key1(f1)
+                if keyval in hsh:
+                    f2row = hsh[keyval]
+                    yield f1,f2row
+                elif keepall:
+                    f2row = ("" for f in other.fields if f not in self.fields)
+                    yield f1,f2row
+
+        for pair in grouppairs(self, k1, other, k2):
+            f1,f2row = pair
+            row = list(f1.row)
+            row += f2row
+            out.add_feature(row=row, geometry=f1.geometry)
 
         return out
     

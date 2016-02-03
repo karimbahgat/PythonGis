@@ -115,4 +115,43 @@ def to_file(bands, meta, filepath):
         # write world file
         create_world_file(filepath, meta["affine"])
 
+    elif filepath.lower().endswith(".txt"):
+        # cell by cell table format
+        with open(filepath, "w") as writer:
+            bandnum = meta.get("bandnum", 0)
+            band = bands[bandnum]
+            pixelaccess = band.load()
+            w,h = band.size
+            delimiter = meta.get("delimiter", None)
+            cellid = meta.get("cellid", "colrow")
+            
+            if cellid == "xy":
+                fields = ["x","y","value"]
+                writer.write("\t".join(fields)+"\n")
+                xscale,xskew,xoffset, yskew,yscale,yoffset = meta["affine"]
+                for row in range(h):
+                    for col in range(w):
+                        val = pixelaccess[col,row]
+                        x,y = col*xscale + row*xskew + xoffset, col*yscale + row*yskew + yoffset
+                        row = [x,y,val]
+                        writer.write("\t".join(row)+"\n")
+                        
+            elif cellid == "colrow":
+                fields = ["column","row","value"]
+                writer.write("\t".join(fields)+"\n")
+                for row in range(h):
+                    for col in range(w):
+                        val = pixelaccess[col,row]
+                        row = [col,row,val]
+                        writer.write("\t".join(row)+"\n")
+                        
+            else:
+                raise Exception("Cellid option must be either xy or colrow")
+            
+        # write world file
+        create_world_file(filepath, meta["affine"])
+
+    else:
+
+        raise Exception("Could not save a raster to the given filepath: the filetype extension is either missing or not supported")
 
