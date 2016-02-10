@@ -183,6 +183,26 @@ class VectorData:
         feature = Feature(self, row, geometry)
         self[feature.id] = feature
 
+    def add_field(self, field, index=None):
+        if index is None:
+            self.fields.append(field)
+            for feat in self:
+                feat.row.append(None)
+        else:
+            self.fields.insert(index, field)
+            for feat in self:
+                feat.row.insert(index, None)
+
+    def compute(self, field, func):
+        for feat in self:
+            feat[field] = func(feat)
+
+    def drop_field(self, field):
+        fieldindex = self.fields.index(field)
+        del self.fields[fieldindex]
+        for feat in self:
+            del feat.row[fieldindex]
+
     def convert_field(self, field, valfunc):
         fieldindex = self.fields.index(field)
         for feat in self:

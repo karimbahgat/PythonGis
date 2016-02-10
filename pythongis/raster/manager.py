@@ -90,8 +90,8 @@ def resample(raster, algorithm="nearest", **rasterdef):
         algocode = algocodes[algorithm.lower()] # resampling code used by PIL
         
         # get coords of all 4 target corners
-        coordspace_bbox = targetrast.bbox
-        xleft,ytop,xright,ybottom = coordspace_bbox
+        xleft,ytop = targetrast.cell_to_geo(0,0)
+        xright,ybottom = targetrast.cell_to_geo(targetrast.width-1, targetrast.height-1)
         targetcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
         
         # find pixel locs of all these coords in the source raster
@@ -122,6 +122,19 @@ def resample(raster, algorithm="nearest", **rasterdef):
 
     return targetrast
 
+def align(raster, **rasterdef):
+    rasterdef = rasterdef.copy()
+    ref = data.RasterData(mode="1bit", **rasterdef)
+    
+    xscale,xskew,xoffset,yskew,yscale,yoffset = raster.meta["affine"]
+    xoffset,yoffset = ref.meta["affine"][2], ref.meta["affine"][5]
+    resampledef = {"width":raster.width,
+                   "height":raster.height,
+                   "affine":[xscale,xskew,xoffset,yskew,yscale,yoffset]}
+    
+    aligned = resample(raster, **resampledef)
+    return aligned
+
 def upscale(raster, stat="sum", **rasterdef):
     # either use focal stats followed by nearest resampling to match target raster
     # or use zonal stats where zone values are determined by col/row to form squares
@@ -138,7 +151,7 @@ def upscale(raster, stat="sum", **rasterdef):
         targetrast.add_band()
 
     # maybe align the valueraster to rasterdef by rounding the xoff and yoff to georef
-    # ...
+    raster = align(raster, **rasterdef)
 
     # run moving focal window to group cells
     tilesize = (abs(xscale),abs(yscale))
@@ -385,14 +398,34 @@ def crop(raster, bbox, worldcoords=True):
     and just does a normal image crop, meaning no resampling/changing of data.
     """
     x1,y1,x2,y2 = bbox
+    xscale,xskew,xoffset, yskew,yscale,yoffset = raster.meta["affine"]
 
     if worldcoords:
+        # bbox is only used manually by user and should include the corners (+- half cellsize)
+        # need to remove this padding to get it right
+        if x2 > x1:
+            x1 += xscale/2.0
+            x2 -= xscale/2.0
+        else:
+            x1 -= xscale/2.0
+            x2 += xscale/2.0
+        if y2 > y1:
+            y1 += yscale/2.0
+            y2 -= yscale/2.0
+        else:
+            y1 -= yscale/2.0
+            y2 += yscale/2.0
+
         # get nearest pixels of bbox coords
         px1,py1 = raster.geo_to_cell(x1,y1)
         px2,py2 = raster.geo_to_cell(x2,y2)
     else:
         # already in pixels
         px1,py1,px2,py2 = x1,y1,x2,y2
+
+    # PIL doesnt include the max pixel coords
+    px2 += 1
+    py2 += 1
 
     # get new dimensions
     outrast = data.RasterData(**raster.meta)
@@ -406,17 +439,16 @@ def crop(raster, bbox, worldcoords=True):
     # crop each and add as band
     pxmin = min(px1,px2)
     pymin = min(py1,py2)
-    pxmax = max(px1,px2)
-    pymax = max(py1,py2)
+    pxmax = max(px1,px2) 
+    pymax = max(py1,py2) 
     for band in raster.bands:
         img = band.img.crop((pxmin,pymin,pxmax,pymax))
         outrast.add_band(img=img, nodataval=band.nodataval)
 
-    # update output geotransform based on crop corners
+    # update output affine offset based on new upperleft corner
     x1,y1 = raster.cell_to_geo(px1,py1)
-    x2,y2 = raster.cell_to_geo(px2,py2)
-    outrast.set_geotransform(width=width, height=height,
-                             bbox=[x1,y1,x2,y2])
+    outrast.set_geotransform(xoffset=x1, yoffset=y1)
+
     return outrast
 
 def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False):
@@ -432,7 +464,10 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False):
         raise Exception("Either tiles or tilesize must be specified")
 
     if worldcoords:
-        x1,y1,x2,y2 = raster.bbox
+        xscale,xskew,xoffset, yskew,yscale,yoffset = raster.meta["affine"]
+        x1,y1 = raster.cell_to_geo(0,0)
+        x2,y2 = raster.cell_to_geo(raster.width-1,raster.height-1)
+            
         xfrac,yfrac = tw / abs(x2-x1), th / abs(y2-y1) 
         tw,th = int(round(raster.width*xfrac)), int(round(raster.height*yfrac))
 

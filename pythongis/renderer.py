@@ -176,7 +176,7 @@ class VectorLayer:
                     val = self.styleoptions[key]
                     if isinstance(val, dict):
                         # lookup self in precomputed symboldict
-                        rendict[key] = val["symbols"][id(feat)]
+                        rendict[key] = val["symbols"].get(id(feat)) # this means symbol defaults to None ie transparent if feature had a missing/null value, which should be correct
                     else:
                         rendict[key] = val
 
@@ -237,8 +237,9 @@ class RasterLayer:
         self.styleoptions = options
 
     def render(self, resampling="nearest", lock_ratio=True, **georef):
-        # NOT DONE...
         # position in space
+        # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
+        # LIKELY DUE TO HALF CELL CENTER VS CORNER
         if "bbox" not in georef:
             georef["bbox"] = self.data.bbox
 

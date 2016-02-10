@@ -304,6 +304,13 @@ def from_file(filepath, **georef):
         # ...
         pass 
 
+    elif filepath.lower().endswith(".bil"):
+        raise Exception("Not yet implemented")
+
+    elif filepath.lower().endswith(".adf"):
+        # arcinfo raster: http://support.esri.com/en/knowledgebase/techarticles/detail/30616
+        raise Exception("Not yet implemented")
+
     elif filepath.lower().endswith(".txt"):
         # cell by cell table format
         with open(filepath) as reader:
@@ -449,13 +456,31 @@ def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
             xscale = cellwidth
         elif bbox and width:
             xwidth = bbox[2]-bbox[0]
-            xscale = xwidth / float(width)
+            xscale = xwidth / float(width+1) # +1 is to account for the two half pixels padding of bbox
     if not yscale:
         if cellheight:
             yscale = cellheight
         elif bbox and height:
             yheight = bbox[3]-bbox[1]
-            yscale = yheight / float(height)
+            yscale = yheight / float(height+1) # +1 is to account for the two half pixels padding of bbox
+
+    # bbox is only used manually by user and should include the corners (+- half cellsize)
+    # need to remove this padding to get it right
+    if bbox:
+        x1,y1,x2,y2 = bbox
+        if x2 > x1:
+            x1 += xscale/2.0
+            x2 -= xscale/2.0
+        else:
+            x1 -= xscale/2.0
+            x2 += xscale/2.0
+        if y2 > y1:
+            y1 += yscale/2.0
+            y2 -= yscale/2.0
+        else:
+            y1 -= yscale/2.0
+            y2 += yscale/2.0
+        bbox = x1,y1,x2,y2
 
     # get skew values from bbox if not specified
     # ...

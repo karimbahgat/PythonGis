@@ -299,10 +299,10 @@ class Band(object):
                 statsdict["median"] = sortedvals[len(sortedvals)//2][1]
             if not stattypes or "majority" in stattypes:
                 sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
-                statsdict["majority"] = sortedvals[0][1]
+                statsdict["majority"] = sortedvals[-1][1]
             if not stattypes or "minority" in stattypes:
                 sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
-                statsdict["minority"] = sortedvals[-1][1]
+                statsdict["minority"] = sortedvals[0][1]
 
         elif self.mode.endswith(("16","32","1bit")):
             
@@ -456,36 +456,36 @@ class RasterData(object):
 
         else:            
             # auto set width of new raster based on georef if needed
-            if "width" not in kwargs:
-                if "cellwidth" in kwargs:
-                    kwargs["xscale"] = kwargs["cellwidth"]
-                if "bbox" in kwargs and "xscale" in kwargs:
-                    xwidth = kwargs["bbox"][2] - kwargs["bbox"][0]
-                    kwargs["width"] = abs(int(round( xwidth / float(kwargs["xscale"]) )))
+            if "width" not in georef:
+                if "cellwidth" in georef:
+                    georef["xscale"] = georef["cellwidth"]
+                if "bbox" in georef and "xscale" in georef:
+                    xwidth = georef["bbox"][2] - georef["bbox"][0]
+                    georef["width"] = abs(int(round( xwidth / float(georef["xscale"]) )))
                     # adjust bbox based on rounded width
-                    x1,y1,x2,y2 = kwargs["bbox"]
-                    xwidth = kwargs["xscale"] * kwargs["width"]
-                    kwargs["bbox"] = x1,y1,x1+xwidth,y2
+                    x1,y1,x2,y2 = georef["bbox"]
+                    xwidth = georef["xscale"] * georef["width"]
+                    georef["bbox"] = x1,y1,x1+xwidth,y2
                 else:
                     raise Exception("Either the raster width or a bbox and xscale must be set")
 
             # auto set height of new raster based on georef if needed
-            if "height" not in kwargs:
-                if "cellheight" in kwargs:
-                    kwargs["yscale"] = kwargs["cellheight"]
-                if "bbox" in kwargs and "yscale" in kwargs:
-                    yheight = kwargs["bbox"][3] - kwargs["bbox"][1]
-                    kwargs["height"] = abs(int(round( yheight / float(kwargs["yscale"]) )))
+            if "height" not in georef:
+                if "cellheight" in georef:
+                    georef["yscale"] = georef["cellheight"]
+                if "bbox" in georef and "yscale" in georef:
+                    yheight = georef["bbox"][3] - georef["bbox"][1]
+                    georef["height"] = abs(int(round( yheight / float(georef["yscale"]) )))
                     # adjust bbox based on rounded width
-                    x1,y1,x2,y2 = kwargs["bbox"]
-                    yheight = kwargs["yscale"] * kwargs["height"]
-                    kwargs["bbox"] = x1,y1,x2,y1+yheight
+                    x1,y1,x2,y2 = georef["bbox"]
+                    yheight = georef["yscale"] * georef["height"]
+                    georef["bbox"] = x1,y1,x2,y1+yheight
                 else:
                     raise Exception("Either the raster height or a bbox and yscale must be set")
 
             # set the rest
-            self.width = kwargs["width"]
-            self.height = kwargs["height"]
+            self.width = georef["width"]
+            self.height = georef["height"]
             if mode:
                 self.mode = mode
             else:
@@ -576,6 +576,9 @@ class RasterData(object):
              yskew, yscale, yoffset] = georef["affine"]
         else:
             # more intuitive way
+            current = dict(zip("xscale xskew xoffset yskew yscale yoffset".split(), self.meta["affine"]))
+            current.update(georef)
+            georef = current
             [xscale, xskew, xoffset, yskew, yscale, yoffset] = loader.compute_affine(**georef)
 
         self.affine = [xscale, xskew, xoffset, yskew, yscale, yoffset]
