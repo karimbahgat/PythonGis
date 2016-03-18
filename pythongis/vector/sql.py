@@ -13,7 +13,7 @@ from shapely.prepared import prep as supershapely
 
 def aggreg(iterable, aggregfuncs, geomfunc=None):
     """Each func must be able to take an iterable and return a single item.
-    Aggregfuncs is a series of 3-tuples: an output column name, a value function on which to base the aggregation, and a valid string or custom function for aggregating the retieved values.
+    Aggregfuncs is a series of 3-tuples: an output column name, a value function or value hash index on which to base the aggregation, and a valid string or custom function for aggregating the retieved values.
     """
     def lookup_aggfunc(agg):
         if agg == "count": return len
@@ -32,8 +32,13 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
             raise Exception("aggfunc must be a callable function or a valid statistics string name")
 
     def check_valfunc(valfunc):
-        if not hasattr(valfunc,"__call__"):
-            raise Exception("valfunc for field '%s' must be a callable function"%name)
+        if hasattr(valfunc,"__call__"):
+            pass
+        elif isinstance(valfunc,(str,unicode)):
+            hashindex = valfunc
+            valfunc = lambda f: f[hashindex]
+        else:
+            raise Exception("valfunc for field '%s' must be a callable function or a string of the hash index for retrieving the value"%name)
         return valfunc
     
     aggregfuncs = [(name,check_valfunc(valfunc),aggname,lookup_aggfunc(aggname)) for name,valfunc,aggname in aggregfuncs]

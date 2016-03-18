@@ -172,11 +172,12 @@ class VectorLayer:
             # get symbols
             rendict = dict()
             for key in "fillcolor fillsize outlinecolor outlinewidth".split():
+                nullval = None if "color" in key else 0 # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
                 if key in self.styleoptions:
                     val = self.styleoptions[key]
                     if isinstance(val, dict):
                         # lookup self in precomputed symboldict
-                        rendict[key] = val["symbols"].get(id(feat)) # this means symbol defaults to None ie transparent if feature had a missing/null value, which should be correct
+                        rendict[key] = val["symbols"].get(id(feat),nullval) 
                     else:
                         rendict[key] = val
 

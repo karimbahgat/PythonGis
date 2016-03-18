@@ -53,13 +53,14 @@ def from_file(filepath, encoding="utf8", **kwargs):
     # normal table file without geometry
     elif filepath.endswith((".txt",".csv")):
         delimiter = kwargs.get("delimiter")
-        with codecs.open(filepath, encoding=encoding) as fileobj:
+        with open(filepath, "rb") as fileobj:
             if delimiter is None:
                 dialect = csv.Sniffer().sniff(fileobj.read())
                 fileobj.seek(0)
                 rows = csv.reader(fileobj, dialect)
             else:
                 rows = csv.reader(fileobj, delimiter=delimiter)
+            rows = ([cell.decode(encoding) for cell in row] for row in rows)
             rows = list(rows)
         fields = rows.pop(0)
         
