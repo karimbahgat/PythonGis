@@ -194,6 +194,8 @@ class VectorData:
                 feat.row.insert(index, None)
 
     def compute(self, field, func):
+        if field not in self.fields:
+            self.add_field(field)
         for feat in self:
             feat[field] = func(feat)
 
@@ -221,6 +223,34 @@ class VectorData:
                 new.add_feature(feat.row, feat.geometry)
 
         return new
+
+    def aggregate(self, key, geomfunc, fieldmapping=[]):
+        # Aggregate values and geometries within key groupings
+        # Allows a lot of customization
+        out = VectorData()
+        out.fields = [fieldname for fieldname,_,_ in fieldmapping]
+
+        from . import sql
+        
+        for feats in sql.groupby(self, key=key):
+            row,geom = sql.aggreg(feats, aggregfuncs=fieldmapping, geomfunc=geomfunc)
+            out.add_feature(row=row, geometry=geom)
+
+        return out
+
+    def aggregate_duplicate_geoms(self, subkey=None, fieldmapping=[]):
+        # group within unique geometries
+        if subkey:
+            # additional subgrouping within identical geometries
+            keywrap = lambda f: (f.geometry, subkey(f))
+        else:
+            # only by geometry
+            keywrap = lambda f: f.geometry
+            
+        geomfunc = lambda items: items[0].geometry # since geometries are same within each group, pick first one
+        out = self.aggregate(keywrap, geomfunc=geomfunc, fieldmapping=fieldmapping)
+        
+        return out
 
     def join(self, other, k1, k2, fieldmapping=[], keepall=True): 
         out = VectorData()

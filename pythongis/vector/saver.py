@@ -9,12 +9,15 @@ import pygeoj
 
 
 
-def to_file(fields, rows, geometries, filepath, encoding="utf8"):
+def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12):
 
     def encode(value):
-        if isinstance(value, (float,int)):
-            # nrs are kept as nrs
+        if isinstance(value, int):
+            # ints are kept as ints
             return value
+        elif isinstance(value, float):
+            # floats are rounded
+            return round(value, maxprecision)
         elif isinstance(value, unicode):
             # unicode is custom encoded into bytestring
             return value.encode(encoding)
@@ -30,29 +33,31 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8"):
         
         # set fields with correct fieldtype
         for fieldindex,fieldname in enumerate(fields):
+            fieldlen = 1
+            decimals = 0
+            fieldtype = "N" # assume number until proven otherwise
             for row in rows:
                 value = row[fieldindex]
                 if value != "":
                     try:
                         # make nr fieldtype if content can be made into nr
-                        float(value)
-                        fieldtype = "N"
-                        fieldlen = 16
-                        decimals = 8
+                        value = float(value)
+                        fieldlen = max(( len(bytes(value)), fieldlen ))
+                        if not value.is_integer():
+                            # get max decimals, capped to max precision
+                            decimals = max(( len(bytes(round(value - int(value), maxprecision)).split(".")[1]), decimals )) 
                     except:
                         # but turn to text if any of the cells cannot be made to float bc they are txt
                         fieldtype = "C"
-                        fieldlen = 250
-                        decimals = 0
-                        break
+                        fieldlen = max(( len(value), fieldlen ))
                 else:
-                    # empty value, so just keep assuming nr type
-                    fieldtype = "N"
-                    fieldlen = 16
-                    decimals = 8
+                    # empty value, so just keep assuming same type
+                    pass
             # clean fieldname
             fieldname = fieldname.replace(" ","_")[:10]
             # write field
+            if fieldtype != "N":
+                decimals = 0
             shapewriter.field(fieldname.encode(encoding), fieldtype, fieldlen, decimals)
 
         # convert geojson to shape
@@ -137,7 +142,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8"):
             geojwriter.add_feature(properties=rowdict,
                                    geometry=geom)
         # save
-        geojwriter.save(filepath)
+        geojwriter.save(filepath, encoding=encoding)
             
     else:
         raise Exception("Could not save the vector data to the given filepath: the filetype extension is either missing or not supported")
