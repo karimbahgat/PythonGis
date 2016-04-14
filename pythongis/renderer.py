@@ -1,11 +1,12 @@
 
 import random
-import pyagg
+import pyagg, pyagg.legend
 import PIL, PIL.Image
 
+from .vector.data import VectorData
+from .raster.data import RasterData
 
-
-class MapCanvas:
+class Map:
     def __init__(self, width, height, background=None, layers=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
@@ -37,11 +38,56 @@ class MapCanvas:
     def zoom_bbox(self, xmin, ymin, xmax, ymax):
         self.drawer.zoom_bbox(xmin, ymin, xmax, ymax)
 
-    def zoom_factor(self, factor, center=None):
-        self.drawer.zoom_factor(factor, center=center)
+    def zoom_in(self, factor, center=None):
+        self.drawer.zoom_in(factor, center=center)
+
+    def zoom_out(self, factor, center=None):
+        self.drawer.zoom_out(factor, center=center)
 
     def zoom_units(self, units, center=None):
         self.drawer.zoom_units(units, center=center)
+
+    # Layers
+
+    def __iter__(self):
+        for layer in self.layers:
+            yield layer
+
+    def add_layer(self, layer, **options):
+        return self.layers.add_layer(layer, **options)
+
+    def move_layer(self, from_pos, to_pos):
+        self.layers.move_layer(from_pos, to_pos)
+
+    def remove_layer(self, position):
+        self.layers.remove_layer(position)
+
+    def get_position(self, layer):
+        return self.layers.get_position(layer)
+
+    # Legend
+
+    def draw_legend(self, legend, **options):
+        self.drawer.paste(legend._legend.render(), **options)
+
+    # Decorations
+
+    def draw_grid(self, xinterval, yinterval, **kwargs):
+        self.drawer.draw_grid(xinterval, yinterval, **kwargs)
+
+    def draw_axis(self, axis, minval, maxval, intercept,
+                  tickpos=None,
+                  tickinterval=None, ticknum=5,
+                  ticktype="tick", tickoptions={},
+                  ticklabelformat=None, ticklabeloptions={},
+                  noticks=False, noticklabels=False,
+                  **kwargs):
+        self.drawer.draw_axis(axis, minval, maxval, intercept,
+                              tickpos=tickpos, tickinterval=tickinterval, ticknum=ticknum,
+                              ticktype=ticktype, tickoptions=tickoptions,
+                              ticklabelformat=ticklabelformat, ticklabeloptions=ticklabeloptions,
+                              noticks=noticks, noticklabels=noticklabels,
+                              **kwargs)
 
     # Drawing
 
@@ -72,45 +118,53 @@ class MapCanvas:
         return self.drawer.get_tkimage()
 
     def view(self):
-        import Tkinter as tk
-        
-        app = tk.Tk()
-        tkimg = self.get_tkimage()
-        lbl = tk.Label(image=tkimg)
-        lbl.tkimg = tkimg
-        lbl.pack()
-        app.mainloop() 
+        self.drawer.view()
+
+    def save(self, savepath):
+        self.drawer.save(savepath)
 
         
 
 
 class LayerGroup:
     def __init__(self):
-        self.layers = list()
+        self._layers = list()
         self.connected_maps = list()
 
     def __iter__(self):
-        for layer in self.layers:
+        for layer in self._layers:
             yield layer
 
-    def add_layer(self, layer):
-        self.layers.append(layer)
+    def add_layer(self, layer, **options):
+        if not isinstance(layer, (VectorLayer,RasterLayer)):
+            try:
+                layer = VectorLayer(layer, **options)
+            except:
+                layer = RasterLayer(layer, **options)
+        self._layers.append(layer)
+
+        return layer
 
     def move_layer(self, from_pos, to_pos):
-        layer = self.layers.pop(from_pos)
-        self.layers.insert(to_pos, layer)
+        layer = self._layers.pop(from_pos)
+        self._layers.insert(to_pos, layer)
 
     def remove_layer(self, position):
-        self.layers.pop(position)
+        self._layers.pop(position)
 
     def get_position(self, layer):
-        return self.layers.index(layer)
+        return self._layers.index(layer)
 
 
 
 
 class VectorLayer:
     def __init__(self, data, **options):
+
+        if not isinstance(data, VectorData):
+            # assume data is filepath
+            doptions = options.get("dataoptions", dict())
+            data = VectorData(data, **doptions)
         
         self.data = data
         self.visible = True
@@ -191,6 +245,12 @@ class VectorLayer:
         
 class RasterLayer:
     def __init__(self, data, **options):
+        
+        if not isinstance(data, RasterData):
+            # assume data is filepath
+            doptions = options.get("dataoptions", dict())
+            data = RasterData(data, **doptions)
+        
         self.data = data
         self.visible = True
         self.img = None
@@ -311,3 +371,78 @@ class RasterLayer:
         self.img = img
 
 
+class Legend:
+    def __init__(self, map, **options):
+        self.map = map
+        self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **options)
+
+    def add_fillcolors(self, layer, **options):
+        if isinstance(layer, VectorLayer):
+            if "Polygon" in layer.data.type:
+                shape = "polygon"
+            elif "Line" in layer.data.type:
+                shape = "line"
+            elif "Point" in layer.data.type:
+                shape = "circle"
+            else:
+                raise Exception("Legend layer data must be of type polygon, linestring, or point")
+
+            cls = layer.styleoptions["fillcolor"]["classifier"]
+            if options.get("valuetype") == "categorical":
+                # WARNING: not very stable yet...
+                categories = set((cls.key(item),tuple(classval)) for item,classval in cls) # only the unique keys
+                breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
+            else:
+                breaks = cls.breaks
+                classvalues = cls.classvalues
+
+            # add any other nonvarying layer options
+            options = dict(options)
+            for k in "fillsize outlinecolor outlinewidth".split():
+                if k not in options and k in layer.styleoptions:
+                    v = layer.styleoptions[k]
+                    if not isinstance(v, dict):
+                        options[k] = v
+            
+            self._legend.add_fillcolors(shape, breaks, classvalues, **options)
+
+        elif isinstance(layer, RasterLayer):
+            shape = "polygon"
+            # ...
+            raise Exception("Legend layer for raster data not yet implemented")
+
+    def add_fillsizes(self, layer, **options):
+        if isinstance(layer, VectorLayer):
+            if "Polygon" in layer.data.type:
+                shape = "polygon"
+            elif "Line" in layer.data.type:
+                shape = "line"
+            elif "Point" in layer.data.type:
+                shape = "circle"
+            else:
+                raise Exception("Legend layer data must be of type polygon, linestring, or point")
+
+            # add any other nonvarying layer options
+            options = dict(options)
+            print 9999
+            print options
+            for k in "fillcolor outlinecolor outlinewidth".split():
+                print k
+                if k not in options and k in layer.styleoptions:
+                    v = layer.styleoptions[k]
+                    print k,v,type(v)
+                    if not isinstance(v, dict):
+                        options[k] = v
+            print options
+
+            cls = layer.styleoptions["fillsize"]["classifier"]
+            self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues, **options)
+
+        elif isinstance(layer, RasterLayer):
+            raise Exception("Fillcolor is the only possible legend entry for a raster layer")
+
+        
+
+        
+
+        

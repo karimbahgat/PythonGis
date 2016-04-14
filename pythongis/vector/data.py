@@ -406,7 +406,9 @@ class VectorData:
         for field,vals in cols.items():
             uniqvals = set(vals)
             cols[field] = list(sorted(uniqvals))[:maxvals]
-        return cols
+
+        import pprint
+        return "Vector data contents:\n" + pprint.pformat(cols, indent=4)
     
     def render(self, width, height, bbox=None, flipy=False, **styleoptions):
         from .. import renderer
