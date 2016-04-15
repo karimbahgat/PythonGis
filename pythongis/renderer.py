@@ -159,7 +159,7 @@ class LayerGroup:
 
 
 class VectorLayer:
-    def __init__(self, data, **options):
+    def __init__(self, data, name=None, **options):
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -169,6 +169,8 @@ class VectorLayer:
         self.data = data
         self.visible = True
         self.img = None
+
+        self.name = name
         
         # by default, set random style color
         rand = random.randrange
@@ -244,7 +246,7 @@ class VectorLayer:
 
         
 class RasterLayer:
-    def __init__(self, data, **options):
+    def __init__(self, data, name=None, **options):
         
         if not isinstance(data, RasterData):
             # assume data is filepath
@@ -254,6 +256,8 @@ class RasterLayer:
         self.data = data
         self.visible = True
         self.img = None
+
+        self.name = name
 
         # by default, set random style color
         if not "type" in options:
@@ -396,6 +400,10 @@ class Legend:
                 breaks = cls.breaks
                 classvalues = cls.classvalues
 
+            # add title automatically
+            if not "title" in options and layer.name:
+                options["title"] = layer.name
+
             # add any other nonvarying layer options
             options = dict(options)
             for k in "fillsize outlinecolor outlinewidth".split():
@@ -421,6 +429,10 @@ class Legend:
                 shape = "circle"
             else:
                 raise Exception("Legend layer data must be of type polygon, linestring, or point")
+
+            # add title automatically
+            if not "title" in options and layer.name:
+                options["title"] = layer.name
 
             # add any other nonvarying layer options
             options = dict(options)
