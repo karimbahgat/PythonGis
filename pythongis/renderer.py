@@ -7,7 +7,7 @@ from .vector.data import VectorData
 from .raster.data import RasterData
 
 class Map:
-    def __init__(self, width, height, background=None, layers=None, *args, **kwargs):
+    def __init__(self, width, height, background=None, layers=None, title="", titleoptions=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -19,6 +19,14 @@ class Map:
         self.drawer = pyagg.Canvas(width, height, background)
         self.drawer.geographic_space() 
 
+        # foreground layergroup for non-map decorations
+        self.foreground = ForegroundLayerGroup()
+
+        # title
+        if title:
+            titleoptions = titleoptions or dict()
+            self.add_title(title, **titleoptions)
+            
         self.img = self.drawer.get_image()
 
     def pixel2coord(self, x, y):
@@ -67,27 +75,53 @@ class Map:
 
     # Legend
 
-    def draw_legend(self, legend, **options):
-        self.drawer.paste(legend._legend.render(), **options)
+    def add_legend(self, legend=None, legendoptions=None, **pasteoptions):
+        if not legend:
+            # auto creates and builds legend
+            legendoptions = legendoptions or dict()
+            legend = Legend(self, **legendoptions)
+            legend.autobuild()
+            
+        legend.pasteoptions = pasteoptions
+        self.foreground.add_layer(legend)
+        return legend
 
     # Decorations
 
-    def draw_grid(self, xinterval, yinterval, **kwargs):
-        self.drawer.draw_grid(xinterval, yinterval, **kwargs)
+    def add_title(self, title, **titleoptions):
+        # a little hacky, since uses pyagg label object directly,
+        # better if canvas could allow percent coord units
+        # ...
+        override = titleoptions
+        titleoptions = dict(textsize=18)
+        titleoptions.update(override)
+        decor = pyagg.legend.Label(title, **titleoptions) # pyagg label indeed implements a render method()
+        decor.pasteoptions = dict(xy=("50%w","1%h"), anchor="n")
+        decor.img = decor.render()
+        self.foreground.add_layer(decor)
+        
+    def add_decoration(self, funcname, *args, **kwargs):
+        # draws directly on an image the size of the map canvas, so no pasteoptions needed
+        decor = Decoration(self, funcname, *args, **kwargs)
+        decor.pasteoptions = dict() #xy=(0,0), anchor="nw")
+        self.foreground.add_layer(decor)
 
-    def draw_axis(self, axis, minval, maxval, intercept,
-                  tickpos=None,
-                  tickinterval=None, ticknum=5,
-                  ticktype="tick", tickoptions={},
-                  ticklabelformat=None, ticklabeloptions={},
-                  noticks=False, noticklabels=False,
-                  **kwargs):
-        self.drawer.draw_axis(axis, minval, maxval, intercept,
-                              tickpos=tickpos, tickinterval=tickinterval, ticknum=ticknum,
-                              ticktype=ticktype, tickoptions=tickoptions,
-                              ticklabelformat=ticklabelformat, ticklabeloptions=ticklabeloptions,
-                              noticks=noticks, noticklabels=noticklabels,
-                              **kwargs)
+##    def draw_grid(self, xinterval, yinterval, **kwargs):
+##        self.drawer.draw_grid(xinterval, yinterval, **kwargs)
+##
+##    def draw_axis(self, axis, minval, maxval, intercept,
+##                  tickpos=None,
+##                  tickinterval=None, ticknum=5,
+##                  ticktype="tick", tickoptions={},
+##                  ticklabelformat=None, ticklabeloptions={},
+##                  noticks=False, noticklabels=False,
+##                  **kwargs):
+##        self.drawer.draw_axis(axis, minval, maxval, intercept,
+##                              tickpos=tickpos, tickinterval=tickinterval, ticknum=ticknum,
+##                              ticktype=ticktype, tickoptions=tickoptions,
+##                              ticklabelformat=ticklabelformat, ticklabeloptions=ticklabeloptions,
+##                              noticks=noticks, noticklabels=noticklabels,
+##                              **kwargs)
 
     # Drawing
 
@@ -104,13 +138,23 @@ class Map:
                 layer.render(width=self.drawer.width,
                              height=self.drawer.height,
                              bbox=self.drawer.coordspace_bbox)
+        for layer in self.foreground:
+            layer.render()
         self.update_draworder()
 
     def update_draworder(self):
         self.drawer.clear()
+
+        # paste the map layers
         for layer in self.layers:
             if layer.visible:
                 self.drawer.paste(layer.img)
+
+        # paste the foreground decorations
+        for layer in self.foreground:
+            if layer.img:
+                self.drawer.paste(layer.img, **layer.pasteoptions)
+                
         self.img = self.drawer.get_image()
 
     def get_tkimage(self):
@@ -158,8 +202,15 @@ class LayerGroup:
 
 
 
+class ForegroundLayerGroup(LayerGroup):
+    def add_layer(self, layer, **options):
+        self._layers.append(layer, **options)
+
+
+
+
 class VectorLayer:
-    def __init__(self, data, name=None, **options):
+    def __init__(self, data, legendoptions=None, **options):
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -170,7 +221,7 @@ class VectorLayer:
         self.visible = True
         self.img = None
 
-        self.name = name
+        self.legendoptions = legendoptions or dict()
         
         # by default, set random style color
         rand = random.randrange
@@ -246,7 +297,7 @@ class VectorLayer:
 
         
 class RasterLayer:
-    def __init__(self, data, name=None, **options):
+    def __init__(self, data, legendoptions=None, **options):
         
         if not isinstance(data, RasterData):
             # assume data is filepath
@@ -257,7 +308,7 @@ class RasterLayer:
         self.visible = True
         self.img = None
 
-        self.name = name
+        self.legendoptions = legendoptions or dict()
 
         # by default, set random style color
         if not "type" in options:
@@ -378,9 +429,10 @@ class RasterLayer:
 class Legend:
     def __init__(self, map, **options):
         self.map = map
+        self.img = None
         self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **options)
 
-    def add_fillcolors(self, layer, **options):
+    def add_fillcolors(self, layer, **override):
         if isinstance(layer, VectorLayer):
             if "Polygon" in layer.data.type:
                 shape = "polygon"
@@ -391,6 +443,10 @@ class Legend:
             else:
                 raise Exception("Legend layer data must be of type polygon, linestring, or point")
 
+            # use layer's legendoptions and possibly override
+            options = dict(layer.legendoptions)
+            options.update(override)
+
             cls = layer.styleoptions["fillcolor"]["classifier"]
             if options.get("valuetype") == "categorical":
                 # WARNING: not very stable yet...
@@ -400,12 +456,7 @@ class Legend:
                 breaks = cls.breaks
                 classvalues = cls.classvalues
 
-            # add title automatically
-            if not "title" in options and layer.name:
-                options["title"] = layer.name
-
             # add any other nonvarying layer options
-            options = dict(options)
             for k in "fillsize outlinecolor outlinewidth".split():
                 if k not in options and k in layer.styleoptions:
                     v = layer.styleoptions[k]
@@ -419,7 +470,7 @@ class Legend:
             # ...
             raise Exception("Legend layer for raster data not yet implemented")
 
-    def add_fillsizes(self, layer, **options):
+    def add_fillsizes(self, layer, **override):
         if isinstance(layer, VectorLayer):
             if "Polygon" in layer.data.type:
                 shape = "polygon"
@@ -430,12 +481,11 @@ class Legend:
             else:
                 raise Exception("Legend layer data must be of type polygon, linestring, or point")
 
-            # add title automatically
-            if not "title" in options and layer.name:
-                options["title"] = layer.name
+            # use layer's legendoptions and possibly override
+            options = dict(layer.legendoptions)
+            options.update(override)
 
             # add any other nonvarying layer options
-            options = dict(options)
             print 9999
             print options
             for k in "fillcolor outlinecolor outlinewidth".split():
@@ -453,8 +503,41 @@ class Legend:
         elif isinstance(layer, RasterLayer):
             raise Exception("Fillcolor is the only possible legend entry for a raster layer")
 
-        
+    def autobuild(self):
+        # build the legend automatically
+        for layer in self.map:
+            if "fillcolor" in layer.styleoptions and not isinstance(layer.styleoptions["fillcolor"],(tuple,list,str)):
+                # is classipy object and should be included in legend
+                self.add_fillcolors(layer, **layer.legendoptions) 
+            elif "fillsize" in layer.styleoptions and not isinstance(layer.styleoptions["fillsize"],(int,float,str)):
+                # is classipy object and should be included in legend
+                self.add_fillsizes(layer, **layer.legendoptions) 
 
+    def render(self):
+        # render it
+        rendered = self._legend.render()
+        self.img = rendered.get_image()
+
+
+
+
+class Decoration:
+    def __init__(self, map, funcname, *args, **kwargs):
+        # As opposed to other layers, this just runs the function onto the map
+        self.map = map
+        
+        self.funcname = funcname
+        self.args = args
+        self.kwargs = kwargs
+
+        self.img = None
+        
+    def render(self):
+        drawer = pyagg.Canvas(self.map.drawer.width, self.map.drawer.height, background=None)
+        drawer.custom_space(*self.map.drawer.coordspace_bbox)
+        func = getattr(drawer,self.funcname)
+        func(*self.args, **self.kwargs)
+        self.img = drawer.get_image()
         
 
         
