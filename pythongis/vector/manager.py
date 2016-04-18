@@ -1,5 +1,5 @@
 
-import itertools, operator
+import itertools, operator, math
 from .data import *
 
 
@@ -101,17 +101,31 @@ def where(data, other, condition, **kwargs):
 
 # File management
 
-def split(data, splitfields):
+def split(data, key, breaks="unique", **kwargs):
     """
-    Splits a vector data layer into multiple ones based on a list of one or more unique
-    field values ("splitfields"). 
+    Splits a vector data layer into multiple ones based on a key which can be
+    a field name, a list of field names, or a function. The default is to
+    create a split for each new unique occurance of the key value, but the
+    breaks arg can also be set to the name of other classification algorithms
+    or to a list of your own custom break values. The key, breaks, and kwargs
+    follow the input and behavior of the Classipy package's split and unique
+    functions. 
 
-    Adds each new split layer to the layers list. 
+    Iterates through each new split layer one at a time. 
     """
-    fieldindexes = [index for index,field in enumerate(data.fields)
-                    if field in splitfields]
-    sortedfeatures = sorted(data, key=operator.itemgetter(*fieldindexes))
-    grouped = itertools.groupby(sortedfeatures, key=operator.itemgetter(*fieldindexes))
+    keywrap = key
+    if not hasattr(key, "__call__"):
+        if isinstance(key,(list,tuple)):
+            keywrap = lambda f: tuple((f[k] for k in key))
+        else:
+            keywrap = lambda f: f[key]
+
+    import classipy as cp
+    if breaks == "unique":
+        grouped = cp.unique(data, key=keywrap, **kwargs)
+    else:
+        grouped = cp.split(data, breaks=breaks, key=keywrap, **kwargs)
+        
     for splitid,features in grouped:
         outfile = VectorData()
         outfile.fields = list(data.fields)
@@ -209,6 +223,65 @@ def integrate(data, snapto):
 
     raise Exception("Not yet implemented")
 
+
+
+
+
+
+# Create operations
+
+def connect(frompoints, topoints, k1=None, k2=None, greatcircle=True):
+    """Two point files, and for each frompoint draw line to each topoint
+    that matches based on some key value."""
+
+    from ._helpers import great_circle_path
+
+    # TODO: allow any geometry types via centroids, not just point types
+    # ...
+    
+    key1,key2 = k1,k2
+    if key1 and not hasattr(key1, "__call__"):
+        key1 = lambda f: f[k1]
+    if key2 and not hasattr(key2, "__call__"):
+        key2 = lambda f: f[k2]
+
+    # TODO: optimize with hash lookup table
+    # ...
+        
+    def flatten(data):
+        for feat in data:
+            if not feat.geometry: continue
+            geotype = feat.geometry["type"]
+            coords = feat.geometry["coordinates"]
+            if "Multi" in geotype:
+                for singlepart in coords:
+                    geoj = {"type": geotype.replace("Multi", ""),
+                            "coordinates": singlepart}
+                    yield feat, geoj
+            else:
+                yield feat, feat.geometry
+
+    # create new file
+    outfile = VectorData()
+    outfile.fields = list(frompoints.fields)
+    outfile.fields.extend(topoints.fields)
+
+    # connect points matching criteria
+    for fromfeat,frompoint in flatten(frompoints):
+        for tofeat,topoint in flatten(topoints):
+            match = key1(fromfeat) == key2(tofeat) if key1 and key2 else True
+            if match:
+                if greatcircle:
+                    linepath = great_circle_path(frompoint["coordinates"], topoint["coordinates"], segments=100)
+                else:
+                    linepath = [frompoint["coordinates"], topoint["coordinates"]]
+                geoj = {"type": "LineString",
+                        "coordinates": linepath}
+                row = list(fromfeat.row)
+                row.extend(tofeat.row)
+                outfile.add_feature(row=row, geometry=geoj)
+
+    return outfile
 
 
 

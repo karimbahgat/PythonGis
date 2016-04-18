@@ -52,21 +52,22 @@ def from_file(filepath, encoding="utf8", **kwargs):
     # normal table file without geometry
     elif filepath.endswith((".txt",".csv")):
         delimiter = kwargs.get("delimiter")
-        with open(filepath, "rb") as fileobj:
-            if delimiter is None:
-                dialect = csv.Sniffer().sniff(fileobj.read())
-                fileobj.seek(0)
-                rows = csv.reader(fileobj, dialect)
-            else:
-                rows = csv.reader(fileobj, delimiter=delimiter)
-            rows = ([cell.decode(encoding) for cell in row] for row in rows)
-            fields = next(rows)
+        fileobj = open(filepath, "rb")
+        if delimiter is None:
+            dialect = csv.Sniffer().sniff(fileobj.read())
+            fileobj.seek(0)
+            rows = csv.reader(fileobj, dialect)
+        else:
+            rows = csv.reader(fileobj, delimiter=delimiter)
+        rows = ([cell.decode(encoding) for cell in row] for row in rows)
+        fields = next(rows)
         
         geokey = kwargs.get("geokey")
         xfield = kwargs.get("xfield")
         yfield = kwargs.get("yfield")
         
         if geokey:
+            rows = list(rows) # needed so rowgen doesnt get consumed
             geometries = (geokey(dict(zip(fields,row))) for row in rows)
             
         elif xfield and yfield:

@@ -1,5 +1,5 @@
 
-import itertools, operator
+import itertools, operator, math
 from .data import *
 
 import shapely, shapely.ops, shapely.geometry
@@ -181,6 +181,7 @@ def nearest_identity(groupbydata, valuedata,
     # recording its distance, and optionally its id, and other attribute fields
     # ...
     pass
+
 
 
 

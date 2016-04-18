@@ -105,6 +105,21 @@ class Feature:
         if self.geometry and self._cached_bbox: geoj["bbox"] = self._cached_bbox
         return Feature(self._data, self.row, geoj)
 
+    # Easy access to shapely methods
+
+    @property
+    def length(self):
+        return self.get_shapely().length
+
+    @property
+    def area(self):
+        return self.get_shapely().area
+
+    @property
+    def geodetic_length(self):
+        from ._helpers import geodetic_length
+        return geodetic_length(self.geometry)
+
 
 
 
@@ -204,6 +219,15 @@ class VectorData:
         del self.fields[fieldindex]
         for feat in self:
             del feat.row[fieldindex]
+
+    def drop_fields(self, fields):
+        for f in fields:
+            self.drop_field(f)
+
+    def keep_fields(self, fields):
+        for f in reversed(self.fields):
+            if f not in fields:
+                self.drop_field(f)
 
     def convert_field(self, field, valfunc):
         fieldindex = self.fields.index(field)

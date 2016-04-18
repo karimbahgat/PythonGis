@@ -88,15 +88,17 @@ class Map:
 
     # Decorations
 
-    def add_title(self, title, **titleoptions):
+    def add_title(self, title, titleoptions=None, **pasteoptions):
         # a little hacky, since uses pyagg label object directly,
         # better if canvas could allow percent coord units
         # ...
-        override = titleoptions
+        override = titleoptions or dict()
         titleoptions = dict(textsize=18)
         titleoptions.update(override)
         decor = pyagg.legend.Label(title, **titleoptions) # pyagg label indeed implements a render method()
-        decor.pasteoptions = dict(xy=("50%w","1%h"), anchor="n")
+        defaultpaste = dict(xy=("50%w","1%h"), anchor="n")
+        defaultpaste.update(pasteoptions)
+        decor.pasteoptions = defaultpaste
         decor.img = decor.render()
         self.foreground.add_layer(decor)
         
@@ -210,7 +212,7 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 class VectorLayer:
-    def __init__(self, data, legendoptions=None, **options):
+    def __init__(self, data, legendoptions=None, nolegend=False, **options):
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -222,6 +224,7 @@ class VectorLayer:
         self.img = None
 
         self.legendoptions = legendoptions or dict()
+        self.nolegend = nolegend
         
         # by default, set random style color
         rand = random.randrange
@@ -297,7 +300,7 @@ class VectorLayer:
 
         
 class RasterLayer:
-    def __init__(self, data, legendoptions=None, **options):
+    def __init__(self, data, legendoptions=None, nolegend=False, **options):
         
         if not isinstance(data, RasterData):
             # assume data is filepath
@@ -309,6 +312,7 @@ class RasterLayer:
         self.img = None
 
         self.legendoptions = legendoptions or dict()
+        self.nolegend = nolegend
 
         # by default, set random style color
         if not "type" in options:
@@ -506,12 +510,16 @@ class Legend:
     def autobuild(self):
         # build the legend automatically
         for layer in self.map:
-            if "fillcolor" in layer.styleoptions and not isinstance(layer.styleoptions["fillcolor"],(tuple,list,str)):
-                # is classipy object and should be included in legend
-                self.add_fillcolors(layer, **layer.legendoptions) 
-            elif "fillsize" in layer.styleoptions and not isinstance(layer.styleoptions["fillsize"],(int,float,str)):
-                # is classipy object and should be included in legend
-                self.add_fillsizes(layer, **layer.legendoptions) 
+            if not layer.nolegend:
+                # Todo: better handling when more than one classipy option for same layer
+                # perhaps grouping into basegroup under same layer label
+                # ...
+                if "fillcolor" in layer.styleoptions and not isinstance(layer.styleoptions["fillcolor"],(tuple,list,str)):
+                    # is classipy object and should be included in legend
+                    self.add_fillcolors(layer, **layer.legendoptions) 
+                if "fillsize" in layer.styleoptions and not isinstance(layer.styleoptions["fillsize"],(int,float,str)):
+                    # is classipy object and should be included in legend
+                    self.add_fillsizes(layer, **layer.legendoptions) 
 
     def render(self):
         # render it
@@ -523,7 +531,6 @@ class Legend:
 
 class Decoration:
     def __init__(self, map, funcname, *args, **kwargs):
-        # As opposed to other layers, this just runs the function onto the map
         self.map = map
         
         self.funcname = funcname
