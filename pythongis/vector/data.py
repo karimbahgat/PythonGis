@@ -282,6 +282,9 @@ class VectorData:
         out.fields += (field for field in other.fields if field not in self.fields)
 
         from . import sql
+
+        key1 = k1 if hasattr(k1,"__call__") else lambda f:f[k1]
+        key2 = k2 if hasattr(k2,"__call__") else lambda f:f[k2]
         
         _fieldmapping = [(field,lambda f,field=field:f[field],"first") for field in other.fields if field not in self.fields]
         fs,vfs,afs = zip(*fieldmapping) or [[],[],[]]
@@ -310,7 +313,7 @@ class VectorData:
                     f2row = ("" for f in other.fields if f not in self.fields)
                     yield f1,f2row
 
-        for pair in grouppairs(self, k1, other, k2):
+        for pair in grouppairs(self, key1, other, key2):
             f1,f2row = pair
             row = list(f1.row)
             row += f2row

@@ -1,5 +1,6 @@
 
 import random
+import itertools
 import pyagg, pyagg.legend
 import PIL, PIL.Image
 
@@ -22,12 +23,22 @@ class Map:
         # foreground layergroup for non-map decorations
         self.foreground = ForegroundLayerGroup()
 
-        # title
+        # title (would be good to make these properties affect the actual rendered title after init)
+        self.title = title
+        self.titleoptions = titleoptions
         if title:
             titleoptions = titleoptions or dict()
             self.add_title(title, **titleoptions)
+
+        self.dimensions = dict()
             
         self.img = self.drawer.get_image()
+
+    def copy(self):
+        dupl = Map(self.drawer.width, self.drawer.height, layers=self.layers.copy(), title=self.title, titleoptions=self.titleoptions)
+        dupl.drawer = self.drawer.copy()
+        dupl.foreground = self.foreground.copy()
+        return dupl
 
     def pixel2coord(self, x, y):
         return self.drawer.pixel2coord(x, y)
@@ -100,6 +111,7 @@ class Map:
         defaultpaste.update(pasteoptions)
         decor.pasteoptions = defaultpaste
         decor.img = decor.render()
+        print self.foreground,self.foreground._layers
         self.foreground.add_layer(decor)
         
     def add_decoration(self, funcname, *args, **kwargs):
@@ -124,6 +136,71 @@ class Map:
 ##                              ticklabelformat=ticklabelformat, ticklabeloptions=ticklabeloptions,
 ##                              noticks=noticks, noticklabels=noticklabels,
 ##                              **kwargs)
+
+    # Batch utilities
+
+    def add_dimension(self, dimtag, dimvalues):
+        self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
+        
+##        for tag,func in procedures.items():
+##            submap = self.copy()
+##            func(submap) # makes changes to the map
+##            yield tag,submap
+
+    def iter_dimensions(self, groupings=None):
+        
+##        groupings = groupings or []
+##        groupbydims = [(grouptag,self.dimensions[grouptag]) for grouptag in groupings]
+##        otherdims = [(dimtag,procedures) for dimtag,procedures in self.dimensions.items() if dimtag not in groupings]
+        
+        if False: #groupbydims:
+            pass
+        
+##            # yield flatly all combinations of otherdims in all combinations of groups defined by groupby dimensions
+##            for grouptagcombis in itertools.product(*groupbydims.keys()):
+##                # run the grouped procedures to set the stage for each group
+##                groupedprocedures = [(grouptag,self.dimensions[grouptag]) for grouptag in grouptagcombis]
+##                # ...
+##
+##                # then run and collect all the flat procedures
+##                submaps = []
+##                dimdicts = []
+##                for dimtag,procedures in otherdims:
+##                    # ...
+##                    dimdict = dict()
+##                    # how to set the current groupbytags ???
+##                    # ...
+##                    
+##                    for valtag,func in procedures:
+##                        submap = self.copy()
+##                        func(submap)
+##                        dimdict[dimtag] = valtag
+##                    submaps.append(submap)
+##                    dimdicts.append(dimdict)
+##                    
+##                # yield batches once for every grouping
+##                yield dimdicts,submaps
+
+        else:
+            # yield all dimensions as flat combination of each other, one at a time
+            dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc in dimvalues] for dimtag,dimvalues in self.dimensions.items()]
+            allcombis = itertools.product(*dimtagvalpairs)
+            for dimcombi in allcombis:
+                # create the map and run all the functions for that combination
+                submap = self.copy()
+                for dimtag,dimval in dimcombi:
+                    dimfunc = next((_dimfunc for _dimval,_dimfunc in self.dimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
+                    dimfunc(submap)
+                dimdict = dict(dimcombi)
+                yield dimdict,submap
+                
+##                for dimtag in dimcombi:
+##                    dimdict = dict()
+##                    submap = self.copy()
+##                    for valtag,func in self.dimensions[dimtag].items():
+##                        dimdict[
+##                        func(submap) # makes changes to the map
+##                    yield dimdict,submap
 
     # Drawing
 
@@ -181,6 +258,11 @@ class LayerGroup:
         for layer in self._layers:
             yield layer
 
+    def copy(self):
+        layergroup = LayerGroup()
+        layergroup._layers = list(self._layers)
+        return layergroup
+
     def add_layer(self, layer, **options):
         if not isinstance(layer, (VectorLayer,RasterLayer)):
             try:
@@ -208,11 +290,16 @@ class ForegroundLayerGroup(LayerGroup):
     def add_layer(self, layer, **options):
         self._layers.append(layer, **options)
 
+    def copy(self):
+        foreground = ForegroundLayerGroup()
+        foreground._layers = list(self._layers)
+        return foreground
+
 
 
 
 class VectorLayer:
-    def __init__(self, data, legendoptions=None, nolegend=False, **options):
+    def __init__(self, data, legendoptions=None, nolegend=False, datafilter=None, **options):
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -225,6 +312,7 @@ class VectorLayer:
 
         self.legendoptions = legendoptions or dict()
         self.nolegend = nolegend
+        self.datafilter = datafilter
         
         # by default, set random style color
         rand = random.randrange
@@ -236,7 +324,7 @@ class VectorLayer:
         self.styleoptions.update(options)
 
         # set up classifier
-        features = self.data
+        features = list(self.features())
         import classipy as cp
         for key,val in self.styleoptions.copy().items():
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
@@ -256,6 +344,23 @@ class VectorLayer:
                 else:
                     self.styleoptions[key] = val
 
+    def features(self, bbox=None):
+        # get features based on spatial index, for better speeds when zooming
+        if bbox:
+            if not hasattr(self.data, "spindex"):
+                self.data.create_spatial_index()
+            features = self.data.quick_overlap(bbox)
+        else:
+            features = self.data
+        
+        if self.datafilter:
+            for feat in features:
+                if self.datafilter(feat):
+                    yield feat
+        else:
+            for feat in features:
+                yield feat
+
     def render(self, width, height, bbox=None, lock_ratio=True, flipy=False):
         if not bbox:
             bbox = self.data.bbox
@@ -266,10 +371,8 @@ class VectorLayer:
         drawer = pyagg.Canvas(width, height, background=None)
         drawer.custom_space(*bbox, lock_ratio=lock_ratio)
 
-        # get features based on spatial index, for better speeds when zooming
-        if not hasattr(self.data, "spindex"):
-            self.data.create_spatial_index()
-        features = self.data.quick_overlap(bbox)
+        
+        features = self.features(bbox=bbox)
 
         # custom draworder (sortorder is only used with sortkey)
         if "sortkey" in self.styleoptions:
@@ -451,23 +554,36 @@ class Legend:
             options = dict(layer.legendoptions)
             options.update(override)
 
-            cls = layer.styleoptions["fillcolor"]["classifier"]
-            if options.get("valuetype") == "categorical":
-                # WARNING: not very stable yet...
-                categories = set((cls.key(item),tuple(classval)) for item,classval in cls) # only the unique keys
-                breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
-            else:
-                breaks = cls.breaks
-                classvalues = cls.classvalues
+            if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
+                cls = layer.styleoptions["fillcolor"]["classifier"]
 
-            # add any other nonvarying layer options
-            for k in "fillsize outlinecolor outlinewidth".split():
-                if k not in options and k in layer.styleoptions:
-                    v = layer.styleoptions[k]
-                    if not isinstance(v, dict):
-                        options[k] = v
-            
-            self._legend.add_fillcolors(shape, breaks, classvalues, **options)
+                # force to categorical if classifier algorithm is unique
+                options["valuetype"] = "categorical" if cls.algo == "unique" else options.get("valuetype")
+
+                # detect valuetype
+                if options.get("valuetype") == "categorical":
+                    # WARNING: not very stable yet...
+                    categories = set((cls.key(item),tuple(classval)) for item,classval in cls) # only the unique keys
+                    breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
+                else:
+                    breaks = cls.breaks
+                    classvalues = cls.classvalues
+
+                # add any other nonvarying layer options
+                for k in "fillsize outlinecolor outlinewidth".split():
+                    if k not in options and k in layer.styleoptions:
+                        v = layer.styleoptions[k]
+                        if not isinstance(v, dict):
+                            options[k] = v
+
+                print options
+                
+                self._legend.add_fillcolors(shape, breaks, classvalues, **options)
+
+            else:
+                # add as static symbol if none of the dynamic ones
+                # self.add_single_symbol()
+                raise Exception("Not yet implemented")
 
         elif isinstance(layer, RasterLayer):
             shape = "polygon"
@@ -488,21 +604,29 @@ class Legend:
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
+            
+            if "fillsizes" in layer.styleoptions and isinstance(layer.styleoptions["fillsizes"], dict):
+                
+                # add any other nonvarying layer options
+                print 9999
+                print options
+                for k in "fillcolor outlinecolor outlinewidth".split():
+                    print k
+                    if k not in options and k in layer.styleoptions:
+                        v = layer.styleoptions[k]
+                        print k,v,type(v)
+                        if not isinstance(v, dict):
+                            options[k] = v
+                            
+                print options
 
-            # add any other nonvarying layer options
-            print 9999
-            print options
-            for k in "fillcolor outlinecolor outlinewidth".split():
-                print k
-                if k not in options and k in layer.styleoptions:
-                    v = layer.styleoptions[k]
-                    print k,v,type(v)
-                    if not isinstance(v, dict):
-                        options[k] = v
-            print options
+                cls = layer.styleoptions["fillsize"]["classifier"]
+                self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues, **options)
 
-            cls = layer.styleoptions["fillsize"]["classifier"]
-            self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues, **options)
+            else:
+                # add as static symbol if none of the dynamic ones
+                # self.add_single_symbol()
+                raise Exception("Not yet implemented")
 
         elif isinstance(layer, RasterLayer):
             raise Exception("Fillcolor is the only possible legend entry for a raster layer")
@@ -514,12 +638,20 @@ class Legend:
                 # Todo: better handling when more than one classipy option for same layer
                 # perhaps grouping into basegroup under same layer label
                 # ...
-                if "fillcolor" in layer.styleoptions and not isinstance(layer.styleoptions["fillcolor"],(tuple,list,str)):
-                    # is classipy object and should be included in legend
-                    self.add_fillcolors(layer, **layer.legendoptions) 
-                if "fillsize" in layer.styleoptions and not isinstance(layer.styleoptions["fillsize"],(int,float,str)):
-                    # is classipy object and should be included in legend
-                    self.add_fillsizes(layer, **layer.legendoptions) 
+                anydynamic = False
+                if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
+                    # is dynamic and should be highlighted specially
+                    self.add_fillcolors(layer, **layer.legendoptions)
+                    anydynamic = True
+                if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
+                    # is dynamic and should be highlighted specially
+                    self.add_fillsizes(layer, **layer.legendoptions)
+                    anydynamic = True
+                    
+                # add as static symbol if none of the dynamic ones
+                if not anydynamic:
+                    # self.add_single_symbol()
+                    raise Exception("Not yet implemented")
 
     def render(self):
         # render it

@@ -25,6 +25,7 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
         elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))
         elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))
         elif agg == "average": return lambda seq: sum(seq)/float(len(seq))
+        elif agg == "mean": return lambda seq: sum(seq)/float(len(seq))
         elif hasattr(agg, "__call__"):
             # agg is not a string but a function
             return agg

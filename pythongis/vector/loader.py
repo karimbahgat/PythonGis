@@ -52,7 +52,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
     # normal table file without geometry
     elif filepath.endswith((".txt",".csv")):
         delimiter = kwargs.get("delimiter")
-        fileobj = open(filepath, "rb")
+        fileobj = open(filepath, "rU")
         if delimiter is None:
             dialect = csv.Sniffer().sniff(fileobj.read())
             fileobj.seek(0)
@@ -71,6 +71,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
             geometries = (geokey(dict(zip(fields,row))) for row in rows)
             
         elif xfield and yfield:
+            rows = list(rows) # needed so rowgen doesnt get consumed
             def xygeoj(row):
                 rowdict = dict(zip(fields,row))
                 x,y = rowdict[xfield],rowdict[yfield]
@@ -81,6 +82,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
             geometries = (xygeoj(row) for row in rows)
             
         else:
+            rows = list(rows)
             geometries = (None for _ in rows)
             
         crs = None

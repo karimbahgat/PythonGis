@@ -131,7 +131,7 @@ def split(data, key, breaks="unique", **kwargs):
         outfile.fields = list(data.fields)
         for oldfeat in features:
             outfile.add_feature(oldfeat.row, oldfeat.geometry)
-        yield outfile
+        yield splitid,outfile
 
 def merge(*datalist):
     """
