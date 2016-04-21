@@ -511,21 +511,21 @@ def clip(raster, clipdata, bbox=None, bandnum=0):
               "affine":raster.affine}
     outrast = data.RasterData(mode=raster.mode, **georef)
 
-    # get raster of valid areas
+    # get band of valid areas
     if isinstance(clipdata, VectorData):
         # rasterize vector data
-        valid = rasterize(clipdata, **georef)
+        valid = rasterize(clipdata, **georef).bands[0]
     elif isinstance(clipdata, RasterData):
-        # get boolean raster where nodatavals
-        valid = clipdata.bands[bandnum].conditional("val != %s" % clipdata.nodataval)
+        # get boolean band where nodatavals
+        valid = clipdata.bands[bandnum].conditional("val != %s" % clipdata.bands[bandnum].nodataval)
 
     # clip and add each band
     for band in raster.bands:
         
         # paste data onto blank image where 'valid' is true
         img = PIL.Image.new(band.img.mode, band.img.size, band.nodataval)
-        img.paste(band.img, mask=valid.bands[0].img)
+        img.paste(band.img, mask=valid.img)
         outrast.add_band(img=img, nodataval=band.nodataval)
 
-        return outrast
+    return outrast
 

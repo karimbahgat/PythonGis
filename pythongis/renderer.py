@@ -141,66 +141,45 @@ class Map:
 
     def add_dimension(self, dimtag, dimvalues):
         self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
-        
-##        for tag,func in procedures.items():
-##            submap = self.copy()
-##            func(submap) # makes changes to the map
-##            yield tag,submap
 
     def iter_dimensions(self, groupings=None):
+        # collect all dimensions from layers and the map itself as a flat list
+        alldimensions = dict()
+##        for lyr in self:
+##            if lyr.dimensions: 
+##                alldimensions.update(lyr.dimensions) # note, duplicate dim names will be overwritten
+        alldimensions.update(self.dimensions)
         
-##        groupings = groupings or []
-##        groupbydims = [(grouptag,self.dimensions[grouptag]) for grouptag in groupings]
-##        otherdims = [(dimtag,procedures) for dimtag,procedures in self.dimensions.items() if dimtag not in groupings]
-        
-        if False: #groupbydims:
-            pass
-        
-##            # yield flatly all combinations of otherdims in all combinations of groups defined by groupby dimensions
-##            for grouptagcombis in itertools.product(*groupbydims.keys()):
-##                # run the grouped procedures to set the stage for each group
-##                groupedprocedures = [(grouptag,self.dimensions[grouptag]) for grouptag in grouptagcombis]
-##                # ...
-##
-##                # then run and collect all the flat procedures
-##                submaps = []
-##                dimdicts = []
-##                for dimtag,procedures in otherdims:
-##                    # ...
-##                    dimdict = dict()
-##                    # how to set the current groupbytags ???
-##                    # ...
-##                    
-##                    for valtag,func in procedures:
-##                        submap = self.copy()
-##                        func(submap)
-##                        dimdict[dimtag] = valtag
-##                    submaps.append(submap)
-##                    dimdicts.append(dimdict)
-##                    
-##                # yield batches once for every grouping
-##                yield dimdicts,submaps
+        # yield all dimensions as all possible value combinations of each other
+        dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc in dimvalues] for dimtag,dimvalues in alldimensions.items()]
+        allcombis = itertools.product(*dimtagvalpairs)
 
-        else:
-            # yield all dimensions as flat combination of each other, one at a time
-            dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc in dimvalues] for dimtag,dimvalues in self.dimensions.items()]
-            allcombis = itertools.product(*dimtagvalpairs)
+        def submapgen():
             for dimcombi in allcombis:
                 # create the map and run all the functions for that combination
                 submap = self.copy()
                 for dimtag,dimval in dimcombi:
-                    dimfunc = next((_dimfunc for _dimval,_dimfunc in self.dimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
+                    dimfunc = next((_dimfunc for _dimval,_dimfunc in alldimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
                     dimfunc(submap)
                 dimdict = dict(dimcombi)
                 yield dimdict,submap
                 
-##                for dimtag in dimcombi:
-##                    dimdict = dict()
-##                    submap = self.copy()
-##                    for valtag,func in self.dimensions[dimtag].items():
-##                        dimdict[
-##                        func(submap) # makes changes to the map
-##                    yield dimdict,submap
+        if groupings:
+            # yield all grouped by each unique value combination belonging to the dimension names specified in groupings
+            # eg grouping by a region dimension will return groups of dimdict,submap for each unique value of region
+
+            def key(item):
+                dimdict,submap = item
+                keyval = [dimdict[gr] for gr in groupings]
+                return keyval
+            
+            for _id,dimcombis in itertools.groupby(sorted(submapgen(),key=key), key=key):
+                yield list(dimcombis) # list of dimdict,submap pairs belonging to same group
+
+        else:
+            # yield all flat, one by one
+            for dimdict,submap in submapgen():
+                yield dimdict,submap
 
     # Drawing
 
@@ -253,10 +232,15 @@ class LayerGroup:
     def __init__(self):
         self._layers = list()
         self.connected_maps = list()
+        self.dimensions = dict()
 
     def __iter__(self):
         for layer in self._layers:
             yield layer
+
+    def add_dimension(self, dimtag, dimvalues):
+        # used by parent map to batch render all varieties of this layer
+        self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
 
     def copy(self):
         layergroup = LayerGroup()

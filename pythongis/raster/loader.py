@@ -206,9 +206,14 @@ def from_file(filepath, **georef):
             return info
 
         def read_nodata(raw_tags):
-            if raw_tags.get(42113):
-                nodataval = eval(raw_tags.get(42113)) # eval from string to nr
-                return nodataval
+            nodataval = raw_tags.get(42113)
+            if nodataval:
+                try:
+                    float(nodataval) # make sure is possible to make into nr
+                    nodataval = eval(nodataval) # eval from string to nr
+                    return nodataval
+                except:
+                    pass
 
         def read_crs(raw_tags):
             crs = dict()
