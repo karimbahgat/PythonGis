@@ -9,6 +9,8 @@ import itertools
 import shapefile as pyshp
 import pygeoj
 
+from ..exceptions import UnknownFileError
+
 
 def from_file(filepath, encoding="utf8", **kwargs):
 
@@ -88,7 +90,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         crs = None
     
     else:
-        raise Exception("Could not create vector data from the given filepath: the filetype extension is either missing or not supported")
+        raise UnknownFileError("Could not create vector data from the given filepath: the filetype extension is either missing or not supported")
 
     # filter if needed
     if select:

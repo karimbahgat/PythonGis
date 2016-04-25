@@ -276,17 +276,19 @@ class VectorData:
         
         return out
 
-    def join(self, other, k1, k2, fieldmapping=[], keepall=True): 
+    def join(self, other, k1, k2, fieldmapping=[], keepall=True):
+        # TODO: should create new vars if using new fieldmaping name not in existing fields
         out = VectorData()
         out.fields = list(self.fields)
         out.fields += (field for field in other.fields if field not in self.fields)
+        out.fields += (fieldtup[0] for fieldtup in fieldmapping if fieldtup[0] not in out.fields)
 
         from . import sql
 
         key1 = k1 if hasattr(k1,"__call__") else lambda f:f[k1]
         key2 = k2 if hasattr(k2,"__call__") else lambda f:f[k2]
         
-        _fieldmapping = [(field,lambda f,field=field:f[field],"first") for field in other.fields if field not in self.fields]
+        fieldmapping_default = [(field,lambda f,field=field:f[field],"first") for field in other.fields if field not in self.fields]
         fs,vfs,afs = zip(*fieldmapping) or [[],[],[]]
         
         def getfm(item):
@@ -294,7 +296,10 @@ class VectorData:
                 return fieldmapping[fs.index(item[0])]
             else:
                 return item
-        fieldmapping = [getfm(item) for item in _fieldmapping]
+        fieldmapping_old = fieldmapping
+        fieldmapping = [getfm(item) for item in fieldmapping_default]
+        fieldmapping += (item for item in fieldmapping_old if item[0] not in self.fields and item[0] not in other.fields)
+        print fieldmapping
 
         def grouppairs(data1, key1, data2, key2):
             # create hash table
@@ -310,7 +315,7 @@ class VectorData:
                     f2row = hsh[keyval]
                     yield f1,f2row
                 elif keepall:
-                    f2row = ("" for f in other.fields if f not in self.fields)
+                    f2row = ("" for f in fieldmapping)
                     yield f1,f2row
 
         for pair in grouppairs(self, key1, other, key2):

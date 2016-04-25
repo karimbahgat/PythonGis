@@ -7,6 +7,8 @@ import PIL, PIL.Image
 from .vector.data import VectorData
 from .raster.data import RasterData
 
+from .exceptions import UnknownFileError
+
 class Map:
     def __init__(self, width, height, background=None, layers=None, title="", titleoptions=None, *args, **kwargs):
 
@@ -251,7 +253,7 @@ class LayerGroup:
         if not isinstance(layer, (VectorLayer,RasterLayer)):
             try:
                 layer = VectorLayer(layer, **options)
-            except:
+            except UnknownFileError:
                 layer = RasterLayer(layer, **options)
         self._layers.append(layer)
 
@@ -287,8 +289,8 @@ class VectorLayer:
 
         if not isinstance(data, VectorData):
             # assume data is filepath
-            doptions = options.get("dataoptions", dict())
-            data = VectorData(data, **doptions)
+            dtoptions = options.get("dataoptions", dict())
+            data = VectorData(data, **dtoptions)
         
         self.data = data
         self.visible = True
@@ -308,7 +310,7 @@ class VectorLayer:
         self.styleoptions.update(options)
 
         # set up classifier
-        features = list(self.features())
+        features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
         import classipy as cp
         for key,val in self.styleoptions.copy().items():
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
@@ -542,7 +544,7 @@ class Legend:
                 cls = layer.styleoptions["fillcolor"]["classifier"]
 
                 # force to categorical if classifier algorithm is unique
-                options["valuetype"] = "categorical" if cls.algo == "unique" else options.get("valuetype")
+                if cls.algo == "unique": options["valuetype"] = "categorical"
 
                 # detect valuetype
                 if options.get("valuetype") == "categorical":
@@ -589,7 +591,7 @@ class Legend:
             options = dict(layer.legendoptions)
             options.update(override)
             
-            if "fillsizes" in layer.styleoptions and isinstance(layer.styleoptions["fillsizes"], dict):
+            if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                 
                 # add any other nonvarying layer options
                 print 9999
@@ -625,9 +627,10 @@ class Legend:
                 anydynamic = False
                 if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
                     # is dynamic and should be highlighted specially
+                    print 999,layer,layer.legendoptions
                     self.add_fillcolors(layer, **layer.legendoptions)
                     anydynamic = True
-                if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
+                if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                     # is dynamic and should be highlighted specially
                     self.add_fillsizes(layer, **layer.legendoptions)
                     anydynamic = True

@@ -5,6 +5,8 @@ import sys, os, itertools, operator
 # import PIL as the image loader
 import PIL.Image
 
+from ..exceptions import UnknownFileError
+
 
 def from_file(filepath, **georef):
 
@@ -414,7 +416,7 @@ def from_file(filepath, **georef):
     
     else:
 
-        raise Exception("Could not create a raster from the given filepath: the filetype extension is either missing or not supported")
+        raise UnknownFileError("Could not create a raster from the given filepath: the filetype extension is either missing or not supported")
 
 
 def from_lists(data, nodataval=-9999.0, cell_anchor="center", **geoargs):
