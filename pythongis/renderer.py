@@ -142,7 +142,7 @@ class Map:
     # Batch utilities
 
     def add_dimension(self, dimtag, dimvalues):
-        self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
+        self.dimensions[dimtag] = [(dimval,dimfunc,self)for dimval,dimfunc in dimvalues] # list of dimval-dimfunc pairs
 
     def iter_dimensions(self, groupings=None):
         # collect all dimensions from layers and the map itself as a flat list
@@ -153,7 +153,7 @@ class Map:
         alldimensions.update(self.dimensions)
         
         # yield all dimensions as all possible value combinations of each other
-        dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc in dimvalues] for dimtag,dimvalues in alldimensions.items()]
+        dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc,dimparent in dimvalues] for dimtag,dimvalues in alldimensions.items()]
         allcombis = itertools.product(*dimtagvalpairs)
 
         def submapgen():
@@ -161,8 +161,12 @@ class Map:
                 # create the map and run all the functions for that combination
                 submap = self.copy()
                 for dimtag,dimval in dimcombi:
-                    dimfunc = next((_dimfunc for _dimval,_dimfunc in alldimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
-                    dimfunc(submap)
+                    dimfunc,dimparent = next(( (_dimfunc,_dimparent) for _dimval,_dimfunc,_dimparent in alldimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
+                    if dimparent is self:
+                        dimfunc(submap)
+                    else:
+                        dimparent = dimparent.copy()
+                        dimfunc(dimparent)
                 dimdict = dict(dimcombi)
                 yield dimdict,submap
                 
