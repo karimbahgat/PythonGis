@@ -12,7 +12,7 @@ from shapely.prepared import prep as supershapely
 
 # Overlay Analysis (transfer of values, but no clip)
 
-def overlap_summary(groupbydata, valuedata, fieldmapping=[], **kwargs):
+def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, **kwargs):
     """
     Summarizes the values of "valuedata" that overlap "groupbydata",
     and adds the summary statistics to the output data.
@@ -39,12 +39,19 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], **kwargs):
         valuefeats = (valfeat for valfeat in valuedata.quick_overlap(groupfeat.bbox))
 
         # aggregate
-        matches = (valfeat for valfeat in valuefeats
-                   if valfeat.get_shapely().intersects(geom))
-        newrow.extend( sql.aggreg(matches, fieldmapping) )
+        matches = [valfeat for valfeat in valuefeats
+                   if valfeat.get_shapely().intersects(geom)]
+        if matches:
+            aggreg = sql.aggreg(matches, fieldmapping)
 
         # add
-        out.add_feature(newrow, geom.__geo_interface__)
+        if matches:
+            newrow.extend( aggreg )
+            out.add_feature(newrow, geom.__geo_interface__)
+
+        elif keepall:
+            newrow.extend( ("" for _ in fieldmapping) )
+            out.add_feature(newrow, geom.__geo_interface__)
         
 ##    # insert groupby data fields into fieldmapping
 ##    basefm = [(name,lambda f:f[name],"first") for name in groupbydata.fields]

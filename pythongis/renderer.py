@@ -9,8 +9,111 @@ from .raster.data import RasterData
 
 from .exceptions import UnknownFileError
 
+class Layout:
+    def __init__(self, width, height, background=None, title="", titleoptions=None, *args, **kwargs):
+
+        # create a single map by default
+        self.maps = []
+        self.changed = True
+
+        # create the drawer with a default percent space
+        self.drawer = pyagg.Canvas(width, height, background)
+        self.drawer.percent_space() 
+
+        # foreground layergroup for non-map decorations
+        self.foregroundgroup = ForegroundLayerGroup()
+
+        # title (would be good to make these properties affect the actual rendered title after init)
+        self.title = title
+        self.titleoptions = titleoptions or dict()
+        self.foregroundgroup.add_layer(Title(self))
+            
+        self.img = self.drawer.get_image()
+
+    def add_map(self, mapobj, **pasteoptions):
+        self.changed = True
+        mapobj.pasteoptions = pasteoptions
+        self.maps.append(mapobj)
+        return mapobj
+
+    def add_legend(self, legend=None, legendoptions=None, **pasteoptions):
+        self.changed = True
+        if not legend:
+            # auto creates and builds legend based on first map (TODO: allow from other maps too)
+            legendoptions = legendoptions or dict()
+            legend = self.maps[0].get_legend(**legendoptions)
+            
+        legend.pasteoptions = pasteoptions
+        self.foregroundgroup.add_layer(legend)
+        return legend
+
+##    def add_title(self, title, titleoptions=None, **pasteoptions):
+##        # a little hacky, since uses pyagg label object directly,
+##        # better if canvas could allow percent coord units
+##        # ...
+##        self.changed = True
+##        override = titleoptions or dict()
+##        titleoptions = dict(textsize=18)
+##        titleoptions.update(override)
+##        decor = pyagg.legend.Label(title, **titleoptions) # pyagg label indeed implements a render method()
+##        defaultpaste = dict(xy=("50%w","1%h"), anchor="n")
+##        defaultpaste.update(pasteoptions)
+##        decor.pasteoptions = defaultpaste
+##        decor.img = decor.render()
+##        print self.foreground,self.foreground._layers
+##        self.foreground.add_layer(decor)
+
+    def render_all(self, columns=None, rows=None, **kwargs):
+        # render and draworder in one
+        self.drawer.clear()
+
+        if len(self.maps) == 1:
+            mapobj = self.maps[0]
+            mapobj.render_all()
+            pasteoptions = mapobj.pasteoptions or dict(bbox=[5,5,95,95]) #dict(xy=("0%w","0%h")) #,"100%w","100%h"))
+            self.drawer.paste(mapobj.img, **pasteoptions)
+
+        elif len(self.maps) > 1:
+            # grid all maps without any pasteoptions
+            def mapimgs():
+                for mapobj in self.maps:
+                    if not mapobj.pasteoptions:
+                        mapobj.render_all()
+                        yield mapobj.img
+            self.drawer.grid_paste(mapimgs(), columns=columns, rows=rows, **kwargs)
+            
+            # any remaining maps are pasted based on pasteoptions
+            for mapobj in self.maps:
+                if mapobj.pasteoptions:
+                    mapobj.render_all()
+                    self.drawer.paste(mapobj.img, **mapobj.pasteoptions)
+
+        # foreground
+        for layer in self.foregroundgroup:
+            layer.render()
+            self.drawer.paste(layer.img, **layer.pasteoptions)
+            
+        self.img = self.drawer.get_image()
+
+    def get_tkimage(self):
+        # Special image format needed by Tkinter to display it in the GUI
+        return self.drawer.get_tkimage()
+
+    def view(self):
+        if self.changed:
+            self.render_all()
+            self.changed = False
+        self.drawer.view()
+
+    def save(self, savepath):
+        if self.changed:
+            self.render_all()
+            self.changed = False
+        self.drawer.save(savepath)
+
+
 class Map:
-    def __init__(self, width, height, background=None, layers=None, title="", titleoptions=None, *args, **kwargs):
+    def __init__(self, width, height, background=None, layers=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -18,28 +121,30 @@ class Map:
         self.layers = layers
         layers.connected_maps.append(self)
 
+        # background decorations
+        self.backgroundgroup = BackgroundLayerGroup()
+        if background:
+            obj = Background(self)
+            self.backgroundgroup.add_layer(obj)
+        self.background = background
+
         # create the drawer with a default unprojected lat-long coordinate system
-        self.drawer = pyagg.Canvas(width, height, background)
+        self.drawer = pyagg.Canvas(width, height, None)
         self.drawer.geographic_space() 
 
         # foreground layergroup for non-map decorations
-        self.foreground = ForegroundLayerGroup()
-
-        # title (would be good to make these properties affect the actual rendered title after init)
-        self.title = title
-        self.titleoptions = titleoptions
-        if title:
-            titleoptions = titleoptions or dict()
-            self.add_title(title, **titleoptions)
+        self.foregroundgroup = ForegroundLayerGroup()
 
         self.dimensions = dict()
             
         self.img = self.drawer.get_image()
+        self.changed = False
 
     def copy(self):
-        dupl = Map(self.drawer.width, self.drawer.height, layers=self.layers.copy(), title=self.title, titleoptions=self.titleoptions)
+        dupl = Map(self.drawer.width, self.drawer.height, background=self.background, layers=self.layers.copy())
+        dupl.backgroundgroup = self.backgroundgroup.copy()
         dupl.drawer = self.drawer.copy()
-        dupl.foreground = self.foreground.copy()
+        dupl.foregroundgroup = self.foregroundgroup.copy()
         return dupl
 
     def pixel2coord(self, x, y):
@@ -48,24 +153,34 @@ class Map:
     # Map canvas alterations
 
     def offset(self, xmove, ymove):
+        self.changed = True
         self.drawer.move(xmove, ymove)
 
     def resize(self, width, height):
+        self.changed = True
         self.drawer.resize(width, height, lock_ratio=True)
         self.img = self.drawer.get_image()
 
     # Zooming
 
+    def zoom_auto(self):
+        bbox = self.layers.bbox
+        self.zoom_bbox(*bbox)
+
     def zoom_bbox(self, xmin, ymin, xmax, ymax):
+        self.changed = True
         self.drawer.zoom_bbox(xmin, ymin, xmax, ymax)
 
     def zoom_in(self, factor, center=None):
+        self.changed = True
         self.drawer.zoom_in(factor, center=center)
 
     def zoom_out(self, factor, center=None):
+        self.changed = True
         self.drawer.zoom_out(factor, center=center)
 
     def zoom_units(self, units, center=None):
+        self.changed = True
         self.drawer.zoom_units(units, center=center)
 
     # Layers
@@ -85,42 +200,13 @@ class Map:
 
     def get_position(self, layer):
         return self.layers.get_position(layer)
-
-    # Legend
-
-    def add_legend(self, legend=None, legendoptions=None, **pasteoptions):
-        if not legend:
-            # auto creates and builds legend
-            legendoptions = legendoptions or dict()
-            legend = Legend(self, **legendoptions)
-            legend.autobuild()
-            
-        legend.pasteoptions = pasteoptions
-        self.foreground.add_layer(legend)
-        return legend
-
-    # Decorations
-
-    def add_title(self, title, titleoptions=None, **pasteoptions):
-        # a little hacky, since uses pyagg label object directly,
-        # better if canvas could allow percent coord units
-        # ...
-        override = titleoptions or dict()
-        titleoptions = dict(textsize=18)
-        titleoptions.update(override)
-        decor = pyagg.legend.Label(title, **titleoptions) # pyagg label indeed implements a render method()
-        defaultpaste = dict(xy=("50%w","1%h"), anchor="n")
-        defaultpaste.update(pasteoptions)
-        decor.pasteoptions = defaultpaste
-        decor.img = decor.render()
-        print self.foreground,self.foreground._layers
-        self.foreground.add_layer(decor)
         
-    def add_decoration(self, funcname, *args, **kwargs):
-        # draws directly on an image the size of the map canvas, so no pasteoptions needed
-        decor = Decoration(self, funcname, *args, **kwargs)
-        decor.pasteoptions = dict() #xy=(0,0), anchor="nw")
-        self.foreground.add_layer(decor)
+##    def add_decoration(self, funcname, *args, **kwargs):
+##        # draws directly on an image the size of the map canvas, so no pasteoptions needed
+##        self.changed = True
+##        decor = Decoration(self, funcname, *args, **kwargs)
+##        decor.pasteoptions = dict() #xy=(0,0), anchor="nw")
+##        self.foreground.add_layer(decor)
 
 ##    def draw_grid(self, xinterval, yinterval, **kwargs):
 ##        self.drawer.draw_grid(xinterval, yinterval, **kwargs)
@@ -139,53 +225,58 @@ class Map:
 ##                              noticks=noticks, noticklabels=noticklabels,
 ##                              **kwargs)
 
+    def get_legend(self, **legendoptions):
+        legendoptions = legendoptions or dict()
+        legend = Legend(self, **legendoptions)
+        return legend
+
     # Batch utilities
 
-    def add_dimension(self, dimtag, dimvalues):
-        self.dimensions[dimtag] = [(dimval,dimfunc,self)for dimval,dimfunc in dimvalues] # list of dimval-dimfunc pairs
-
-    def iter_dimensions(self, groupings=None):
-        # collect all dimensions from layers and the map itself as a flat list
-        alldimensions = dict()
+##    def add_dimension(self, dimtag, dimvalues):
+##        self.dimensions[dimtag] = [(dimval,dimfunc,self)for dimval,dimfunc in dimvalues] # list of dimval-dimfunc pairs
+##
+##    def iter_dimensions(self, groupings=None):
+##        # collect all dimensions from layers and the map itself as a flat list
+##        alldimensions = dict()
 ##        for lyr in self:
 ##            if lyr.dimensions: 
 ##                alldimensions.update(lyr.dimensions) # note, duplicate dim names will be overwritten
-        alldimensions.update(self.dimensions)
-        
-        # yield all dimensions as all possible value combinations of each other
-        dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc,dimparent in dimvalues] for dimtag,dimvalues in alldimensions.items()]
-        allcombis = itertools.product(*dimtagvalpairs)
-
-        def submapgen():
-            for dimcombi in allcombis:
-                # create the map and run all the functions for that combination
-                submap = self.copy()
-                for dimtag,dimval in dimcombi:
-                    dimfunc,dimparent = next(( (_dimfunc,_dimparent) for _dimval,_dimfunc,_dimparent in alldimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
-                    if dimparent is self:
-                        dimfunc(submap)
-                    else:
-                        dimparent = dimparent.copy()
-                        dimfunc(dimparent)
-                dimdict = dict(dimcombi)
-                yield dimdict,submap
-                
-        if groupings:
-            # yield all grouped by each unique value combination belonging to the dimension names specified in groupings
-            # eg grouping by a region dimension will return groups of dimdict,submap for each unique value of region
-
-            def key(item):
-                dimdict,submap = item
-                keyval = [dimdict[gr] for gr in groupings]
-                return keyval
-            
-            for _id,dimcombis in itertools.groupby(sorted(submapgen(),key=key), key=key):
-                yield list(dimcombis) # list of dimdict,submap pairs belonging to same group
-
-        else:
-            # yield all flat, one by one
-            for dimdict,submap in submapgen():
-                yield dimdict,submap
+##        alldimensions.update(self.dimensions)
+##        
+##        # yield all dimensions as all possible value combinations of each other
+##        dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc,dimparent in dimvalues] for dimtag,dimvalues in alldimensions.items()]
+##        allcombis = itertools.product(*dimtagvalpairs)
+##
+##        def submapgen():
+##            for dimcombi in allcombis:
+##                # create the map and run all the functions for that combination
+##                submap = self.copy()
+##                for dimtag,dimval in dimcombi:
+##                    dimfunc,dimparent = next(( (_dimfunc,_dimparent) for _dimval,_dimfunc,_dimparent in alldimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
+##                    if dimparent is self:
+##                        dimfunc(submap)
+##                    else:
+##                        dimparent = dimparent.copy()
+##                        dimfunc(dimparent)
+##                dimdict = dict(dimcombi)
+##                yield dimdict,submap
+##                
+##        if groupings:
+##            # yield all grouped by each unique value combination belonging to the dimension names specified in groupings
+##            # eg grouping by a region dimension will return groups of dimdict,submap for each unique value of region
+##
+##            def key(item):
+##                dimdict,submap = item
+##                keyval = [dimdict[gr] for gr in groupings]
+##                return keyval
+##            
+##            for _id,dimcombis in itertools.groupby(sorted(submapgen(),key=key), key=key):
+##                yield list(dimcombis) # list of dimdict,submap pairs belonging to same group
+##
+##        else:
+##            # yield all flat, one by one
+##            for dimdict,submap in submapgen():
+##                yield dimdict,submap
 
     # Drawing
 
@@ -197,17 +288,30 @@ class Map:
             self.update_draworder()
 
     def render_all(self):
+        self.drawer.clear()
+
+        for layer in self.backgroundgroup:
+            layer.render()
+        
         for layer in self.layers:
             if layer.visible:
                 layer.render(width=self.drawer.width,
                              height=self.drawer.height,
                              bbox=self.drawer.coordspace_bbox)
-        for layer in self.foreground:
+                
+        for layer in self.foregroundgroup:
             layer.render()
+            
+        self.changed = False
         self.update_draworder()
 
     def update_draworder(self):
         self.drawer.clear()
+
+        # paste the background decorations
+        for layer in self.backgroundgroup:
+            if layer.img:
+                self.drawer.paste(layer.img, **layer.pasteoptions)
 
         # paste the map layers
         for layer in self.layers:
@@ -215,10 +319,11 @@ class Map:
                 self.drawer.paste(layer.img)
 
         # paste the foreground decorations
-        for layer in self.foreground:
+        for layer in self.foregroundgroup:
             if layer.img:
                 self.drawer.paste(layer.img, **layer.pasteoptions)
-                
+
+        self.layers.changed = False
         self.img = self.drawer.get_image()
 
     def get_tkimage(self):
@@ -226,9 +331,17 @@ class Map:
         return self.drawer.get_tkimage()
 
     def view(self):
+        if self.changed:
+            self.render_all()
+        elif self.layers.changed:
+            self.update_draworder()
         self.drawer.view()
 
     def save(self, savepath):
+        if self.changed:
+            self.render_all()
+        elif self.layers.changed:
+            self.update_draworder()
         self.drawer.save(savepath)
 
         
@@ -239,14 +352,21 @@ class LayerGroup:
         self._layers = list()
         self.connected_maps = list()
         self.dimensions = dict()
+        self.changed = False
 
     def __iter__(self):
         for layer in self._layers:
             yield layer
 
-    def add_dimension(self, dimtag, dimvalues):
-        # used by parent map to batch render all varieties of this layer
-        self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
+    @property
+    def bbox(self):
+        xmins,ymins,xmaxs,ymaxs = zip(*(lyr.bbox for lyr in self._layers))
+        bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
+        return bbox
+
+##    def add_dimension(self, dimtag, dimvalues):
+##        # used by parent map to batch render all varieties of this layer
+##        self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
 
     def copy(self):
         layergroup = LayerGroup()
@@ -254,6 +374,7 @@ class LayerGroup:
         return layergroup
 
     def add_layer(self, layer, **options):
+        self.changed = True
         if not isinstance(layer, (VectorLayer,RasterLayer)):
             try:
                 layer = VectorLayer(layer, **options)
@@ -264,14 +385,30 @@ class LayerGroup:
         return layer
 
     def move_layer(self, from_pos, to_pos):
+        self.changed = True
         layer = self._layers.pop(from_pos)
         self._layers.insert(to_pos, layer)
 
     def remove_layer(self, position):
+        self.changed = True
         self._layers.pop(position)
 
     def get_position(self, layer):
         return self._layers.index(layer)
+
+
+
+
+
+class BackgroundLayerGroup(LayerGroup):
+    def add_layer(self, layer, **options):
+        self._layers.append(layer, **options)
+
+    def copy(self):
+        background = BackgroundLayerGroup()
+        background._layers = list(self._layers)
+        return background
+
 
 
 
@@ -319,20 +456,34 @@ class VectorLayer:
         for key,val in self.styleoptions.copy().items():
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
                 if isinstance(val, dict):
+                    # random colors if not specified in unique algo
+                    if val["breaks"] == "unique" and "symbolvalues" not in val:
+                        rand = random.randrange
+                        val["symbolvalues"] = [(rand(255), rand(255), rand(255))
+                                             for _ in range(20)]
+
+                    # remove args that are not part of classipy
+                    val = dict(val)
+                    val["classvalues"] = val.pop("symbolvalues")
+                    notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
+
                     # cache precalculated values in id dict
                     # more memory friendly alternative is to only calculate breakpoints
                     # and then find classvalue for feature when rendering,
                     # which is likely slower
-                    if val["breaks"] == "unique" and "valuestops" not in val:
-                        rand = random.randrange
-                        val["valuestops"] = [(rand(255), rand(255), rand(255))
-                                             for _ in range(20)] 
                     classifier = cp.Classifier(features, **val)
                     self.styleoptions[key] = dict(classifier=classifier,
-                                                   symbols=dict((id(f),classval) for f,classval in classifier)
+                                                   symbols=dict((id(f),classval) for f,classval in classifier),
+                                                   notclassified=notclassified
                                                    )
                 else:
                     self.styleoptions[key] = val
+
+    @property
+    def bbox(self):
+        xmins,ymins,xmaxs,ymaxs = zip(*(feat.bbox for feat in self.features() ))
+        bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
+        return bbox
 
     def features(self, bbox=None):
         # get features based on spatial index, for better speeds when zooming
@@ -375,12 +526,15 @@ class VectorLayer:
             # get symbols
             rendict = dict()
             for key in "fillcolor fillsize outlinecolor outlinewidth".split():
-                nullval = None if "color" in key else 0 # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
                 if key in self.styleoptions:
                     val = self.styleoptions[key]
                     if isinstance(val, dict):
                         # lookup self in precomputed symboldict
-                        rendict[key] = val["symbols"].get(id(feat),nullval) 
+                        fid = id(feat)
+                        if fid in val["symbols"]:
+                            rendict[key] = val["symbols"][fid]
+                        else:
+                            rendict[key] = val["notclassified"]
                     else:
                         rendict[key] = val
 
@@ -448,6 +602,10 @@ class RasterLayer:
             
         # remember style settings
         self.styleoptions = options
+
+    @property
+    def bbox(self):
+        return self.data.bbox
 
     def render(self, resampling="nearest", lock_ratio=True, **georef):
         # position in space
@@ -524,21 +682,15 @@ class RasterLayer:
 
 
 class Legend:
-    def __init__(self, map, **options):
+    def __init__(self, map, autobuild=True, **options):
         self.map = map
         self.img = None
+        self.autobuild = autobuild
         self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **options)
 
     def add_fillcolors(self, layer, **override):
         if isinstance(layer, VectorLayer):
-            if "Polygon" in layer.data.type:
-                shape = "polygon"
-            elif "Line" in layer.data.type:
-                shape = "line"
-            elif "Point" in layer.data.type:
-                shape = "circle"
-            else:
-                raise Exception("Legend layer data must be of type polygon, linestring, or point")
+            shape = self._get_layer_shape(layer)
 
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
@@ -557,7 +709,7 @@ class Legend:
                     breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
                 else:
                     breaks = cls.breaks
-                    classvalues = cls.classvalues
+                    classvalues = cls.classvalues_interp
 
                 # add any other nonvarying layer options
                 for k in "fillsize outlinecolor outlinewidth".split():
@@ -572,8 +724,7 @@ class Legend:
 
             else:
                 # add as static symbol if none of the dynamic ones
-                # self.add_single_symbol()
-                raise Exception("Not yet implemented")
+                self.add_single_symbol(shape, **options)
 
         elif isinstance(layer, RasterLayer):
             shape = "polygon"
@@ -582,15 +733,8 @@ class Legend:
 
     def add_fillsizes(self, layer, **override):
         if isinstance(layer, VectorLayer):
-            if "Polygon" in layer.data.type:
-                shape = "polygon"
-            elif "Line" in layer.data.type:
-                shape = "line"
-            elif "Point" in layer.data.type:
-                shape = "circle"
-            else:
-                raise Exception("Legend layer data must be of type polygon, linestring, or point")
-
+            shape = self._get_layer_shape(layer)
+            
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
@@ -611,17 +755,55 @@ class Legend:
                 print options
 
                 cls = layer.styleoptions["fillsize"]["classifier"]
-                self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues, **options)
+                self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues_interp, **options)
 
             else:
                 # add as static symbol if none of the dynamic ones
-                # self.add_single_symbol()
-                raise Exception("Not yet implemented")
+                self.add_single_symbol(shape, **options)
 
         elif isinstance(layer, RasterLayer):
-            raise Exception("Fillcolor is the only possible legend entry for a raster layer")
+            raise Exception("Fillsize is not a possible legend entry for a raster layer")
 
-    def autobuild(self):
+    def add_single_symbol(self, layer, **override):
+        if isinstance(layer, VectorLayer):
+            shape = self._get_layer_shape(layer)
+
+            # use layer's legendoptions and possibly override
+            options = dict(layer.legendoptions)
+            options.update(override)
+            options.update(layer.styleoptions)
+
+            if "title" in options:
+                options["label"] = options.pop("title")
+            if "titleoptions" in options:
+                options["labeloptions"] = options.pop("titleoptions")
+
+            self._legend.add_symbol(shape, **options)
+
+        elif isinstance(layer, RasterLayer):
+            raise Exception("Not yet implemented")
+
+
+    def _get_layer_shape(self, layer):
+        if isinstance(layer, VectorLayer):
+            if "Polygon" in layer.data.type:
+                shape = "polygon"
+            elif "Line" in layer.data.type:
+                shape = "line"
+            elif "Point" in layer.data.type:
+                shape = "circle"
+            else:
+                raise Exception("Legend layer data must be of type polygon, linestring, or point")
+
+            return shape
+
+        elif isinstance(layer, RasterLayer):
+            raise Exception("_get_layer_shape is only meant for vector data, not raster data")
+
+    def _autobuild(self):
+        # maybe somehow clear itself in case autobuild and rendering multiple times for updating
+        # ...
+        
         # build the legend automatically
         for layer in self.map:
             if not layer.nolegend:
@@ -641,33 +823,57 @@ class Legend:
                     
                 # add as static symbol if none of the dynamic ones
                 if not anydynamic:
-                    # self.add_single_symbol()
-                    raise Exception("Not yet implemented")
+                    self.add_single_symbol(layer, **layer.legendoptions)
 
     def render(self):
         # render it
+        if self.autobuild:
+            self._autobuild()
         rendered = self._legend.render()
         self.img = rendered.get_image()
 
 
 
-
-class Decoration:
-    def __init__(self, map, funcname, *args, **kwargs):
+class Background:
+    def __init__(self, map):
         self.map = map
-        
-        self.funcname = funcname
-        self.args = args
-        self.kwargs = kwargs
-
         self.img = None
-        
+        self.pasteoptions = dict()
+
     def render(self):
-        drawer = pyagg.Canvas(self.map.drawer.width, self.map.drawer.height, background=None)
-        drawer.custom_space(*self.map.drawer.coordspace_bbox)
-        func = getattr(drawer,self.funcname)
-        func(*self.args, **self.kwargs)
-        self.img = drawer.get_image()
+        canv = pyagg.Canvas(self.map.drawer.width, self.map.drawer.height, self.map.background)
+        self.img = canv.get_image()
+
+
+
+class Title:
+    def __init__(self, layout):
+        self.layout = layout
+        self.img = None
+        self.pasteoptions = dict(xy=("50%w","1%h"), anchor="n")
+
+    def render(self):
+        rendered = pyagg.legend.Label(self.layout.title, **self.layout.titleoptions).render() # pyagg label indeed implements a render method()
+        self.img = rendered.get_image()
+
+
+
+##class Decoration:
+##    def __init__(self, map, funcname, *args, **kwargs):
+##        self.map = map
+##        
+##        self.funcname = funcname
+##        self.args = args
+##        self.kwargs = kwargs
+##
+##        self.img = None
+##        
+##    def render(self):
+##        drawer = pyagg.Canvas(self.map.drawer.width, self.map.drawer.height, background=None)
+##        drawer.custom_space(*self.map.drawer.coordspace_bbox)
+##        func = getattr(drawer,self.funcname)
+##        func(*self.args, **self.kwargs)
+##        self.img = drawer.get_image()
         
 
         
