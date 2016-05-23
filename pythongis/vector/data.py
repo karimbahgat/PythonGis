@@ -208,11 +208,15 @@ class VectorData:
             for feat in self:
                 feat.row.insert(index, None)
 
-    def compute(self, field, func):
+    def compute(self, field, value):
         if field not in self.fields:
             self.add_field(field)
-        for feat in self:
-            feat[field] = func(feat)
+        if hasattr(value, "__call__"):
+            for feat in self:
+                feat[field] = value(feat)
+        else:
+            for feat in self:
+                feat[field] = value
 
     def drop_field(self, field):
         fieldindex = self.fields.index(field)

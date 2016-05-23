@@ -16,8 +16,11 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             # ints are kept as ints
             return value
         elif isinstance(value, float):
-            # floats are rounded
-            return round(value, maxprecision)
+            if value.is_integer():
+                return int(value)
+            else:
+                # floats are rounded
+                return round(value, maxprecision)
         elif isinstance(value, unicode):
             # unicode is custom encoded into bytestring
             return value.encode(encoding)
@@ -38,17 +41,19 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             fieldtype = "N" # assume number until proven otherwise
             for row in rows:
                 value = row[fieldindex]
-                if value != "":
+                if value not in (None,""):
                     try:
                         # make nr fieldtype if content can be made into nr
                         value = float(value)
-                        fieldlen = max(( len(bytes(value)), fieldlen ))
+                        _strnr = format(value, ".%sf"%maxprecision).rstrip(".0")
+                        fieldlen = max(( len(_strnr), fieldlen ))
                         if not value.is_integer():
                             # get max decimals, capped to max precision
-                            decimals = max(( len(bytes(round(value - int(value), maxprecision)).split(".")[1]), decimals )) 
-                    except:
+                            decimals = max(( len(_strnr.split(".")[1]), decimals ))
+                    except ValueError:
                         # but turn to text if any of the cells cannot be made to float bc they are txt
                         fieldtype = "C"
+                        value = value if isinstance(value, unicode) else bytes(value)
                         fieldlen = max(( len(value), fieldlen ))
                 else:
                     # empty value, so just keep assuming same type
