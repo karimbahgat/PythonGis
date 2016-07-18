@@ -320,6 +320,26 @@ def buffer(data, dist_expression, join_style="round", cap_style="round", mitre_l
     new.type = "Polygon"
     return new
 
+def buffer_geodetic(data, dist_expression, resolution=100):
+    """Only for points for now"""
+    from ._helpers import geodetic_buffer
+    
+    if "Point" in data.type:
+        new = VectorData()
+        new.fields = list(data.fields)
+        for feat in data:
+            geoj = feat.geometry
+            dist = eval(dist_expression)
+            assert dist > 0
+            buffered = geodetic_buffer(geoj, dist, resolution)
+            new.add_feature(feat.row, buffered)
+        # change data type to polygon
+        new.type = "Polygon"
+        return new
+
+    else:
+        raise Exception("Geodetic buffer only implemented for points")
+
 def collapse(data, key=None, fieldmapping=[], contig=False):
     """
     Glue and aggregate features in a single layer with same values.

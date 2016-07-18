@@ -6,7 +6,7 @@ def _pairwise(iterable):
     next(b, None)
     return itertools.izip(a, b)
 
-def vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245, f=1/298.257223563, MILES_PER_KILOMETER=0.621371, MAX_ITERATIONS=200, CONVERGENCE_THRESHOLD=1e-12):
+def _vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245, f=1/298.257223563, MILES_PER_KILOMETER=0.621371, MAX_ITERATIONS=200, CONVERGENCE_THRESHOLD=1e-12):
     """
     Vincenty's formula (inverse method) to calculate the distance (in
     kilometers or miles) between two points on the surface of a spheroid
@@ -84,6 +84,93 @@ def vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245, 
         s *= MILES_PER_KILOMETER  # kilometers to miles
  
     return round(s, 6)
+
+def _walk(startpoint, direction, distance): 
+    """
+    Walk from a starting point in a direction for x distance to find the endpoint, using geodetic calculations.
+    
+    Bearing is degrees clockwise northfaced?
+    Distance is in km. 
+    """
+    # Taken entirely from GeoPy, https://github.com/geopy/geopy/blob/master/geopy/distance.py
+    
+    from math import radians, degrees, sqrt, tan, sin, cos, atan2, pi
+    lon,lat = startpoint
+    lat1 = radians(lat)
+    lng1 = radians(lon)
+    bearing = radians(direction)
+
+    major, minor, f = (6378.137, 6356.7523142, 1 / 298.257223563) # WGS84 ellipsoid
+
+    tan_reduced1 = (1 - f) * tan(lat1)
+    cos_reduced1 = 1 / sqrt(1 + tan_reduced1 ** 2)
+    sin_reduced1 = tan_reduced1 * cos_reduced1
+    sin_bearing, cos_bearing = sin(bearing), cos(bearing)
+    sigma1 = atan2(tan_reduced1, cos_bearing)
+    sin_alpha = cos_reduced1 * sin_bearing
+    cos_sq_alpha = 1 - sin_alpha ** 2
+    u_sq = cos_sq_alpha * (major ** 2 - minor ** 2) / minor ** 2
+
+    A = 1 + u_sq / 16384. * (
+        4096 + u_sq * (-768 + u_sq * (320 - 175 * u_sq))
+    )
+    B = u_sq / 1024. * (256 + u_sq * (-128 + u_sq * (74 - 47 * u_sq)))
+
+    sigma = distance / (minor * A)
+    sigma_prime = 2 * pi
+
+    while abs(sigma - sigma_prime) > 10e-12:
+        cos2_sigma_m = cos(2 * sigma1 + sigma)
+        sin_sigma, cos_sigma = sin(sigma), cos(sigma)
+        delta_sigma = B * sin_sigma * (
+            cos2_sigma_m + B / 4. * (
+                cos_sigma * (
+                    -1 + 2 * cos2_sigma_m
+                ) - B / 6. * cos2_sigma_m * (
+                    -3 + 4 * sin_sigma ** 2
+                ) * (
+                    -3 + 4 * cos2_sigma_m ** 2
+                )
+            )
+        )
+        sigma_prime = sigma
+        sigma = distance / (minor * A) + delta_sigma
+
+    sin_sigma, cos_sigma = sin(sigma), cos(sigma)
+
+    lat2 = atan2(
+        sin_reduced1 * cos_sigma + cos_reduced1 * sin_sigma * cos_bearing,
+        (1 - f) * sqrt(
+            sin_alpha ** 2 + (
+                sin_reduced1 * sin_sigma -
+                cos_reduced1 * cos_sigma * cos_bearing
+            ) ** 2
+        )
+    )
+
+    lambda_lng = atan2(
+        sin_sigma * sin_bearing,
+        cos_reduced1 * cos_sigma - sin_reduced1 * sin_sigma * cos_bearing
+    )
+
+    C = f / 16. * cos_sq_alpha * (4 + f * (4 - 3 * cos_sq_alpha))
+
+    delta_lng = (
+        lambda_lng - (1 - C) * f * sin_alpha * (
+            sigma + C * sin_sigma * (
+                cos2_sigma_m + C * cos_sigma * (
+                    -1 + 2 * cos2_sigma_m ** 2
+                )
+            )
+        )
+    )
+
+    lng2 = lng1 + delta_lng
+
+    return degrees(lng2), degrees(lat2)
+
+
+# PUBLIC FUNCTIONS
  
 def geodetic_length(geometry):
     
@@ -92,13 +179,13 @@ def geodetic_length(geometry):
             return 0.0
  
         elif geometry["type"] == "LineString":
-            length = sum((vincenty_distance(p1,p2)
+            length = sum((_vincenty_distance(p1,p2)
                           for p1,p2 in _pairwise(geometry["coordinates"]))
                          )
             return length
  
         elif geometry["type"] == "MultiLineString":
-            length = sum((vincenty_distance(p1,p2)
+            length = sum((_vincenty_distance(p1,p2)
                           for line in geometry["coordinates"]
                           for p1,p2 in _pairwise(line))
                          )
@@ -115,6 +202,31 @@ def geodetic_length(geometry):
         length = _handle(geometry)
         return length
 
+def geodetic_buffer(geometry, distance, resolution=100):
+    
+    if "Point" in geometry["type"]:
+        incr = 360 / float(resolution)
+
+        def singlebuff(subgeom):
+            point = subgeom["coordinates"]
+            buffercoords = []
+            cur = 0
+            while cur < 360:
+                pointbuff = _walk(point, cur, distance)
+                buffercoords.append(pointbuff)
+                cur += incr
+                
+            return buffercoords
+        
+        if "Multi" in geometry["type"]:
+            return {"type":"MultiPolygon", "coordinates":[[singlebuff(subgeom)] for subgeom in geometry["geoms"]]}
+
+        else:
+            return {"type":"Polygon", "coordinates":[singlebuff(geometry)]}
+        
+    else:
+        raise Exception("Geodetic buffer only implemented for points")
+    
 
 def great_circle_path(point1, point2, segments):
     # http://gis.stackexchange.com/questions/47/what-tools-in-python-are-available-for-doing-great-circle-distance-line-creati
