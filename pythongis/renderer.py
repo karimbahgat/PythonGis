@@ -10,7 +10,7 @@ from .raster.data import RasterData
 from .exceptions import UnknownFileError
 
 class Layout:
-    def __init__(self, width, height, background=None, title="", titleoptions=None, *args, **kwargs):
+    def __init__(self, width, height, background="white", title="", titleoptions=None, *args, **kwargs):
 
         # create a single map by default
         self.maps = []
@@ -60,7 +60,7 @@ class Layout:
 ##        defaultpaste.update(pasteoptions)
 ##        decor.pasteoptions = defaultpaste
 ##        decor.img = decor.render()
-##        print self.foreground,self.foreground._layers
+##        #print self.foreground,self.foreground._layers
 ##        self.foreground.add_layer(decor)
 
     def render_all(self, columns=None, rows=None, **kwargs):
@@ -113,7 +113,7 @@ class Layout:
 
 
 class Map:
-    def __init__(self, width, height, background=None, layers=None, *args, **kwargs):
+    def __init__(self, width=None, height=None, background=None, layers=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -129,18 +129,57 @@ class Map:
         self.background = background
 
         # create the drawer with a default unprojected lat-long coordinate system
-        self.drawer = pyagg.Canvas(width, height, None)
-        self.drawer.geographic_space() 
+        # setting width and height locks the ratio, otherwise map size will adjust to the coordspace
+        self.width = width or None
+        self.height = height or None
+        self.drawer = None
+        self.zooms = []
 
         # foreground layergroup for non-map decorations
         self.foregroundgroup = ForegroundLayerGroup()
 
         self.dimensions = dict()
             
-        self.img = self.drawer.get_image()
-        self.changed = False
+        self.img = None
+        self.changed = True
+
+    def _create_drawer(self):
+        # get coordspace bbox aspect ratio of all layers
+        if self.width and self.height:
+            pass
+        else:
+            bbox = self.layers.bbox
+            w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
+            aspect = w/float(h)
+            if not self.width and not self.height:
+                # largest side gets set to default minimum requirement
+                if aspect < 1:
+                    self.height = 500 # default min height
+                else:
+                    self.width = 1000 # default min height
+                
+            if self.width:
+                self.height = int(self.width / float(aspect))
+            elif self.height:
+                self.width = int(self.height * aspect)
+            
+        # factor in zooms (zoombbx should somehow be crop, so alters overall img dims...)
+        self.drawer = pyagg.Canvas(self.width, self.height, None)
+        self.drawer.geographic_space()
+        for zoom in self.zooms:
+            zoom()
+        # determine drawer pixel size based on these
+        bbox = self.drawer.coordspace_bbox
+        w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
+        aspect = w/float(h)
+        if aspect < 1:
+            self.width = int(self.height * aspect)
+        else:
+            self.height = int(self.width / float(aspect))
+        self.drawer.resize(self.width, self.height, lock_ratio=False)
 
     def copy(self):
+        if not self.drawer: self._create_drawer() 
         dupl = Map(self.drawer.width, self.drawer.height, background=self.background, layers=self.layers.copy())
         dupl.backgroundgroup = self.backgroundgroup.copy()
         dupl.drawer = self.drawer.copy()
@@ -148,15 +187,18 @@ class Map:
         return dupl
 
     def pixel2coord(self, x, y):
+        if not self.drawer: self._create_drawer() 
         return self.drawer.pixel2coord(x, y)
 
     # Map canvas alterations
 
     def offset(self, xmove, ymove):
+        func = lambda: self.drawer.move(xmove, ymove)
+        self.zooms.append(func)
         self.changed = True
-        self.drawer.move(xmove, ymove)
 
     def resize(self, width, height):
+        if not self.drawer: self._create_drawer()
         self.changed = True
         self.drawer.resize(width, height, lock_ratio=True)
         self.img = self.drawer.get_image()
@@ -165,23 +207,34 @@ class Map:
 
     def zoom_auto(self):
         bbox = self.layers.bbox
-        self.zoom_bbox(*bbox)
+        func = lambda: self.zoom_bbox(*bbox)
+        self.zooms.append(func)
+        self.changed = True
 
     def zoom_bbox(self, xmin, ymin, xmax, ymax):
+        if self.width and self.height:
+            # predetermined map size will conor the aspect ratio
+            func = lambda: self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=True)
+        else:
+            # otherwise snap zoom to edges so can determine map size from coordspace
+            func = lambda: self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=False)
+        self.zooms.append(func)
         self.changed = True
-        self.drawer.zoom_bbox(xmin, ymin, xmax, ymax)
 
     def zoom_in(self, factor, center=None):
+        func = lambda: self.drawer.zoom_in(factor, center=center)
+        self.zooms.append(func)
         self.changed = True
-        self.drawer.zoom_in(factor, center=center)
 
     def zoom_out(self, factor, center=None):
+        func = lambda: self.drawer.zoom_out(factor, center=center)
+        self.zooms.append(func)
         self.changed = True
-        self.drawer.zoom_out(factor, center=center)
 
     def zoom_units(self, units, center=None):
+        func = lambda: self.drawer.zoom_units(units, center=center)
+        self.zooms.append(func)
         self.changed = True
-        self.drawer.zoom_units(units, center=center)
 
     # Layers
 
@@ -208,10 +261,10 @@ class Map:
 ##        decor.pasteoptions = dict() #xy=(0,0), anchor="nw")
 ##        self.foreground.add_layer(decor)
 
-##    def draw_grid(self, xinterval, yinterval, **kwargs):
+##    def add_grid(self, xinterval, yinterval, **kwargs):
 ##        self.drawer.draw_grid(xinterval, yinterval, **kwargs)
 ##
-##    def draw_axis(self, axis, minval, maxval, intercept,
+##    def add_axis(self, axis, minval, maxval, intercept,
 ##                  tickpos=None,
 ##                  tickinterval=None, ticknum=5,
 ##                  ticktype="tick", tickoptions={},
@@ -281,6 +334,8 @@ class Map:
     # Drawing
 
     def render_one(self, layer):
+        self._create_drawer()
+        
         if layer.visible:
             layer.render(width=self.drawer.width,
                          height=self.drawer.height,
@@ -288,8 +343,8 @@ class Map:
             self.update_draworder()
 
     def render_all(self):
-        self.drawer.clear()
-
+        self._create_drawer()
+        
         for layer in self.backgroundgroup:
             layer.render()
         
@@ -306,7 +361,7 @@ class Map:
         self.update_draworder()
 
     def update_draworder(self):
-        self.drawer.clear()
+        if not self.drawer: self._create_drawer()
 
         # paste the background decorations
         for layer in self.backgroundgroup:
@@ -328,6 +383,7 @@ class Map:
 
     def get_tkimage(self):
         # Special image format needed by Tkinter to display it in the GUI
+        if not self.drawer: self._create_drawer() 
         return self.drawer.get_tkimage()
 
     def view(self):
@@ -718,7 +774,7 @@ class Legend:
                         if not isinstance(v, dict):
                             options[k] = v
 
-                print options
+                #print options
                 
                 self._legend.add_fillcolors(shape, breaks, classvalues, **options)
 
@@ -738,21 +794,22 @@ class Legend:
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
+            options["fillcolor"] = options.get("fillcolor")
             
             if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                 
                 # add any other nonvarying layer options
-                print 9999
-                print options
+                #print 9999
+                #print options
                 for k in "fillcolor outlinecolor outlinewidth".split():
-                    print k
+                    #print k
                     if k not in options and k in layer.styleoptions:
                         v = layer.styleoptions[k]
-                        print k,v,type(v)
+                        #print k,v,type(v)
                         if not isinstance(v, dict):
                             options[k] = v
                             
-                print options
+                #print options
 
                 cls = layer.styleoptions["fillsize"]["classifier"]
                 self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues_interp, **options)
@@ -813,7 +870,7 @@ class Legend:
                 anydynamic = False
                 if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
                     # is dynamic and should be highlighted specially
-                    print 999,layer,layer.legendoptions
+                    #print 999,layer,layer.legendoptions
                     self.add_fillcolors(layer, **layer.legendoptions)
                     anydynamic = True
                 if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
