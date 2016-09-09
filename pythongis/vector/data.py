@@ -186,11 +186,14 @@ class VectorData:
 
     @property
     def bbox(self):
-        xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self if feat.geometry))
-        xmin, xmax = min(xmins), max(xmaxs)
-        ymin, ymax = min(ymins), max(ymaxs)
-        bbox = (xmin, ymin, xmax, ymax)
-        return bbox
+        if any((feat.geometry for feat in self)):
+            xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self if feat.geometry))
+            xmin, xmax = min(xmins), max(xmaxs)
+            ymin, ymax = min(ymins), max(ymaxs)
+            bbox = (xmin, ymin, xmax, ymax)
+            return bbox
+        else:
+            raise Exception("Cannot get bbox since there are no features with geometries")
 
     ### DATA ###
 

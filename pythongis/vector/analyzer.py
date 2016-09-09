@@ -12,14 +12,16 @@ from shapely.prepared import prep as supershapely
 
 # Overlay Analysis (transfer of values, but no clip)
 
-def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, **kwargs):
+def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, key=None, **kwargs):
     """
     Summarizes the values of "valuedata" that overlap "groupbydata",
     and adds the summary statistics to the output data.
 
     "fieldmapping" is a list of ('outfieldname', 'getvaluefunction', 'statistic name or function') tuples that decides which
     variables to summarize and how to do so. Valid statistics are count,
-    sum, max, min, and average. 
+    sum, max, min, and average.
+
+    Key is a function for determining if a pair of features should be processed, taking feat and clipfeat as input args and returning True or False
     """
 
     from . import sql
@@ -33,14 +35,19 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, **kwa
     # loop
     if not hasattr(groupbydata, "spindex"): groupbydata.create_spatial_index()
     if not hasattr(valuedata, "spindex"): valuedata.create_spatial_index()
-    for groupfeat in groupbydata.quick_overlap(valuedata.bbox):
+    for groupfeat in groupbydata: #.quick_overlap(valuedata.bbox): # TODO: Doesnt keep all bc of quickoverlap only iters some
         newrow = list(groupfeat.row)
         geom = groupfeat.get_shapely()
+        supergeom = supershapely(geom)
         valuefeats = (valfeat for valfeat in valuedata.quick_overlap(groupfeat.bbox))
 
         # aggregate
-        matches = [valfeat for valfeat in valuefeats
-                   if valfeat.get_shapely().intersects(geom)]
+        if key:
+            matches = [valfeat for valfeat in valuefeats
+                       if key(groupfeat,valfeat) and supergeom.intersects(valfeat.get_shapely())]
+        else:
+            matches = [valfeat for valfeat in valuefeats
+                       if supergeom.intersects(valfeat.get_shapely())]
         if matches:
             aggreg = sql.aggreg(matches, fieldmapping)
 

@@ -23,7 +23,7 @@ class Layout:
         # foreground layergroup for non-map decorations
         self.foregroundgroup = ForegroundLayerGroup()
 
-        # title (would be good to make these properties affect the actual rendered title after init)
+        # title (these properties affect the actual rendered title after init)
         self.title = title
         self.titleoptions = titleoptions or dict()
         self.foregroundgroup.add_layer(Title(self))
@@ -91,7 +91,8 @@ class Layout:
         # foreground
         for layer in self.foregroundgroup:
             layer.render()
-            self.drawer.paste(layer.img, **layer.pasteoptions)
+            if layer.img:
+                self.drawer.paste(layer.img, **layer.pasteoptions)
             
         self.img = self.drawer.get_image()
 
@@ -113,7 +114,7 @@ class Layout:
 
 
 class Map:
-    def __init__(self, width=None, height=None, background=None, layers=None, *args, **kwargs):
+    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -137,6 +138,11 @@ class Map:
 
         # foreground layergroup for non-map decorations
         self.foregroundgroup = ForegroundLayerGroup()
+
+        # title (these properties affect the actual rendered title after init)
+        self.title = title
+        self.titleoptions = titleoptions or dict()
+        self.foregroundgroup.add_layer(Title(self))
 
         self.dimensions = dict()
             
@@ -282,6 +288,13 @@ class Map:
         legendoptions = legendoptions or dict()
         legend = Legend(self, **legendoptions)
         return legend
+
+    def add_legend(self, legendoptions=None, **pasteoptions):
+        self.changed = True
+        legendoptions = legendoptions or {}
+        legend = self.get_legend(**legendoptions)
+        legend.pasteoptions = pasteoptions
+        self.foregroundgroup.add_layer(legend)
 
     # Batch utilities
 
@@ -794,7 +807,7 @@ class Legend:
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
-            options["fillcolor"] = options.get("fillcolor")
+            options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
             
             if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                 
@@ -910,8 +923,9 @@ class Title:
         self.pasteoptions = dict(xy=("50%w","1%h"), anchor="n")
 
     def render(self):
-        rendered = pyagg.legend.Label(self.layout.title, **self.layout.titleoptions).render() # pyagg label indeed implements a render method()
-        self.img = rendered.get_image()
+        if self.layout.title:
+            rendered = pyagg.legend.Label(self.layout.title, **self.layout.titleoptions).render() # pyagg label indeed implements a render method()
+            self.img = rendered.get_image()
 
 
 

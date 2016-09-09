@@ -2,6 +2,8 @@
 import itertools, operator, math
 from .data import *
 
+import shapely, shapely.ops, shapely.geometry
+from shapely.prepared import prep as supershapely
 
 
 
@@ -113,6 +115,9 @@ def split(data, key, breaks="unique", **kwargs):
 
     Iterates through each new split layer one at a time. 
     """
+    
+    # TODO: MAYBE SWITCH key TO by
+    
     keywrap = key
     if not hasattr(key, "__call__"):
         if isinstance(key,(list,tuple)):
@@ -135,7 +140,7 @@ def split(data, key, breaks="unique", **kwargs):
 
 def merge(*datalist):
     """
-    Merges two or more vector data layer, combining all their rows
+    Merges two or more vector data layers, combining all their rows
     and fields into a single table.
 
     Adds the merged data to the layers list.
@@ -180,6 +185,9 @@ def clean(data, tolerance=0):
 
     Adds the resulting cleaned data to the layers list.
     """
+    # TODO: MAYBE ADD PRESERVETOPOLOGY OPTION FOR POLYGON TYPE, WHICH CONVERTS TO UNIQUE LINES, THEN CLEANS THE LINES,
+    # THEN RECOMBINES BACK TO POLYGONS, THEN REASSIGNS ATTRIBUTES BY JOINING WITH CENTERPOINT OF ORIGINAL SHAPES
+    
     # create new file
     outfile = VectorData()
     outfile.fields = list(data.fields)
@@ -230,11 +238,13 @@ def integrate(data, snapto):
 
 # Create operations
 
-def connect(frompoints, topoints, k1=None, k2=None, greatcircle=True):
+def connect(frompoints, topoints, k1=None, k2=None, greatcircle=True, segments=100):
     """Two point files, and for each frompoint draw line to each topoint
     that matches based on some key value."""
 
     from ._helpers import great_circle_path
+
+    # TODO: swithc k1,k2 to a single key function
 
     # TODO: allow any geometry types via centroids, not just point types
     # ...
@@ -272,7 +282,7 @@ def connect(frompoints, topoints, k1=None, k2=None, greatcircle=True):
             match = key1(fromfeat) == key2(tofeat) if key1 and key2 else True
             if match:
                 if greatcircle:
-                    linepath = great_circle_path(frompoint["coordinates"], topoint["coordinates"], segments=100)
+                    linepath = great_circle_path(frompoint["coordinates"], topoint["coordinates"], segments=segments)
                 else:
                     linepath = [frompoint["coordinates"], topoint["coordinates"]]
                 geoj = {"type": "LineString",
@@ -340,7 +350,7 @@ def buffer_geodetic(data, dist_expression, resolution=100):
     else:
         raise Exception("Geodetic buffer only implemented for points")
 
-def collapse(data, key=None, fieldmapping=[], contig=False):
+def collapse(data, by=None, fieldmapping=[], contig=False):
     """
     Glue and aggregate features in a single layer with same values.
     """
@@ -382,7 +392,7 @@ def collapse(data, key=None, fieldmapping=[], contig=False):
         # TODO: redo so key and fieldmapping funcs only have to expect the feat obj
         # maybe by switching away from full sql approach...
 
-        if not key: key = lambda x: True # groups together all items
+        if not by: by = lambda x: True # groups together all items
 
         def _geomselect(itemcombis):
             geoms = []
@@ -395,7 +405,7 @@ def collapse(data, key=None, fieldmapping=[], contig=False):
                 return union.__geo_interface__
 
         q = sql.query(_from=[iterable],
-                     _groupby=key,
+                     _groupby=by,
                      _select=fieldmapping,
                      _geomselect=_geomselect,
                     )
@@ -495,9 +505,11 @@ def cut(data, cutter):
 
 # Compare operations
 
-def intersection(data, clipper):
+def intersection(data, clipper, key=None):
     """
     Clips the data to the parts that it has in common with the clipper polygon.
+
+    Key is a function for determining if a pair of features should be processed, taking feat and clipfeat as input args and returning True or False
     """
 
     # create spatial index
@@ -509,11 +521,14 @@ def intersection(data, clipper):
 
     iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
     for feat,geom in iterable:
+        supergeom = supershapely(geom)
         iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
         for clipfeat,clipgeom in iterable2:
-            intsec = geom.intersection(clipgeom)
-            if not intsec.is_empty:
-                out.add_feature(feat.row, intsec.__geo_interface__)
+            if key and key(feat,clipfeat):
+                if supergeom.intersects(clipgeom):
+                    intsec = geom.intersection(clipgeom)
+                    if not intsec.is_empty:
+                        out.add_feature(feat.row, intsec.__geo_interface__)
 
     return out
 

@@ -29,12 +29,10 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
         else:
             # brute force anything else to string representation
             return bytes(value)
-    
-    # shapefile
-    if filepath.endswith(".shp"):
-        shapewriter = pyshp.Writer()
-        
+
+    def detect_fieldtypes(fields, rows):
         # set fields with correct fieldtype
+        fieldtypes = []
         for fieldindex,fieldname in enumerate(fields):
             fieldlen = 1
             decimals = 0
@@ -45,11 +43,13 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                     try:
                         # make nr fieldtype if content can be made into nr
                         value = float(value)
-                        _strnr = format(value, ".%sf"%maxprecision).rstrip(".0")
-                        fieldlen = max(( len(_strnr), fieldlen ))
-                        if not value.is_integer():
+                        if value.is_integer():
+                            _strnr = bytes(value)
+                        else:
                             # get max decimals, capped to max precision
+                            _strnr = format(value, ".%sf"%maxprecision).rstrip("0")
                             decimals = max(( len(_strnr.split(".")[1]), decimals ))
+                        fieldlen = max(( len(_strnr), fieldlen ))
                     except ValueError:
                         # but turn to text if any of the cells cannot be made to float bc they are txt
                         fieldtype = "C"
@@ -58,11 +58,27 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                 else:
                     # empty value, so just keep assuming same type
                     pass
-            # clean fieldname
+            if fieldtype == "N" and decimals == 0:
+                fieldlen -= 2 # bc above we measure lengths for ints as if they were floats, ie with an additional ".0"
+                func = lambda v: None if v in (None,"") else int(v)
+            elif fieldtype == "N" and decimals:
+                func = lambda v: None if v in (None,"") else float(v)
+            elif fieldtype == "C":
+                func = lambda v:v #encoding are handled later
+            else:
+                raise Exception("Unexpected bug: Detected field should be always N or C")
+            fieldtypes.append( (fieldtype,func,fieldlen,decimals) )
+        return fieldtypes
+    
+    # shapefile
+    if filepath.endswith(".shp"):
+        shapewriter = pyshp.Writer()
+
+        fieldtypes = detect_fieldtypes(fields,rows)
+        
+        # set fields with correct fieldtype
+        for fieldname,(fieldtype,func,fieldlen,decimals) in itertools.izip(fields, fieldtypes):
             fieldname = fieldname.replace(" ","_")[:10]
-            # write field
-            if fieldtype != "N":
-                decimals = 0
             shapewriter.field(fieldname.encode(encoding), fieldtype, fieldlen, decimals)
 
         # convert geojson to shape
@@ -131,16 +147,19 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
         for row,geom in itertools.izip(rows, geometries):
             shape = geoj2shape(geom)
             shapewriter._shapes.append(shape)
-            shapewriter.record(*[encode(value) for value in row])
+            row = [encode(func(value)) for (typ,func,length,deci),value in zip(fieldtypes,row)]
+            shapewriter.record(*row)
             
         # save
         shapewriter.save(filepath)
 
     # geojson file
     elif filepath.endswith((".geojson",".json")):
-        geojwriter = pygeoj.new()        
+        geojwriter = pygeoj.new()
+        fieldtypes = detect_fieldtypes(fields,rows)
         for row,geom in itertools.izip(rows,geometries):
             # encode row values
+            row = (func(value) for (typ,func,length,deci),value in zip(fieldtypes,row))
             row = (encode(value) for value in row)
             rowdict = dict(zip(fields, row))
             # create and add feature
