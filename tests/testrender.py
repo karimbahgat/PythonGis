@@ -9,6 +9,116 @@ import pythongis as pg
 
 
 ###
+
+##print("\n"+"feature labels test")
+##mapp = pg.renderer.Map(400,400,background="blue")
+##
+##polys = pg.vector.data.VectorData(r"C:\Users\kimo\Documents\GitHub\pShapes\BaseData\ne_10m_admin_1_states_provinces.shp",
+##                                  encoding="latin",
+##                                  select=lambda f:f["geonunit"] == "Syria")
+##mapp.add_layer(polys,
+##               legendoptions=dict(title="Provinces"),
+##               #fillsize=20, #TODO: legend cant handle if no fillsize is set, but should not be needed for polys, and autoset for lines and points
+##                fillcolor="green",
+##                text=lambda f:f["name"],
+##                textoptions=dict(#anchor="sw",
+##                                 #rotate=dict(breaks="equal",key=lambda f:f["provnum_ne"],symbolvalues=[7,90]),
+##                                 bbox=lambda f:f.bbox,
+##                                 ),
+##                )
+##
+####points = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\shp\domestic.shp")
+####mapp.add_layer(points,
+####                   title="Terrorism",
+####                    fillsize={"breaks":"natural",
+####                                "key":lambda f: float(f["Average_nk"]),
+####                                "symbolvalues":[1, 4.0]
+####                                },
+####                   outlinewidth=0.15,
+####                    fillcolor="red",
+####                    sortkey=lambda f: float(f["Average_nk"]),
+####                    sortorder="incr",
+####                  )
+##
+###mapp.zoom_bbox(*polys.bbox)
+##mapp.zoom_auto()
+##mapp.add_legend()
+##mapp.view()
+##
+##
+##fdsafsafa
+
+###
+
+print("\n"+"categorical test 1")
+mapp = pg.renderer.Map(400,400,background="blue")
+
+polys = pg.vector.data.VectorData(r"C:\Users\kimo\Documents\GitHub\pShapes\BaseData\ne_10m_admin_1_states_provinces.shp",
+                                  encoding="latin",
+                                  select=lambda f:f["geonunit"] == "Syria")
+mapp.add_layer(polys,
+               legendoptions=dict(title="Provinces", padding=0),
+                fillcolor=dict(breaks="unique", key=lambda f:f["name"]),
+                )
+
+##points = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\shp\domestic.shp")
+##mapp.add_layer(points,
+##                   title="Terrorism",
+##                    fillsize={"breaks":"natural",
+##                                "key":lambda f: float(f["Average_nk"]),
+##                                "symbolvalues":[1, 4.0]
+##                                },
+##                   outlinewidth=0.15,
+##                    fillcolor="red",
+##                    sortkey=lambda f: float(f["Average_nk"]),
+##                    sortorder="incr",
+##                  )
+
+#mapp.zoom_bbox(*polys.bbox)
+mapp.zoom_auto()
+mapp.add_legend(legendoptions=dict(padding=0, titleoptions=dict(padding=0)))
+mapp.view()
+
+
+fdsafsafa
+
+###
+
+print("\n"+"categorical test 2")
+mapp = pg.renderer.Map(background="blue")
+
+vect = pg.vector.data.VectorData(r"C:\Users\kimo\Documents\GitHub\pShapes\BaseData\ne_10m_admin_1_states_provinces.shp", encoding="latin")
+mapp.add_layer(vect, legendoptions=dict(title="Provinces"),
+               fillsize=2, #TODO: legend cant handle if no fillsize is set, but should not be needed for polys, and autoset for lines and points
+                fillcolor="green",
+                )
+
+vect = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\shp\domestic.shp")
+mapp.add_layer(vect, title="Terrorism",
+                    #fillsize=1, # TODO: legend size should be set to same pixelsize as dist parsed for map
+                               #{"breaks":"natural",
+                                #"key":lambda f: float(f["Average_nk"]),
+                                #"symbolvalues":[0.2, 2.0]
+                                #},
+                   outlinewidth=0.2,
+                    fillcolor=dict(breaks="unique",symbolvalues=dict(Riyadh=(222,0,0),Casablanca=(0,222,0)), key=lambda f:f["city"]), #"red",
+                              #{"breaks":"natural",
+                              #  "key":lambda f: float(f["Average_nk"]),
+                              #  "symbolvalues":[(0,255,0,255),(255,255,0,255),(255,0,0,255)],
+                              # },
+                    sortkey=lambda f: float(f["Average_nk"]),
+                    sortorder="incr",
+                   #nolegend=True,
+                  )
+
+mapp.add_legend()
+mapp.view()
+
+
+fdsafsafa
+
+
+###
 print("\n"+"canvas layers test")
 mapp = pg.renderer.Map(background="blue")
 
@@ -19,7 +129,7 @@ vect = pg.vector.data.VectorData(r"C:\Users\kimo\Documents\GitHub\pShapes\BaseDa
 mapp.add_layer(pg.renderer.VectorLayer(vect, legendoptions=dict(title="Provinces"), 
                                                 fillcolor={"breaks":"equal",
                                                             "key":lambda f: float(f["latitude"]),
-                                                            "symbolvalues":[(0,255,255,255),(255,255,0,255),(255,0,0,200)],
+                                                            "symbolvalues":[(0,255,255,255),(255,255,0,255),(255,0,0,255)],
                                                             "classes":5,
                                                            },
                                               ))
@@ -37,18 +147,19 @@ mapp.add_layer(pg.renderer.VectorLayer(vect, title="Terrorism",
                                                           #  "symbolvalues":[(0,255,0,255),(255,255,0,255),(255,0,0,255)],
                                                           # },
                                                 sortkey=lambda f: float(f["Average_nk"]),
-                                                sortorder="incr",
+                                                sortorder="incr", 
                                               ))
 
-mapp.zoom_bbox(-10,-40,10,40)
+mapp.zoom_bbox(-10,-40,40,40)
 #mapp.zoom_in(4)
+mapp.add_legend()
 mapp.view()
 
-#lay = pg.renderer.Layout(1000, 500, title="Layout")
-#lay.add_map(mapp)
-#lay.add_legend(legendoptions=dict(padding=0), xy=(0,500),anchor="sw")
-
-#lay.view()
+##lay = pg.renderer.Layout(1000, 500, title="Layout")
+##lay.add_map(mapp)
+##lay.add_legend(legendoptions=dict(padding=0), xy=(0,500),anchor="sw")
+##
+##lay.view()
 
 
 fdsfjsdflk

@@ -9,6 +9,9 @@ from .raster.data import RasterData
 
 from .exceptions import UnknownFileError
 
+class Color:
+    pass
+
 class Layout:
     def __init__(self, width, height, background="white", title="", titleoptions=None, *args, **kwargs):
 
@@ -185,10 +188,9 @@ class Map:
         self.drawer.resize(self.width, self.height, lock_ratio=False)
 
     def copy(self):
-        if not self.drawer: self._create_drawer() 
-        dupl = Map(self.drawer.width, self.drawer.height, background=self.background, layers=self.layers.copy())
+        dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy())
         dupl.backgroundgroup = self.backgroundgroup.copy()
-        dupl.drawer = self.drawer.copy()
+        if self.drawer: dupl.drawer = self.drawer.copy()
         dupl.foregroundgroup = self.foregroundgroup.copy()
         return dupl
 
@@ -367,6 +369,10 @@ class Map:
                              height=self.drawer.height,
                              bbox=self.drawer.coordspace_bbox)
                 
+                layer.render_text(width=self.drawer.width,
+                                 height=self.drawer.height,
+                                 bbox=self.drawer.coordspace_bbox)
+
         for layer in self.foregroundgroup:
             layer.render()
             
@@ -385,6 +391,11 @@ class Map:
         for layer in self.layers:
             if layer.visible:
                 self.drawer.paste(layer.img)
+
+        # paste the map text/label layers
+        for layer in self.layers:
+            if layer.visible and layer.img_text:
+                self.drawer.paste(layer.img_text)
 
         # paste the foreground decorations
         for layer in self.foregroundgroup:
@@ -519,7 +530,7 @@ class VectorLayer:
         # override default if any manually specified styleoptions
         self.styleoptions.update(options)
 
-        # set up classifier
+        # set up symbol classifiers
         features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
         import classipy as cp
         for key,val in self.styleoptions.copy().items():
@@ -547,6 +558,34 @@ class VectorLayer:
                                                    )
                 else:
                     self.styleoptions[key] = val
+
+        # set up text classifiers
+        import classipy as cp
+        if "text" in self.styleoptions and "textoptions" in self.styleoptions:
+            for key,val in self.styleoptions["textoptions"].copy().items():
+                if isinstance(val, dict):
+                    # random colors if not specified in unique algo
+                    if val["breaks"] == "unique" and "symbolvalues" not in val:
+                        rand = random.randrange
+                        val["symbolvalues"] = [(rand(255), rand(255), rand(255))
+                                             for _ in range(20)]
+
+                    # remove args that are not part of classipy
+                    val = dict(val)
+                    val["classvalues"] = val.pop("symbolvalues")
+                    notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
+
+                    # cache precalculated values in id dict
+                    # more memory friendly alternative is to only calculate breakpoints
+                    # and then find classvalue for feature when rendering,
+                    # which is likely slower
+                    classifier = cp.Classifier(features, **val)
+                    self.styleoptions["textoptions"][key] = dict(classifier=classifier,
+                                                               symbols=dict((id(f),classval) for f,classval in classifier),
+                                                               notclassified=notclassified
+                                                               )
+                else:
+                    self.styleoptions["textoptions"][key] = val
 
     @property
     def bbox(self):
@@ -604,6 +643,8 @@ class VectorLayer:
                             rendict[key] = val["symbols"][fid]
                         else:
                             rendict[key] = val["notclassified"]
+                    elif hasattr(val, "__call__"):
+                        rendict[key] = val(feat)
                     else:
                         rendict[key] = val
 
@@ -611,6 +652,65 @@ class VectorLayer:
             drawer.draw_geojson(feat.geometry, **rendict)
             
         self.img = drawer.get_image()
+
+
+    def render_text(self, width, height, bbox=None, lock_ratio=True, flipy=False):
+        if self.styleoptions.get("text"):
+
+            textkey = self.styleoptions["text"]
+            
+            if not bbox:
+                bbox = self.data.bbox
+
+            if flipy:
+                bbox = bbox[0],bbox[3],bbox[2],bbox[1]
+            
+            drawer = pyagg.Canvas(width, height, background=None)
+            drawer.custom_space(*bbox, lock_ratio=lock_ratio)
+
+            
+            features = self.features(bbox=bbox)
+
+            # custom draworder (sortorder is only used with sortkey)
+            if "sortkey" in self.styleoptions:
+                features = sorted(features, key=self.styleoptions["sortkey"],
+                                  reverse=self.styleoptions["sortorder"].lower() == "decr")
+
+            # draw each as text
+            for feat in features:
+                text = textkey(feat)
+                
+                if text is not None:
+                
+                    # get symbols
+                    rendict = dict()
+                    if "textoptions" in self.styleoptions:
+                        for key,val in self.styleoptions["textoptions"].copy().items():
+                            if isinstance(val, dict):
+                                # lookup self in precomputed symboldict
+                                fid = id(feat)
+                                if fid in val["symbols"]:
+                                    rendict[key] = val["symbols"][fid]
+                                else:
+                                    rendict[key] = val["notclassified"]
+                            elif hasattr(val, "__call__"):
+                                rendict[key] = val(feat)
+                            else:
+                                rendict[key] = val
+
+                    # draw
+                    # either bbox or xy can be set for positioning
+                    if "bbox" not in rendict:
+                        # default to xy being centroid, but also allow other options or custom key
+                        rendict["xy"] = rendict.get("xy", "centroid")
+                        if rendict["xy"] == "centroid":
+                            rendict["xy"] = feat.get_shapely().centroid.coords[0]
+                    drawer.draw_text(text, **rendict)
+                
+            self.img_text = drawer.get_image()
+
+        else:
+            self.img_text = None
 
 
 
@@ -848,6 +948,9 @@ class Legend:
             if "titleoptions" in options:
                 options["labeloptions"] = options.pop("titleoptions")
 
+            if not "fillsize" in options:
+                options["fillsize"] = "2%min"
+
             self._legend.add_symbol(shape, **options)
 
         elif isinstance(layer, RasterLayer):
@@ -896,6 +999,10 @@ class Legend:
                     self.add_single_symbol(layer, **layer.legendoptions)
 
     def render(self):
+        # ensure the drawer is created so pyagg legend can use it to calculate sizes etc
+        if not self.map.drawer:
+            self.map._create_drawer()
+        self._legend.refcanvas = self.map.drawer
         # render it
         if self.autobuild:
             self._autobuild()
