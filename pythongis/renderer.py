@@ -3,14 +3,91 @@ import random
 import itertools
 import pyagg, pyagg.legend
 import PIL, PIL.Image
+import colour
 
 from .vector.data import VectorData
 from .raster.data import RasterData
 
 from .exceptions import UnknownFileError
 
-class Color:
-    pass
+DEFAULTSTYLE = None
+
+COLORSTYLES = dict([("strong", dict( [("intensity",1), ("brightness",0.5)]) ),
+                    ("dark", dict( [("intensity",0.8), ("brightness",0.2)]) ),
+                    ("matte", dict( [("intensity",0.4), ("brightness",0.5)]) ),
+                    ("bright", dict( [("intensity",0.8), ("brightness",0.7)] ) ),
+                    ("weak", dict( [("intensity",0.3), ("brightness",0.5)] ) ),
+                    ("pastelle", dict( [("intensity",0.5), ("brightness",0.6)] ) )
+                    ])
+
+def Color(basecolor, intensity=None, brightness=None, opacity=None, style=None):
+    """
+    Returns an rgba color tuple of the color options specified.
+
+    - basecolor: the human-like name of a color. Always required, but can also be set to 'random'. | string
+    - *intensity: how strong the color should be. Must be a float between 0 and 1, or set to 'random' (by default uses the 'strong' style values, see 'style' below). | float between 0 and 1
+    - *brightness: how light or dark the color should be. Must be a float between 0 and 1 , or set to 'random' (by default uses the 'strong' style values, see 'style' below). | float between 0 and 1
+    - *style: a named style that overrides the brightness and intensity options (optional). | For valid style names, see below.
+
+    Valid style names are:
+    - 'strong'
+    - 'dark'
+    - 'matte'
+    - 'bright'
+    - 'pastelle'
+    """
+    # if already rgb tuple just return
+    if isinstance(basecolor, (tuple,list)):
+        rgb = [v / 255.0 for v in basecolor[:3]]
+        if len(basecolor) == 3:
+            rgba = list(colour.Color(rgb=rgb, saturation=intensity, luminance=brightness).rgb) + [opacity or 255]
+        elif len(basecolor) == 4:
+            rgba = list(colour.Color(rgb=rgb, saturation=intensity, luminance=brightness).rgb) + [opacity or basecolor[3]]
+        rgba = [int(round(v * 255)) for v in rgba[:3]] + [rgba[3]]
+        return tuple(rgba)
+    
+    #first check on intens/bright
+    if not style and DEFAULTSTYLE:
+        style = DEFAULTSTYLE
+    if style and basecolor not in ("black","white","gray"):
+        #style overrides manual intensity and brightness options
+        intensity = COLORSTYLES[style]["intensity"]
+        brightness = COLORSTYLES[style]["brightness"]
+    else:
+        #special black,white,gray mode, bc random intens/bright starts creating colors, so have to be ignored
+        if basecolor in ("black","white","gray"):
+            if brightness == "random":
+                brightness = random.randrange(20,80)/100.0
+        #or normal
+        else:
+            if intensity == "random":
+                intensity = random.randrange(20,80)/100.0
+            elif intensity is None:
+                intensity = 0.7
+            if brightness == "random":
+                brightness = random.randrange(20,80)/100.0
+            elif brightness is None:
+                brightness = 0.5
+    #then assign colors
+    if basecolor in ("black","white","gray"):
+        #graymode
+        if brightness is None:
+            rgb = colour.Color(color=basecolor).rgb
+        else:
+            #only listen to gray brightness if was specified by user or randomized
+            rgb = colour.Color(color=basecolor, luminance=brightness).rgb
+    elif basecolor == "random":
+        #random colormode
+        basecolor = tuple([random.uniform(0,1), random.uniform(0,1), random.uniform(0,1)])
+        rgb = colour.Color(rgb=basecolor, saturation=intensity, luminance=brightness).rgb
+    else:
+        #custom made color
+        rgb = colour.Color(color=basecolor, saturation=intensity, luminance=brightness).rgb
+
+    rgba = [int(round(v * 255)) for v in rgb] + [opacity or 255]
+    return tuple(rgba)
+
+    
 
 class Layout:
     def __init__(self, width, height, background="white", title="", titleoptions=None, *args, **kwargs):
@@ -20,6 +97,7 @@ class Layout:
         self.changed = True
 
         # create the drawer with a default percent space
+        background = Color(background)
         self.drawer = pyagg.Canvas(width, height, background)
         self.drawer.percent_space() 
 
@@ -130,7 +208,7 @@ class Map:
         if background:
             obj = Background(self)
             self.backgroundgroup.add_layer(obj)
-        self.background = background
+        self.background = Color(background)
 
         # create the drawer with a default unprojected lat-long coordinate system
         # setting width and height locks the ratio, otherwise map size will adjust to the coordspace
@@ -547,6 +625,17 @@ class VectorLayer:
                     val["classvalues"] = val.pop("symbolvalues")
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
 
+                    # convert any text symbolvalues to pure numeric so can be handled by classipy
+                    if "color" in key:
+                        if isinstance(val["classvalues"], dict):
+                            # value color dict mapping for unique breaks
+                            val["classvalues"] = dict([(k,Color(v)) for k,v in val["classvalues"].items()])
+                        else:
+                            # color gradienr
+                            val["classvalues"] = [Color(col) for col in val["classvalues"]]
+                    else:
+                        pass #val["classvalues"] = [Unit(col) for col in val["classvalues"]]
+
                     # cache precalculated values in id dict
                     # more memory friendly alternative is to only calculate breakpoints
                     # and then find classvalue for feature when rendering,
@@ -556,7 +645,16 @@ class VectorLayer:
                                                    symbols=dict((id(f),classval) for f,classval in classifier),
                                                    notclassified=notclassified
                                                    )
+                    
+                elif hasattr(val, "__call__"):
+                    pass
+                
                 else:
+                    # convert any text symbolvalues to pure numeric so can be handled by classipy
+                    if "color" in key:
+                        val = Color(val)
+                    else:
+                        pass #val = Unit(val)
                     self.styleoptions[key] = val
 
         # set up text classifiers
