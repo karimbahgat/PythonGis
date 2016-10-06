@@ -60,11 +60,11 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                     pass
             if fieldtype == "N" and decimals == 0:
                 fieldlen -= 2 # bc above we measure lengths for ints as if they were floats, ie with an additional ".0"
-                func = lambda v: None if v in (None,"") else int(v)
+                func = lambda v: "" if v in (None,"") else int(v)
             elif fieldtype == "N" and decimals:
-                func = lambda v: None if v in (None,"") else float(v)
+                func = lambda v: "" if v in (None,"") else float(v)
             elif fieldtype == "C":
-                func = lambda v:v #encoding are handled later
+                func = lambda v: v #encoding are handled later
             else:
                 raise Exception("Unexpected bug: Detected field should be always N or C")
             fieldtypes.append( (fieldtype,func,fieldlen,decimals) )
@@ -167,6 +167,11 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                                    geometry=geom)
         # save
         geojwriter.save(filepath, encoding=encoding)
+
+    # normal table file without geometry
+    elif filepath.endswith((".txt",".csv")):
+        # TODO: Implement saving just the table, with option of saving geoms as strings in separate fields
+        raise NotImplementedError()
             
     else:
         raise Exception("Could not save the vector data to the given filepath: the filetype extension is either missing or not supported")

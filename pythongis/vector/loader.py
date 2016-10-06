@@ -14,6 +14,8 @@ from ..exceptions import UnknownFileError
 
 def from_file(filepath, encoding="utf8", **kwargs):
 
+    # TODO: for geoj and delimited should detect and force consistent field types in similar manner as when saving
+
     select = kwargs.get("select")
 
     def decode(value):
@@ -33,6 +35,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
             if hasattr(obj, "bbox"): geoj["bbox"] = list(obj.bbox)
             return geoj
         geometries = (getgeoj(shape) for shape in shapereader.iterShapes())
+        rowgeoms = itertools.izip(rows, geometries)
         
         # load projection string from .prj file if exists
         if os.path.lexists(filepath[:-4] + ".prj"):
@@ -47,6 +50,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         fields = [field for field in geojfile.common_attributes]
         rows = ([feat.properties[field] for field in fields] for feat in geojfile)
         geometries = (feat.geometry.__geo_interface__ for feat in geojfile)
+        rowgeoms = itertools.izip(rows, geometries)
 
         # load crs
         crs = geojfile.crs
@@ -61,7 +65,18 @@ def from_file(filepath, encoding="utf8", **kwargs):
             rows = csv.reader(fileobj, dialect)
         else:
             rows = csv.reader(fileobj, delimiter=delimiter)
-        rows = ([cell.decode(encoding) for cell in row] for row in rows)
+        def parsestring(string):
+            try:
+                val = float(string.replace(",","."))
+                if val.is_integer():
+                    val = int(val)
+                return val
+            except:
+                if string.upper() == "NULL":
+                    return None
+                else:
+                    return string.decode(encoding)
+        rows = ([parsestring(cell) for cell in row] for row in rows)
         fields = next(rows)
         
         geokey = kwargs.get("geokey")
@@ -69,11 +84,9 @@ def from_file(filepath, encoding="utf8", **kwargs):
         yfield = kwargs.get("yfield")
         
         if geokey:
-            rows = list(rows) # needed so rowgen doesnt get consumed
-            geometries = (geokey(dict(zip(fields,row))) for row in rows)
+            rowgeoms = ((row,geokey(dict(zip(fields,row)))) for row in rows)
             
         elif xfield and yfield:
-            rows = list(rows) # needed so rowgen doesnt get consumed
             def xygeoj(row):
                 rowdict = dict(zip(fields,row))
                 x,y = rowdict[xfield],rowdict[yfield]
@@ -81,11 +94,10 @@ def from_file(filepath, encoding="utf8", **kwargs):
                 except: x,y = float(x.replace(",",".")),float(y.replace(",","."))
                 geoj = {"type":"Point", "coordinates":(x,y)}
                 return geoj
-            geometries = (xygeoj(row) for row in rows)
+            rowgeoms = ((row,xygeoj(row)) for row in rows)
             
         else:
-            rows = list(rows)
-            geometries = (None for _ in rows)
+            rowgeoms = ((row,None) for row in rows)
             
         crs = None
     
@@ -94,11 +106,10 @@ def from_file(filepath, encoding="utf8", **kwargs):
 
     # filter if needed
     if select:
-        rowgeoms = itertools.izip(rows, geometries)
         rowgeoms = ( (row,geom) for row,geom in rowgeoms if select(dict(zip(fields,row))) )
-        rows,geometries = itertools.izip(*rowgeoms)
 
     # load to memory in lists
+    rows,geometries = itertools.izip(*rowgeoms)
     rows = list(rows)
     geometries = list(geometries)
 
