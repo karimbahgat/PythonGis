@@ -9,6 +9,26 @@ from shapely.prepared import prep as supershapely
 
 
 
+# Manager
+
+class _Manager(object):
+    "Helps the data instances access this module's functions without having to use self as an arg"
+    # TODO: Doesnt really work yet...
+    def __init__(self, data):
+        self.data = data
+
+        for k,v in globals().items():
+            if hasattr(v, "__call__"):
+                func = v
+                def wrapfunc(*args, **kwargs):
+                    # wrap method to insert self data as the first arg
+                    args = [self.data] + list(args)
+                    return func(*args, **kwargs)
+                wrapfunc.__name__ = func.__name__
+                wrapfunc.__doc__ = func.__doc__
+                
+                self.__dict__[k] = wrapfunc
+
 # Select extract operations
 
 def crop(data, bbox):
@@ -553,103 +573,6 @@ def difference(data, other):
 
 
 
-
-
-
-# Converting between geometry types
-
-def _to_multicentroids(data):
-    """create multiple centroid points for each multi geometry part"""
-    
-    # create new file
-    outfile = VectorData()
-    outfile.fields = list(data.fields)
-    
-    # loop features
-    if "LineString" in data.type or "Polygon" in data.type:
-        for feat in data:
-            if "Multi" in feat.geometry["type"]:
-                multishape = feat.get_shapely()
-                for geom in multishape.geoms:
-                    shapelypoint = geom.centroid
-                    geoj = shapelypoint.__geo_interface__
-                    outfile.add_feature(feat.row, geoj)
-            else:
-                shapelypoint = feat.get_shapely().centroid
-                geoj = shapelypoint.__geo_interface__
-                outfile.add_feature(feat.row, geoj)
-        return outfile
-    
-    else:
-        return data.copy()
-
-def _to_centroids(data):
-    """create one centroid point for each multi geometry part"""
-    
-    # create new file
-    outfile = VectorData()
-    outfile.fields = list(data.fields)
-    
-    # loop features
-    for feat in data:
-        if feat.geometry["type"] != "Point":
-            shapelypoint = feat.get_shapely().centroid
-            geoj = shapelypoint.__geo_interface__
-            outfile.add_feature(feat.row, geoj)
-    return outfile
-
-def _to_vertexes(data):
-    """create points at every vertex, incl holes"""
-    
-    # create new file
-    outfile = VectorData()
-    outfile.fields = list(data.fields)
-    
-    # loop points
-    if "LineString" in data.type:
-        for feat in data:
-            if "Multi" in feat.geometry["type"]:
-                for linestring in feat.geometry["coordinates"]:
-                    for point in linsetring:
-                        geoj = {"type": "Point",
-                                "coordinates": point}
-                        outfile.add_feature(feat.row, geoj)
-            else:
-                for point in feat.geometry["coordinates"]:
-                    geoj = {"type": "Point",
-                            "coordinates": point}
-                    outfile.add_feature(feat.row, geoj)
-        return outfile
-                        
-    elif "Polygon" in data.type:
-        for feat in data:
-            if "Multi" in feat.geometry["type"]:
-                for polygon in feat.geometry["coordinates"]:
-                    for ext_or_hole in polygon:
-                        for point in ext_or_hole:
-                            geoj = {"type": "Point",
-                                    "coordinates": point}
-                            outfile.add_feature(feat.row, geoj)
-            else:
-                for ext_or_hole in feat.geometry["coordinates"]:
-                    for point in ext_or_hole:
-                        geoj = {"type": "Point",
-                                "coordinates": point}
-                        outfile.add_feature(feat.row, geoj)
-        return outfile
-    
-    else:
-        return data.copy()
-
-def to_points(data, pointtype="vertex"):
-    if pointtype == "vertex":
-        return _to_vertexes(data)
-    
-    elif pointtype == "centroid":
-        return _to_centroids(data)
-    
-    elif pointtype == "multicentroid":
-        return _to_multicentroids(data)
 
 
 

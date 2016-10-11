@@ -258,6 +258,8 @@ class VectorData:
     def aggregate(self, key, geomfunc, fieldmapping=[]):
         # Aggregate values and geometries within key groupings
         # Allows a lot of customization
+        # TODO: How is it different than manager.collapse()...?
+        # TODO: Move to manager...?
         out = VectorData()
         out.fields = [fieldname for fieldname,_,_ in fieldmapping]
 
@@ -269,10 +271,11 @@ class VectorData:
 
         return out
 
-    def aggregate_duplicate_geoms(self, subkey=None, fieldmapping=[]):
-        # group within unique geometries
+    def duplicates(self, subkey=None, fieldmapping=[]):
+        # groups duplicate geometries
+        # TODO: Move to manager...?
         if subkey:
-            # additional subgrouping within identical geometries
+            # additional subgrouping based on eg attributes
             keywrap = lambda f: (f.geometry, subkey(f))
         else:
             # only by geometry
@@ -283,8 +286,10 @@ class VectorData:
         
         return out
 
-    def join(self, other, k1, k2, fieldmapping=[], keepall=True):
-        # TODO: should create new vars if using new fieldmaping name not in existing fields
+    def join(self, other, key, fieldmapping=[], keepall=True):
+        # NOTE: key can be a single fieldname or function that returns the link for both tables, or a left-right key pair. 
+        # TODO: enable multiple join conditions in descending priority, ie key can be a list of keys, so looks for a match using the first key, then the second, etc, until a match is found.
+        # TODO: Move to manager...?
         out = VectorData()
         out.fields = list(self.fields)
         out.fields += (field for field in other.fields if field not in self.fields)
@@ -292,6 +297,10 @@ class VectorData:
 
         from . import sql
 
+        if isinstance(key, (list,tuple)) and len(key) == 2:
+            k1,k2 = key
+        else:
+            k1 = k2 = key # same key for both
         key1 = k1 if hasattr(k1,"__call__") else lambda f:f[k1]
         key2 = k2 if hasattr(k2,"__call__") else lambda f:f[k2]
         
@@ -386,6 +395,13 @@ class VectorData:
 ##        return outvec
                 
 
+    ### ACCESS TO ADVANCED METHODS FROM INTERNAL MODULES ###
+
+    @property
+    def manage(self):
+        from .manager import _Manager
+        return _Manager(self)
+
     ###### SPATIAL INDEXING #######
 
     def create_spatial_index(self):
@@ -441,6 +457,7 @@ class VectorData:
 
     def inspect(self, maxvals=30):
         """Returns a dict of all fields and unique values for each."""
+        # TODO: Maybe provide stats for numeric fields...
         cols = dict(zip(self.fields, zip(*self)))
         for field,vals in cols.items():
             uniqvals = set(vals)
