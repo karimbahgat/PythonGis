@@ -9,7 +9,7 @@ import pygeoj
 
 
 
-def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12):
+def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12, **kwargs):
 
     def encode(value):
         if isinstance(value, int):
@@ -170,8 +170,16 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
 
     # normal table file without geometry
     elif filepath.endswith((".txt",".csv")):
-        # TODO: Implement saving just the table, with option of saving geoms as strings in separate fields
-        raise NotImplementedError()
+        import csv
+        
+        # TODO: Add option of saving geoms as strings in separate fields
+        with open(filepath, "w") as fileobj:
+            csvopts = dict()
+            if "delimiter" in kwargs: csvopts["delimiter"] = kwargs["delimiter"]
+            writer = csv.writer(fileobj, **csvopts)
+            writer.writerow([f.encode(encoding) for f in fields])
+            for row,geometry in itertools.izip(rows, geometries):
+                writer.writerow([val.encode(encoding) if isinstance(val, unicode) else val for val in row])
             
     else:
         raise Exception("Could not save the vector data to the given filepath: the filetype extension is either missing or not supported")

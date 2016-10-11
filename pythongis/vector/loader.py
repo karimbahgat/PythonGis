@@ -55,29 +55,47 @@ def from_file(filepath, encoding="utf8", **kwargs):
         # load crs
         crs = geojfile.crs
 
-    # normal table file without geometry
-    elif filepath.endswith((".txt",".csv")):
-        delimiter = kwargs.get("delimiter")
-        fileobj = open(filepath, "rU")
-        if delimiter is None:
-            dialect = csv.Sniffer().sniff(fileobj.read())
-            fileobj.seek(0)
-            rows = csv.reader(fileobj, dialect)
-        else:
-            rows = csv.reader(fileobj, delimiter=delimiter)
-        def parsestring(string):
-            try:
-                val = float(string.replace(",","."))
-                if val.is_integer():
-                    val = int(val)
-                return val
-            except:
-                if string.upper() == "NULL":
-                    return None
+    # table files without geometry
+    elif filepath.endswith((".txt",".csv",".xls",".xlsx")):
+
+        # txt or csv
+        if filepath.endswith((".txt",".csv")):
+            delimiter = kwargs.get("delimiter")
+            fileobj = open(filepath, "rU")
+            if delimiter is None:
+                dialect = csv.Sniffer().sniff(fileobj.read())
+                fileobj.seek(0)
+                rows = csv.reader(fileobj, dialect)
+            else:
+                rows = csv.reader(fileobj, delimiter=delimiter)
+            def parsestring(string):
+                try:
+                    val = float(string.replace(",","."))
+                    if val.is_integer():
+                        val = int(val)
+                    return val
+                except:
+                    if string.upper() == "NULL":
+                        return None
+                    else:
+                        return string.decode(encoding)
+            rows = ([parsestring(cell) for cell in row] for row in rows)
+            fields = next(rows)
+
+        # excel
+        elif filepath.endswith((".xls",".xlsx")):
+            if filepath.endswith(".xls"):
+                import xlrd
+                wb = xlrd.open_workbook(filepath, encoding_override=encoding, on_demand=True)
+                if "sheet" in kwargs:
+                    sheet = wb.sheet_by_name(kwargs["sheet"])
                 else:
-                    return string.decode(encoding)
-        rows = ([parsestring(cell) for cell in row] for row in rows)
-        fields = next(rows)
+                    sheet = wb.sheet_by_index(0)
+                rows = ([cell.value for cell in row] for row in sheet.get_rows())
+                fields = next(rows)
+                
+            elif filepath.endswith(".xlsx"):
+                raise NotImplementedError()
         
         geokey = kwargs.get("geokey")
         xfield = kwargs.get("xfield")
