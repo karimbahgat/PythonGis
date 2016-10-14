@@ -97,7 +97,7 @@ def _to_vertexes(data):
 
 # Converting between geometry types
 
-def to_points(data, pointtype="vertex"):
+def to_points(data, pointtype="centroid"):
     if pointtype == "vertex":
         return _to_vertexes(data)
     

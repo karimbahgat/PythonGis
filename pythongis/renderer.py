@@ -600,8 +600,7 @@ class VectorLayer:
         self.datafilter = datafilter
         
         # by default, set random style color
-        rand = random.randrange
-        randomcolor = (rand(255), rand(255), rand(255), 255)
+        randomcolor = Color("random")
         self.styleoptions = {"fillcolor": randomcolor,
                              "sortorder": "incr"}
             
@@ -617,8 +616,8 @@ class VectorLayer:
                     # random colors if not specified in unique algo
                     if val["breaks"] == "unique" and "symbolvalues" not in val:
                         rand = random.randrange
-                        val["symbolvalues"] = [(rand(255), rand(255), rand(255))
-                                             for _ in range(20)]
+                        val["symbolvalues"] = [Color("random")
+                                                 for _ in range(20)]
 
                     # remove args that are not part of classipy
                     val = dict(val)
@@ -665,8 +664,8 @@ class VectorLayer:
                     # random colors if not specified in unique algo
                     if val["breaks"] == "unique" and "symbolvalues" not in val:
                         rand = random.randrange
-                        val["symbolvalues"] = [(rand(255), rand(255), rand(255))
-                                             for _ in range(20)]
+                        val["symbolvalues"] = [Color("random")
+                                                 for _ in range(20)]
 
                     # remove args that are not part of classipy
                     val = dict(val)
@@ -731,6 +730,7 @@ class VectorLayer:
             
             # get symbols
             rendict = dict()
+            if "shape" in self.styleoptions: rendict["shape"] = self.styleoptions["shape"]
             for key in "fillcolor fillsize outlinecolor outlinewidth".split():
                 if key in self.styleoptions:
                     val = self.styleoptions[key]
@@ -957,11 +957,14 @@ class Legend:
 
     def add_fillcolors(self, layer, **override):
         if isinstance(layer, VectorLayer):
-            shape = self._get_layer_shape(layer)
-
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
+
+            shape = options.pop("shape", None)
+            shape = shape or layer.styleoptions.get("shape")
+            if not shape:
+                shape = self._get_layer_shape(layer)
 
             if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
                 cls = layer.styleoptions["fillcolor"]["classifier"]
@@ -986,7 +989,6 @@ class Legend:
                             options[k] = v
 
                 #print options
-                
                 self._legend.add_fillcolors(shape, breaks, classvalues, **options)
 
             else:
@@ -1000,12 +1002,15 @@ class Legend:
 
     def add_fillsizes(self, layer, **override):
         if isinstance(layer, VectorLayer):
-            shape = self._get_layer_shape(layer)
-            
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
             options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
+
+            shape = options.pop("shape", None)
+            shape = shape or layer.styleoptions.get("shape")
+            if not shape:
+                shape = self._get_layer_shape(layer)
             
             if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                 
@@ -1034,12 +1039,12 @@ class Legend:
 
     def add_single_symbol(self, layer, **override):
         if isinstance(layer, VectorLayer):
-            shape = self._get_layer_shape(layer)
-
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
             options.update(layer.styleoptions)
+
+            shape = options.pop("shape", self._get_layer_shape(layer))
 
             if "title" in options:
                 options["label"] = options.pop("title")
