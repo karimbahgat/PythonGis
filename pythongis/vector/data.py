@@ -20,6 +20,29 @@ from . import saver
 
 
 
+
+class _ModuleFuncsAsClassMethods(object):
+    "Helps access this module's functions as vectordata class methods by automatically inserting self as the first arg"
+    def __init__(self, data, module):
+        from functools import wraps
+        self.data = data
+
+        for k,v in module.__dict__.items():
+            if hasattr(v, "__call__") and not v.__name__.startswith("_"):
+                func = v
+                def as_method(func):
+                    @wraps(func)
+                    def firstarg_inserted(*args, **kwargs):
+                        # wrap method to insert self data as the first arg
+                        args = [self.data] + list(args)
+                        return func(*args, **kwargs)
+                    return firstarg_inserted
+                self.__dict__[k] = as_method(func)
+
+
+
+
+
 class Feature:
     def __init__(self, data, row, geometry, id=None):
         "geometry must be a geojson dictionary"
@@ -152,6 +175,14 @@ class VectorData:
         featureobjs = (Feature(self,row,geom,id=id) for id,row,geom in ids_rows_geoms )
         self.features = OrderedDict([ (feat.id,feat) for feat in featureobjs ])
         self.crs = crs
+
+    def __repr__(self):
+        attrs = dict(filepath=self.filepath,
+                     type=self.type,
+                     length=len(self),
+                     bbox=self.bbox,
+                     )
+        return "<Vector data: type={type} length={length} bbox={bbox} filepath='{filepath}'>".format(**attrs)
 
     def __len__(self):
         """
@@ -399,8 +430,19 @@ class VectorData:
 
     @property
     def manage(self):
-        from .manager import _Manager
-        return _Manager(self)
+        from . import manager
+        return _ModuleFuncsAsClassMethods(self, manager)
+
+    @property
+    def analyze(self):
+        from . import analyzer
+        return _ModuleFuncsAsClassMethods(self, analyzer)
+
+    @property
+    def convert(self):
+        from . import converter
+        return _ModuleFuncsAsClassMethods(self, converter)
+
 
     ###### SPATIAL INDEXING #######
 

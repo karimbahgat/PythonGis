@@ -9,25 +9,6 @@ from shapely.prepared import prep as supershapely
 
 
 
-# Manager
-
-class _Manager(object):
-    "Helps the data instances access this module's functions without having to use self as an arg"
-    # TODO: Doesnt really work yet...
-    def __init__(self, data):
-        self.data = data
-
-        for k,v in globals().items():
-            if hasattr(v, "__call__"):
-                func = v
-                def wrapfunc(*args, **kwargs):
-                    # wrap method to insert self data as the first arg
-                    args = [self.data] + list(args)
-                    return func(*args, **kwargs)
-                wrapfunc.__name__ = func.__name__
-                wrapfunc.__doc__ = func.__doc__
-                
-                self.__dict__[k] = wrapfunc
 
 # Select extract operations
 

@@ -13,7 +13,7 @@ from .exceptions import UnknownFileError
 DEFAULTSTYLE = None
 
 COLORSTYLES = dict([("strong", dict( [("intensity",1), ("brightness",0.5)]) ),
-                    ("dark", dict( [("intensity",0.8), ("brightness",0.2)]) ),
+                    ("dark", dict( [("intensity",0.8), ("brightness",0.3)]) ),
                     ("matte", dict( [("intensity",0.4), ("brightness",0.5)]) ),
                     ("bright", dict( [("intensity",0.8), ("brightness",0.7)] ) ),
                     ("weak", dict( [("intensity",0.3), ("brightness",0.5)] ) ),
@@ -75,14 +75,22 @@ def Color(basecolor, intensity=None, brightness=None, opacity=None, style=None):
             rgb = colour.Color(color=basecolor).rgb
         else:
             #only listen to gray brightness if was specified by user or randomized
-            rgb = colour.Color(color=basecolor, luminance=brightness).rgb
+            col = colour.Color(color=basecolor)
+            col.luminance = brightness
+            rgb = col.rgb
     elif basecolor == "random":
         #random colormode
         basecolor = tuple([random.uniform(0,1), random.uniform(0,1), random.uniform(0,1)])
-        rgb = colour.Color(rgb=basecolor, saturation=intensity, luminance=brightness).rgb
+        col = colour.Color(rgb=basecolor)
+        col.saturation = intensity
+        col.luminance = brightness
+        rgb = col.rgb
     else:
         #custom made color
-        rgb = colour.Color(color=basecolor, saturation=intensity, luminance=brightness).rgb
+        col = colour.Color(rgb=basecolor)
+        col.saturation = intensity
+        col.luminance = brightness
+        rgb = col.rgb
 
     rgba = [int(round(v * 255)) for v in rgb] + [opacity or 255]
     return tuple(rgba)
