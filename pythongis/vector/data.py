@@ -180,8 +180,9 @@ class VectorData:
         attrs = dict(filepath=self.filepath,
                      type=self.type,
                      length=len(self),
-                     bbox=self.bbox,
                      )
+        if any((f.geomety for f in self)):
+            attrs["bbox"] = self.bbox
         return "<Vector data: type={type} length={length} bbox={bbox} filepath='{filepath}'>".format(**attrs)
 
     def __len__(self):
@@ -215,13 +216,14 @@ class VectorData:
         else:
             self.features[i] = feature
 
+    def has_geometry(self):
+        return any((feat.geometry for feat in self))
+
     @property
     def bbox(self):
-        if any((feat.geometry for feat in self)):
+        if self.has_geometry():
             xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self if feat.geometry))
-            xmin, xmax = min(xmins), max(xmaxs)
-            ymin, ymax = min(ymins), max(ymaxs)
-            bbox = (xmin, ymin, xmax, ymax)
+            bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
             return bbox
         else:
             raise Exception("Cannot get bbox since there are no features with geometries")
@@ -452,7 +454,7 @@ class VectorData:
         for feat in self:
             if feat.geometry:
                 self.spindex.insert(feat.id, feat.bbox)
-    
+   
     def quick_overlap(self, bbox):
         """
         Quickly get features whose bbox overlap the specified bbox via the spatial index.
@@ -464,8 +466,24 @@ class VectorData:
         ys = bbox[1],bbox[3]
         bbox = [min(xs),min(ys),max(xs),max(ys)]
         # return generator over results
-        results = self.spindex.intersection(bbox)
-        return (self[id] for id in results)
+        overlaps = self.spindex.intersection(bbox)
+        return (self[id] for id in overlaps)
+
+    def quick_disjoint(self, bbox):
+        """
+        Quickly get features whose bbox do -not- overlap the specified bbox via the spatial index.
+        """
+        if not hasattr(self, "spindex"):
+            raise Exception("You need to create the spatial index before you can use this method")
+        # ensure min,min,max,max pattern
+        xs = bbox[0],bbox[2]
+        ys = bbox[1],bbox[3]
+        bbox = [min(xs),min(ys),max(xs),max(ys)]
+        # return generator over results
+        overlaps = set((id for id in self.spindex.intersection(bbox)))
+        allids = set(self.features.keys())
+        disjoint = allids.difference(overlaps)
+        return (self[id] for id in disjoint)
 
     def quick_nearest(self, bbox, n=1):
         """
@@ -478,8 +496,8 @@ class VectorData:
         ys = bbox[1],bbox[3]
         bbox = [min(xs),min(ys),max(xs),max(ys)]
         # return generator over results
-        results = self.spindex.nearest(bbox, num_results=n)
-        return (self[id] for id in results)
+        within = self.spindex.nearest(bbox, num_results=n)
+        return (self[id] for id in within)
         
     ###### GENERAL #######
 

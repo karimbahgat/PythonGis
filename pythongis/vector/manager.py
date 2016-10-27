@@ -80,15 +80,25 @@ def where(data, other, condition, **kwargs):
         return out
 
     elif condition in ("disjoint",):
-        for feat in data:
+        # first add those whose bboxes dont overlap
+        for feat in data.quick_disjoint(other.bbox):
+            out.add_feature(feat.row, feat.geometry)
+
+        # then check those that might overlap
+        for feat in data.quick_overlap(other.bbox):
             geom = feat.get_shapely()
-            
-            for otherfeat in other:
+
+            # strategy, assume disjoint until find one intersect, then break and add
+            disjoint = True
+            for otherfeat in other.quick_overlap(feat.bbox):
                 othergeom = otherfeat.get_shapely()
                 
-                if geom.disjoint(othergeom):
-                    out.add_feature(feat.row, feat.geometry)
-                    break  # only one match is needed
+                if geom.intersects(othergeom):
+                    disjoint = False
+                    break  # only one intersect is needed to know the feat isnt disjoint
+
+            if disjoint:
+                out.add_feature(feat.row, feat.geometry)
 
         return out
     
@@ -524,8 +534,14 @@ def intersection(data, clipper, key=None):
     for feat,geom in iterable:
         supergeom = supershapely(geom)
         iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
+
         for clipfeat,clipgeom in iterable2:
-            if key and key(feat,clipfeat):
+            if key:
+                if key(feat,clipfeat) and supergeom.intersects(clipgeom):
+                    intsec = geom.intersection(clipgeom)
+                    if not intsec.is_empty:
+                        out.add_feature(feat.row, intsec.__geo_interface__)
+            else:
                 if supergeom.intersects(clipgeom):
                     intsec = geom.intersection(clipgeom)
                     if not intsec.is_empty:
@@ -538,6 +554,7 @@ def difference(data, other):
     Finds the parts that are unique to the main data, that it does not
     have in common with the other data. 
     """
+    # TODO: Fix ala where("disjoint")
 
     out = VectorData()
     out.fields = list(data.fields)

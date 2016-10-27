@@ -10,7 +10,7 @@ from .raster.data import RasterData
 
 from .exceptions import UnknownFileError
 
-DEFAULTSTYLE = None
+DEFAULTSTYLE = "pastelle"
 
 COLORSTYLES = dict([("strong", dict( [("intensity",1), ("brightness",0.5)]) ),
                     ("dark", dict( [("intensity",0.8), ("brightness",0.3)]) ),
@@ -36,6 +36,10 @@ def Color(basecolor, intensity=None, brightness=None, opacity=None, style=None):
     - 'bright'
     - 'pastelle'
     """
+    # test if none
+    if basecolor is None:
+        return None
+    
     # if already rgb tuple just return
     if isinstance(basecolor, (tuple,list)):
         rgb = [v / 255.0 for v in basecolor[:3]]
@@ -82,6 +86,12 @@ def Color(basecolor, intensity=None, brightness=None, opacity=None, style=None):
         #random colormode
         basecolor = tuple([random.uniform(0,1), random.uniform(0,1), random.uniform(0,1)])
         col = colour.Color(rgb=basecolor)
+        col.saturation = intensity
+        col.luminance = brightness
+        rgb = col.rgb
+    elif isinstance(basecolor, (str,unicode)):
+        #color text name
+        col = colour.Color(basecolor)
         col.saturation = intensity
         col.luminance = brightness
         rgb = col.rgb
@@ -242,6 +252,9 @@ class Map:
         # get coordspace bbox aspect ratio of all layers
         if self.width and self.height:
             pass
+        elif self.layers.is_empty():
+            self.height = 500 # default min height
+            self.width = 1000 # default min width
         else:
             bbox = self.layers.bbox
             w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
@@ -251,7 +264,7 @@ class Map:
                 if aspect < 1:
                     self.height = 500 # default min height
                 else:
-                    self.width = 1000 # default min height
+                    self.width = 1000 # default min width
                 
             if self.width:
                 self.height = int(self.width / float(aspect))
@@ -475,7 +488,7 @@ class Map:
 
         # paste the map layers
         for layer in self.layers:
-            if layer.visible:
+            if layer.visible and layer.img:
                 self.drawer.paste(layer.img)
 
         # paste the map text/label layers
@@ -524,11 +537,18 @@ class LayerGroup:
         for layer in self._layers:
             yield layer
 
+    def is_empty(self):
+        return all((lyr.is_empty() for lyr in self))
+
     @property
     def bbox(self):
-        xmins,ymins,xmaxs,ymaxs = zip(*(lyr.bbox for lyr in self._layers))
-        bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
-        return bbox
+        if not self.is_empty():
+            xmins,ymins,xmaxs,ymaxs = zip(*(lyr.bbox for lyr in self._layers if not lyr.is_empty() ))
+            bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
+            return bbox
+
+        else:
+            raise Exception("Cannot get bbox since there are no layers with geometries")
 
 ##    def add_dimension(self, dimtag, dimvalues):
 ##        # used by parent map to batch render all varieties of this layer
@@ -692,11 +712,21 @@ class VectorLayer:
                 else:
                     self.styleoptions["textoptions"][key] = val
 
+    def is_empty(self):
+        """Used for external callers unaware of the vector or raster nature of the layer"""
+        return not self.has_geometry()
+
+    def has_geometry(self):
+        return any((feat.geometry for feat in self.features()))
+    
     @property
     def bbox(self):
-        xmins,ymins,xmaxs,ymaxs = zip(*(feat.bbox for feat in self.features() ))
-        bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
-        return bbox
+        if self.has_geometry():
+            xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self.features() if feat.geometry))
+            bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
+            return bbox
+        else:
+            raise Exception("Cannot get bbox since there are no selected features with geometries")
 
     def features(self, bbox=None):
         # get features based on spatial index, for better speeds when zooming
@@ -716,57 +746,59 @@ class VectorLayer:
                 yield feat
 
     def render(self, width, height, bbox=None, lock_ratio=True, flipy=False):
-        if not bbox:
-            bbox = self.data.bbox
+        if self.has_geometry():
+            if not bbox:
+                bbox = self.bbox
 
-        if flipy:
-            bbox = bbox[0],bbox[3],bbox[2],bbox[1]
-        
-        drawer = pyagg.Canvas(width, height, background=None)
-        drawer.custom_space(*bbox, lock_ratio=lock_ratio)
-
-        
-        features = self.features(bbox=bbox)
-
-        # custom draworder (sortorder is only used with sortkey)
-        if "sortkey" in self.styleoptions:
-            features = sorted(features, key=self.styleoptions["sortkey"],
-                              reverse=self.styleoptions["sortorder"].lower() == "decr")
-
-        # draw each as geojson
-        for feat in features:
+            if flipy:
+                bbox = bbox[0],bbox[3],bbox[2],bbox[1]
             
-            # get symbols
-            rendict = dict()
-            if "shape" in self.styleoptions: rendict["shape"] = self.styleoptions["shape"]
-            for key in "fillcolor fillsize outlinecolor outlinewidth".split():
-                if key in self.styleoptions:
-                    val = self.styleoptions[key]
-                    if isinstance(val, dict):
-                        # lookup self in precomputed symboldict
-                        fid = id(feat)
-                        if fid in val["symbols"]:
-                            rendict[key] = val["symbols"][fid]
+            drawer = pyagg.Canvas(width, height, background=None)
+            drawer.custom_space(*bbox, lock_ratio=lock_ratio)
+            
+            features = self.features(bbox=bbox)
+
+            # custom draworder (sortorder is only used with sortkey)
+            if "sortkey" in self.styleoptions:
+                features = sorted(features, key=self.styleoptions["sortkey"],
+                                  reverse=self.styleoptions["sortorder"].lower() == "decr")
+
+            # draw each as geojson
+            for feat in features:
+                
+                # get symbols
+                rendict = dict()
+                if "shape" in self.styleoptions: rendict["shape"] = self.styleoptions["shape"]
+                for key in "fillcolor fillsize outlinecolor outlinewidth".split():
+                    if key in self.styleoptions:
+                        val = self.styleoptions[key]
+                        if isinstance(val, dict):
+                            # lookup self in precomputed symboldict
+                            fid = id(feat)
+                            if fid in val["symbols"]:
+                                rendict[key] = val["symbols"][fid]
+                            else:
+                                rendict[key] = val["notclassified"]
+                        elif hasattr(val, "__call__"):
+                            rendict[key] = val(feat)
                         else:
-                            rendict[key] = val["notclassified"]
-                    elif hasattr(val, "__call__"):
-                        rendict[key] = val(feat)
-                    else:
-                        rendict[key] = val
+                            rendict[key] = val
 
-            # draw
-            drawer.draw_geojson(feat.geometry, **rendict)
-            
-        self.img = drawer.get_image()
+                # draw
+                drawer.draw_geojson(feat.geometry, **rendict)
+                
+            self.img = drawer.get_image()
 
+        else:
+            self.img = None
 
     def render_text(self, width, height, bbox=None, lock_ratio=True, flipy=False):
-        if self.styleoptions.get("text"):
+        if self.has_geometry() and self.styleoptions.get("text"):
 
             textkey = self.styleoptions["text"]
             
             if not bbox:
-                bbox = self.data.bbox
+                bbox = self.bbox
 
             if flipy:
                 bbox = bbox[0],bbox[3],bbox[2],bbox[1]
