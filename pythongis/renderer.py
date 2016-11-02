@@ -622,6 +622,7 @@ class VectorLayer:
         self.data = data
         self.visible = True
         self.img = None
+        self.img_text = None
 
         self.legendoptions = legendoptions or dict()
         self.nolegend = nolegend
@@ -718,6 +719,20 @@ class VectorLayer:
 
     def has_geometry(self):
         return any((feat.geometry for feat in self.features()))
+
+    def copy(self):
+        new = VectorLayer(self.data)
+        new.visible = self.visible
+        new.img = self.img.copy() if self.img else None
+        new.img_text = self.img_text.copy() if self.img_text else None
+
+        new.legendoptions = self.legendoptions
+        new.nolegend = self.nolegend
+        new.datafilter = self.datafilter
+        
+        new.styleoptions = self.styleoptions.copy()
+
+        return new
     
     @property
     def bbox(self):

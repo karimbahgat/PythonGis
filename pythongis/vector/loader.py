@@ -4,6 +4,7 @@ import os
 import csv
 import codecs
 import itertools
+import warnings
 
 # import fileformat modules
 import shapefile as pyshp
@@ -108,9 +109,16 @@ def from_file(filepath, encoding="utf8", **kwargs):
             def xygeoj(row):
                 rowdict = dict(zip(fields,row))
                 x,y = rowdict[xfield],rowdict[yfield]
-                try: x,y = float(x),float(y)
-                except: x,y = float(x.replace(",",".")),float(y.replace(",","."))
-                geoj = {"type":"Point", "coordinates":(x,y)}
+                try:
+                    x,y = float(x),float(y)
+                    geoj = {"type":"Point", "coordinates":(x,y)}
+                except:
+                    try:
+                        x,y = float(x.replace(",",".")),float(y.replace(",","."))
+                        geoj = {"type":"Point", "coordinates":(x,y)}
+                    except:
+                        warnings.warn("Could not create point geometry from xfield and yfield values {x} and {y}".format(x=repr(x), y=repr(y)))
+                        geoj = None
                 return geoj
             rowgeoms = ((row,xygeoj(row)) for row in rows)
             

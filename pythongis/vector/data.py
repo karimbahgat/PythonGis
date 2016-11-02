@@ -181,8 +181,10 @@ class VectorData:
                      type=self.type,
                      length=len(self),
                      )
-        if any((f.geomety for f in self)):
+        if any((f.geometry for f in self)):
             attrs["bbox"] = self.bbox
+        else:
+            attrs["bbox"] = None
         return "<Vector data: type={type} length={length} bbox={bbox} filepath='{filepath}'>".format(**attrs)
 
     def __len__(self):
@@ -244,15 +246,28 @@ class VectorData:
             for feat in self:
                 feat.row.insert(index, None)
 
-    def compute(self, field, value):
+    def compute(self, field, value, by=None, stat=None):
         if field not in self.fields:
             self.add_field(field)
+
         if hasattr(value, "__call__"):
-            for feat in self:
-                feat[field] = value(feat)
+            valfunc = value
+        else:
+            valfunc = lambda f: value
+
+        if by:
+            from . import sql
+            fieldmapping = [(field, valfunc, stat)]
+            for feats in sql.groupby(self, key=by):
+                feats = list(feats)
+                # aggregate stat for each bygroup
+                aggval = sql.aggreg(feats, aggregfuncs=fieldmapping)[0]
+                # then write to every group member
+                for feat in feats:
+                    feat[field] = aggval
         else:
             for feat in self:
-                feat[field] = value
+                feat[field] = valfunc(feat)
 
     def drop_field(self, field):
         fieldindex = self.fields.index(field)
@@ -317,6 +332,231 @@ class VectorData:
         geomfunc = lambda items: items[0].geometry # since geometries are same within each group, pick first one
         out = self.aggregate(keywrap, geomfunc=geomfunc, fieldmapping=fieldmapping)
         
+        return out
+
+    def intersections(self):
+        # cuts every feature by the intersections with all other features
+        if not hasattr(self, "spindex"):
+            self.create_spatial_index()
+        
+        out = VectorData()
+        out.type = self.type
+        out.fields = list(self.fields)
+        geoms = dict(((f.id,f.get_shapely()) for f in self))
+
+
+        def getisecs(g, geoms):
+            isecs = []
+            for og in geoms:
+                #if og.area < 0.001: continue # this somehow makes it work....????
+                if id(og) != id(g):
+                    #print "testing", id(g), id(og)
+                    isec_bool = og.equals(g) or (og.intersects(g) and not og.touches(g)) #og.crosses(g) or og.contains(g) or og.within(g) # not those that touch or equals
+                    if isec_bool:
+                        isec = g.intersection(og)
+
+                        # sifting through dongles etc approach
+##                        incl = []
+##                        if isec.geom_type == "GeometryCollection":
+##                            # only get same types, ie ignore dongles etc
+##                            incl.extend([sub for sub in isec.geoms if out.type in sub.geom_type])
+##                        elif out.type in isec.geom_type:
+##                            # only if same type
+##                            incl.append(isec)
+##                        #viewisecs(g, [og], "pair isec = %s, include = %s" % (isec_bool,bool(incl)) )
+##                        for sub in incl:
+##                            #REMEMBER: this is only the immediate pairwise isecs, and might be further subdivided
+##                            #viewisecs(g, [og], "pair isec = %s" % isec_bool)
+##                            print repr(sub)
+##                            isecs.append( sub )
+
+                        # only pure approach
+                        #print repr(isec)
+                        if out.type in isec.geom_type:
+                            #print "included for next step"
+                            isecs.append(isec)
+                            
+##                        else:
+##                            ###isecs.append(og)
+##                            if hasattr(isec, "geoms"):
+##                                for i in isec.geoms:
+##                                    if out.type in i.geom_type and i.area >= 0.0001:
+##                                        print str(i)[:200]
+##                                        viewisecs(i, [], str(i.area) + " inside geomcollection, valid = %s" % i.is_valid)
+##                                #viewisecs(og, [i for i in isec.geoms if out.type in i.geom_type], "wrong type")
+
+                    else:
+                        pass #viewisecs(g, [og], "isec_bool False")
+                            
+            return isecs
+
+        DEBUG = False
+
+        def viewisecs(g=None, isecs=None, title="[Title]"):
+            if DEBUG: 
+                from ..renderer import Map, Color
+                mapp = Map(width=1000, height=1000, title=title)
+
+                if isecs:
+                    d = VectorData()
+                    d.fields = ["dum"]
+                    for i in isecs:
+                        d.add_feature([1], i.__geo_interface__)
+                    mapp.add_layer(d, fillcolor="blue")
+
+                if g:
+                    gd = VectorData()
+                    gd.fields = ["dum"]
+                    gd.add_feature([1], g.__geo_interface__)
+                    mapp.add_layer(gd, fillcolor=Color("red",opacity=155))
+
+                mapp.zoom_auto()
+                mapp.view()
+
+##        finals = []
+##        compare = [f.get_shapely() for f in self]
+##        for feat in self:
+##            print feat
+##            geom = geoms[feat.id]
+##            compare = getisecs(geom, compare)
+##            for sub in compare:
+##                finals.append((feat,sub))
+##        for feat,geom in finals:
+##            out.add_feature(feat.row, geom.__geo_interface__)
+
+        def process(isecs):
+            parts = []
+            for g in isecs:
+                subisecs = getisecs(g, isecs)
+                viewisecs(g, [], "getting subisecs of g")
+                viewisecs(None, isecs, "compared to ...")
+                if not subisecs:
+                    viewisecs(g, [], "node (g) reached, adding" )
+                    parts += [g]
+                elif len(subisecs) == 1:
+                    viewisecs(subisecs[0], [], "node (subisec) reached, adding" )
+                    parts += [subisecs[0]]
+                else:
+                    viewisecs(None, subisecs, "going deeper, len = %s" % len(subisecs) )
+                    parts += process(subisecs)
+                    #viewisecs(g, subisecs, str(len(subisecs)) + " were returned as len = %s" % len(parts) )
+            return parts
+
+        for i,feat in enumerate(self):
+            #if feat["CNTRY_NAME"] != "Russia": continue
+            #if i >= 10:
+            #    return out
+            print feat
+            geom = geoms[feat.id]
+            top_isecs = [geoms[otherfeat.id] for otherfeat in self.quick_overlap(feat.bbox)]
+            
+            #print self.select(lambda f:f["CNTRY_NAME"]=="USSR")
+            #top_isecs = [next((f.get_shapely() for f in self.select(lambda f:f["CNTRY_NAME"]=="USSR")))]
+            #print "spindex",top_isecs
+            #from ..renderer import Color
+            #self.select(lambda f:f["CNTRY_NAME"]=="USSR").view(1000,1000,flipy=1,fillcolor=Color("red",opacity=155))
+            #viewisecs(geom, top_isecs, "spindex to be tested for isecs")
+            
+            top_isecs = getisecs(geom, top_isecs)
+            print "top_isecs",top_isecs
+            viewisecs(geom, top_isecs, "spindex verified, len = %s" % len(top_isecs) )
+            parts = process(top_isecs)
+            for g in parts:
+                print "adding", id(g)
+                #viewisecs(g, [], "final isec")
+                out.add_feature(feat.row, g.__geo_interface__)
+        
+
+##        for feat in self:
+##            print feat
+##            geom = geoms[feat.id]
+##            # find all othergeoms that 
+##            othergeoms = (geoms[f.id] for f in self.quick_overlap(feat.bbox))
+##            othergeoms = [og for og in othergeoms if og.intersects(geom)]
+##            for othergeom in othergeoms:
+##                intsec = geom.intersection(othergeom)
+##                if not intsec.is_empty and self.type in intsec.geom_type:
+##                    print intsec.geom_type
+##                    out.add_feature(feat.row, intsec.__geo_interface__)
+##                    out.view(1000, 1000, flipy=1)
+
+
+##        def cutup(geom, othergeoms):
+##            parts = []
+##            for othergeom in othergeoms:
+##                # add intsecs
+##                if geom != othergeom and geom.intersects(othergeom):
+##                    intsec = geom.intersection(othergeom)
+##                    if not intsec.is_empty:
+##                        parts.append(intsec)
+##            # add diff
+##            diff = geom.difference(shapely.ops.cascaded_union(parts))
+##            if not diff.is_empty:
+##                parts.append(diff)
+##            return parts
+##
+##        def subparts(geoms):
+##            subs = []
+##            for geom in geoms:
+##                subs += cutup(geom, geoms)
+##            return subs
+##
+##        def recur(geoms):
+##            prevparts = []
+##            parts = subparts(geoms)
+##            while len(parts) != len(prevparts):
+##                print len(parts)
+##                prevparts = list(parts)
+##                parts = subparts(parts)
+##                break
+##            return parts
+##                
+##        for feat in self:
+##            geom = geoms[feat.id]
+##            # find all othergeoms that 
+##            othergeoms = (geoms[f.id] for f in self.quick_overlap(feat.bbox))
+##            othergeoms = [og for og in othergeoms if og.intersects(geom)]
+##            print feat
+##            parts = recur([geom]+othergeoms)
+##            print len(parts)
+
+
+##        def flatten(geom):
+##            if "Multi" in geom.geom_type:
+##                for g in geom.geoms:
+##                    yield g
+##            else:
+##                yield geom
+##        for feat in self:
+##            geom = geoms[feat.id]
+##            # find all othergeoms that 
+##            othergeoms = []
+##            for otherfeat in self.quick_overlap(feat.bbox):
+##                if otherfeat == feat: continue
+##                if not geoms[otherfeat.id].intersects(geom): continue
+##                othergeoms += list(flatten(geoms[otherfeat.id]))
+##            # combine into one so only have to make one spatial test
+##            if "Polygon" in self.type:
+##                othergeom = shapely.geometry.MultiPolygon(othergeoms)
+##            elif "LineString" in self.type:
+##                othergeom = shapely.geometry.MultiLineString(othergeoms)
+##            elif "Point" in self.type:
+##                othergeom = shapely.geometry.MultiPoint(othergeoms)
+##            else:
+##                raise Exception()
+##            print all((g.is_valid for g in othergeoms))
+##            print othergeom.is_valid
+##            # add intsecs
+##            intsec = geom.intersection(othergeom)
+##            if not intsec.is_empty:
+##                for g in flatten(intsec):
+##                    out.add_feature(feat.row, g)
+##            # add diffs
+##            diff = geom.difference(othergeom)
+##            if not diff.is_empty:
+##                for g in flatten(diff):
+##                    out.add_feature(feat.row, g)
+
         return out
 
     def join(self, other, key, fieldmapping=[], keepall=True):

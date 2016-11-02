@@ -430,6 +430,8 @@ def cut(data, cutter):
     Cuts apart a layer by the lines of another layer
     """
 
+    # TODO: not sure if correct, quite slow
+
     # FOR NOW, only cuts poly by poly or poly by line
     # not yet handling line by line, how to do that...?
     # ...
@@ -468,7 +470,7 @@ def cut(data, cutter):
                     holes = cutgeom.interiors
                 if holes:
                     # combine with exterior
-                    holelines = MultiLineString([hole.boundary for hole in holes])
+                    holelines = shapely.geometry.MultiLineString([hole.boundary for hole in holes])
                     lines = lines.union(holelines)
 
             elif "LineString" in cutgeom.type:
@@ -498,7 +500,7 @@ def cut(data, cutter):
                 holes = cutgeom.interiors
             if holes:
                 # subtract from the exterior
-                holes = MultiPolygon(holes)
+                holes = shapely.geometry.MultiPolygon(holes)
                 newgeom = newgeom.difference(holes)
                 
         elif "LineString" in geom.type:
@@ -522,6 +524,9 @@ def intersection(data, clipper, key=None):
 
     Key is a function for determining if a pair of features should be processed, taking feat and clipfeat as input args and returning True or False
     """
+
+    # NOTE: Not really intersections with all others, more like pairwise intersections
+    # TODO: Make another that is cumulative, and recursively checks for all resulting pieces too...
 
     # create spatial index
     if not hasattr(data, "spindex"): data.create_spatial_index()

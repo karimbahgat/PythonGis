@@ -64,7 +64,7 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
             
         row.append(aggval)
 
-    if geomfunc:    
+    if geomfunc:
         geom = geomfunc(iterable)
         return row,geom
 
@@ -91,6 +91,18 @@ def where(iterable, condition):
             yield item
 
 def groupby(iterable, key):
+    
+    if hasattr(key,"__call__"):
+        pass
+    elif isinstance(key,(str,unicode)):
+        hashindex = key
+        key = lambda f: f[hashindex]
+    elif isinstance(key,(list,tuple)) and all((isinstance(v,(str,unicode)) for v in key)):
+        hashindexes = key
+        key = lambda f: tuple((f[h] for h in hashindexes))
+    else:
+        raise Exception("groupby key must be a callable function or a string or list/tuple of strings of the hash index(es) for retrieving the value(s)")
+
     iterable = sorted(iterable, key=key)
     for groupid,items in itertools.groupby(iterable, key=key):
         yield items
