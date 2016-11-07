@@ -35,19 +35,58 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, key=N
     # loop
     if not hasattr(groupbydata, "spindex"): groupbydata.create_spatial_index()
     if not hasattr(valuedata, "spindex"): valuedata.create_spatial_index()
-    for groupfeat in groupbydata: #.quick_overlap(valuedata.bbox): # TODO: Doesnt keep all bc of quickoverlap only iters some
+    groupfeats = groupbydata if keepall else groupbydata.quick_overlap(valuedata.bbox) # take advantage of spindex if not keeping all
+    for groupfeat in groupfeats: 
+
+        # testing
+##        if groupfeat["CNTRY_NAME"] not in ("Taiwan",):
+##            continue
+        
         newrow = list(groupfeat.row)
         geom = groupfeat.get_shapely()
         supergeom = supershapely(geom)
-        valuefeats = (valfeat for valfeat in valuedata.quick_overlap(groupfeat.bbox))
+        valuefeats = ((valfeat,valfeat.get_shapely()) for valfeat in valuedata.quick_overlap(groupfeat.bbox))
 
         # aggregate
-        if key:
-            matches = [valfeat for valfeat in valuefeats
-                       if key(groupfeat,valfeat) and supergeom.intersects(valfeat.get_shapely())]
+        if groupbydata.type == valuedata.type == "Polygon":
+            # when comparing polys to polys, dont count neighbouring polygons that just touch on the edge
+            def overlaps(valgeom):
+                if supergeom.intersects(valgeom) and not geom.touches(valgeom):
+                    intsec = geom.intersection(valgeom)
+                    if not intsec.is_empty and groupbydata.type in intsec.geom_type and intsec.area > 0.00000000001:
+                        return True
         else:
-            matches = [valfeat for valfeat in valuefeats
-                       if supergeom.intersects(valfeat.get_shapely())]
+            # for lines and points, ok that just touches on the edge
+            def overlaps(valgeom):
+                return supergeom.intersects(valgeom)
+            
+        if key:
+            matches = (valfeat for valfeat,valgeom in valuefeats
+                       if key(groupfeat,valfeat) and overlaps(valgeom))
+        else:
+            matches = ((valfeat,valgeom) for valfeat,valgeom in valuefeats
+                       if overlaps(valgeom))
+
+        # clean potential junk, maybe allow user setting of minimum area (put on hold for now, maybe user should make sure of this in advance?)
+        def cleaned():
+            for valfeat,valgeom in matches:
+##                intsec = geom.intersection(valgeom)
+##                if groupbydata.type in intsec.geom_type and intsec.area > 0.00000000001:
+##                    yield valfeat
+                yield valfeat
+        matches = list(cleaned())
+
+        # testing...
+##        print "groupfeat",zip(groupbydata.fields,groupfeat.row)
+##        groupfeat.view(1000,600,bbox=groupfeat.bbox, fillcolor="red")
+##        for vf in matches:
+##            print "valfeat",zip(valuedata.fields,vf.row)
+##            vf.view(1000,600,bbox=groupfeat.bbox, fillcolor="blue")
+##            from .data import Feature
+##            intsec = groupfeat.get_shapely().intersection(vf.get_shapely())
+##            print intsec.area
+##            Feature(groupbydata, [], intsec.__geo_interface__).view(1000,500,bbox=groupfeat.bbox, fillcolor="yellow")
+            
         if matches:
             aggreg = sql.aggreg(matches, fieldmapping)
 

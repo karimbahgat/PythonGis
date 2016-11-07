@@ -379,7 +379,6 @@ def collapse(data, by=None, fieldmapping=[], contig=False):
     # ALSO use much faster algorithm if no key, since just need cascaded union on all followed by groupby stats on all
 
     from . import sql
-    iterable = ((feat,feat.get_shapely()) for feat in data)
 
     if contig: 
         # contiguous dissolve
@@ -405,17 +404,19 @@ def collapse(data, by=None, fieldmapping=[], contig=False):
 
         if not by: by = lambda x: True # groups together all items
 
-        def _geomselect(itemcombis):
-            geoms = []
-            for combi in itemcombis:
-                f,g = combi[0]
-                geoms.append(g)
+        def feats():
+            for feat in data:
+                feat._tempgeom = feat.get_shapely() # temporary store it for repeated use
+                yield feat
+
+        def _geomselect(feats):
+            geoms = [feat._tempgeom for feat in feats]
             
             union = shapely.ops.cascaded_union(geoms)
             if not union.is_empty:
                 return union.__geo_interface__
 
-        q = sql.query(_from=[iterable],
+        q = sql.query(_from=[feats()],
                      _groupby=by,
                      _select=fieldmapping,
                      _geomselect=_geomselect,
@@ -537,19 +538,29 @@ def intersection(data, clipper, key=None):
 
     iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
     for feat,geom in iterable:
+##        if feat["ID"] not in (3,18):
+##            continue
+        
         supergeom = supershapely(geom)
         iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
 
         for clipfeat,clipgeom in iterable2:
             if key:
-                if key(feat,clipfeat) and supergeom.intersects(clipgeom):
+                if key(feat,clipfeat) and supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
                     intsec = geom.intersection(clipgeom)
-                    if not intsec.is_empty:
+                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:
+                        
+##                        print "paired",feat.row,clipfeat.row
+##                        feat.view(1000,1000, fillcolor="red")
+##                        clipfeat.view(1000,500, fillcolor="blue")
+##                        from .data import Feature
+##                        Feature(data, [], intsec.__geo_interface__).view(1000,500,fillcolor="yellow")
+                        
                         out.add_feature(feat.row, intsec.__geo_interface__)
             else:
-                if supergeom.intersects(clipgeom):
+                if supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
                     intsec = geom.intersection(clipgeom)
-                    if not intsec.is_empty:
+                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:
                         out.add_feature(feat.row, intsec.__geo_interface__)
 
     return out

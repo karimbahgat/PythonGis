@@ -142,7 +142,10 @@ def query(_from, _select, _geomselect=None, _where=None, _groupby=None, _limit=N
     yield colnames
 
     # make an iterable that yields every combinaion of all input iterables' items
-    iterable = itertools.product(*iterables)
+    if len(iterables) == 1:
+        iterable = iterables[0]
+    else:
+        iterable = itertools.product(*iterables)
 
     # iterate and add
     if key:

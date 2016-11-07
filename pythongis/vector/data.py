@@ -143,6 +143,29 @@ class Feature:
         from ._helpers import geodetic_length
         return geodetic_length(self.geometry)
 
+    # convenient visualizing
+
+    def render(self, width, height, bbox=None, flipy=True, **styleoptions):
+        from .. import renderer
+        singledata = renderer.VectorData()
+        singledata.add_feature(self.row, self.geometry)
+        lyr = renderer.VectorLayer(singledata, **styleoptions)
+        lyr.render(width=width, height=height, bbox=bbox, flipy=flipy)
+        return lyr
+
+    def view(self, width, height, bbox=None, flipy=True, **styleoptions):
+        lyr = self.render(width, height, bbox, flipy, **styleoptions)
+        
+        import Tkinter as tk
+        import PIL.ImageTk
+        
+        app = tk.Tk()
+        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
+        lbl = tk.Label(image=tkimg)
+        lbl.tkimg = tkimg
+        lbl.pack()
+        app.mainloop()
+
 
 
 
@@ -280,6 +303,9 @@ class VectorData:
             self.drop_field(f)
 
     def keep_fields(self, fields):
+        for kf in fields:
+            if kf not in self.fields:
+                raise Exception("%s is not a field")
         for f in reversed(self.fields):
             if f not in fields:
                 self.drop_field(f)
@@ -755,8 +781,9 @@ class VectorData:
         if hasattr(self, "spindex"): new.spindex = self.spindex.copy()
         return new
 
-    def inspect(self, maxvals=30):
+    def inspect(self, fields=None, maxvals=30):
         """Returns a dict of all fields and unique values for each."""
+        # TODO: Allow only some fields
         # TODO: Maybe provide stats for numeric fields...
         cols = dict(zip(self.fields, zip(*self)))
         for field,vals in cols.items():
@@ -766,13 +793,13 @@ class VectorData:
         import pprint
         return "Vector data contents:\n" + pprint.pformat(cols, indent=4)
     
-    def render(self, width, height, bbox=None, flipy=False, **styleoptions):
+    def render(self, width, height, bbox=None, flipy=True, **styleoptions):
         from .. import renderer
         lyr = renderer.VectorLayer(self, **styleoptions)
         lyr.render(width=width, height=height, bbox=bbox, flipy=flipy)
         return lyr
 
-    def view(self, width, height, bbox=None, flipy=False, **styleoptions):
+    def view(self, width, height, bbox=None, flipy=True, **styleoptions):
         lyr = self.render(width, height, bbox, flipy, **styleoptions)
         
         import Tkinter as tk
@@ -783,7 +810,7 @@ class VectorData:
         lbl = tk.Label(image=tkimg)
         lbl.tkimg = tkimg
         lbl.pack()
-        app.mainloop()        
+        app.mainloop()
 
 
     

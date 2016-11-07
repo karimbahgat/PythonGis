@@ -31,6 +31,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             return bytes(value)
 
     def detect_fieldtypes(fields, rows):
+        # TODO: allow other data types such as dates etc...
         # set fields with correct fieldtype
         fieldtypes = []
         for fieldindex,fieldname in enumerate(fields):
@@ -175,7 +176,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
         # TODO: Add option of saving geoms as strings in separate fields
         with open(filepath, "w") as fileobj:
             csvopts = dict()
-            if "delimiter" in kwargs: csvopts["delimiter"] = kwargs["delimiter"]
+            csvopts["delimiter"] = kwargs.get("delimiter", "\t") # tab is best for automatically opening in excel...
             writer = csv.writer(fileobj, **csvopts)
             writer.writerow([f.encode(encoding) for f in fields])
             for row,geometry in itertools.izip(rows, geometries):
