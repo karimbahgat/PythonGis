@@ -453,7 +453,7 @@ class Map:
         if layer.visible:
             layer.render(width=self.drawer.width,
                          height=self.drawer.height,
-                         coordspace_bbox=self.drawer.coordspace_bbox)
+                         bbox=self.drawer.coordspace_bbox)
             self.update_draworder()
 
     def render_all(self):

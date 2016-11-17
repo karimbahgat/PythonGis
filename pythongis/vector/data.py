@@ -305,10 +305,13 @@ class VectorData:
     def keep_fields(self, fields):
         for kf in fields:
             if kf not in self.fields:
-                raise Exception("%s is not a field")
+                raise Exception("%s is not a field" % kf)
         for f in reversed(self.fields):
             if f not in fields:
                 self.drop_field(f)
+
+    def rename_field(self, oldname, newname):
+        self.fields[self.fields.index(oldname)] = newname
 
     def convert_field(self, field, valfunc):
         fieldindex = self.fields.index(field)
@@ -793,20 +796,25 @@ class VectorData:
         import pprint
         return "Vector data contents:\n" + pprint.pformat(cols, indent=4)
     
-    def render(self, width, height, bbox=None, flipy=True, **styleoptions):
+    def render(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
         from .. import renderer
-        lyr = renderer.VectorLayer(self, **styleoptions)
-        lyr.render(width=width, height=height, bbox=bbox, flipy=flipy)
-        return lyr
+        mapp = renderer.Map(width, height, title=title, background=background)
+        mapp.add_layer(self, **styleoptions)
+        if bbox:
+            mapp.zoom_bbox(*bbox)
+        else:
+            mapp.zoom_auto()
+        mapp.render_all()
+        return mapp
 
-    def view(self, width, height, bbox=None, flipy=True, **styleoptions):
-        lyr = self.render(width, height, bbox, flipy, **styleoptions)
+    def view(self, width=None, height=None, bbox=None, flipy=True, **styleoptions):
+        mapp = self.render(width, height, bbox, flipy, **styleoptions)
         
         import Tkinter as tk
         import PIL.ImageTk
         
         app = tk.Tk()
-        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
+        tkimg = PIL.ImageTk.PhotoImage(mapp.img)
         lbl = tk.Label(image=tkimg)
         lbl.tkimg = tkimg
         lbl.pack()
