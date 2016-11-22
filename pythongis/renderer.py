@@ -305,6 +305,8 @@ class Map:
         self.changed = True
 
     def resize(self, width, height):
+        self.width = width
+        self.height = height
         if not self.drawer: self._create_drawer()
         self.changed = True
         self.drawer.resize(width, height, lock_ratio=True)
