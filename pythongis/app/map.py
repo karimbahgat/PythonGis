@@ -47,7 +47,28 @@ class MapView(tk.Canvas):
             # only if x time since last resize event
             if time.time() - self.last_resized > 0.3:
                 width, height = self.winfo_width(), self.winfo_height()
-                self.renderer.resize(width, height)
+                #self.threaded_resize(width, height)
+                if self.renderer.img:
+
+                    self.renderer.width = width
+                    self.renderer.height = height
+                    self.renderer._create_drawer()
+                    # ...
+
+                    
+##                    #img = self.renderer.img.copy().resize((width, height))
+##                    self.renderer.resize(width, height)
+##                    #self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
+##                    #self.update_image()
+##                    print "resized", self.renderer.img.size
+##                    self.renderer.img.save(r"\\GRID\karbah\PROFILE\Desktop\hello.png")
+##                    #self.renderer.img = img
+##                    #self.update_image()
+##                    import PIL, PIL.ImageTk
+##                    self.tkimg = PIL.ImageTk.PhotoImage(self.renderer.img)
+##                    self.image_on_canvas = self.create_image(0, 0, anchor="nw", image=self.tkimg )
+##                    self.update()
+                    
                 self.threaded_rendering()
         self.bind("<Configure>", resizing)
         
@@ -192,6 +213,21 @@ class MapView(tk.Canvas):
         statusbar.mapview = self
         self.statusbar = statusbar
 
+##    def threaded_resize(self, width, height):
+##        def task():
+##            self.renderer.resize(width, height)
+##        pending = self.master.new_thread(task)
+##
+##        def finish(result):
+##            if isinstance(result, Exception):
+##                tk2.messagebox.showerror(self, "Resize error: " + str(result) )
+##            else:
+##                # update renderings
+##                self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
+##                self.update_image()
+##
+##        self.master.process_thread(pending, finish)
+
     def threaded_rendering(self):
         # perform render/zoom in separate thread
         if self.statusbar:
@@ -200,7 +236,7 @@ class MapView(tk.Canvas):
 
         def finish(result):
             if isinstance(result, Exception):
-                tk2.messagebox.popup_message(self, "Rendering error: " + str(result) )
+                tk2.messagebox.showerror(self, "Rendering error: " + str(result) )
             else:
                 # update renderings
                 self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
