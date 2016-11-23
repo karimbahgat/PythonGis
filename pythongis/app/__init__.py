@@ -1,2 +1,2 @@
 
-from . import map
+from . import map, controls, miniapps

@@ -13,10 +13,14 @@ class MapView(tk.Canvas):
         # Make this class a subclass of tk.Canvas and add to it
         tk.Canvas.__init__(self, master, **kwargs)
         self.renderer = renderer
+        self.controls = []
 
         # Other
-        self.proj = kwargs.get("projection", "WGS84")
-        self.statusbar = None
+        self.onstart = None
+        self.onsuccess = None
+        self.onfinish = None
+        self.onmousemove = None
+        
         self.mousepressed = False
         self.mouse_mode = "pan"
         self.zoomcenter = None
@@ -32,7 +36,7 @@ class MapView(tk.Canvas):
             self.tkimg = self.renderer.get_tkimage()
             self.image_on_canvas = self.create_image(0, 0, anchor="nw", image=self.tkimg )
 
-        self.after(500, on_startup)
+        self.after(10, on_startup)
         
         # Schedule resize map on window resize
         
@@ -47,28 +51,7 @@ class MapView(tk.Canvas):
             # only if x time since last resize event
             if time.time() - self.last_resized > 0.3:
                 width, height = self.winfo_width(), self.winfo_height()
-                #self.threaded_resize(width, height)
-                if self.renderer.img:
-
-                    self.renderer.width = width
-                    self.renderer.height = height
-                    self.renderer._create_drawer()
-                    # ...
-
-                    
-##                    #img = self.renderer.img.copy().resize((width, height))
-##                    self.renderer.resize(width, height)
-##                    #self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
-##                    #self.update_image()
-##                    print "resized", self.renderer.img.size
-##                    self.renderer.img.save(r"\\GRID\karbah\PROFILE\Desktop\hello.png")
-##                    #self.renderer.img = img
-##                    #self.update_image()
-##                    import PIL, PIL.ImageTk
-##                    self.tkimg = PIL.ImageTk.PhotoImage(self.renderer.img)
-##                    self.image_on_canvas = self.create_image(0, 0, anchor="nw", image=self.tkimg )
-##                    self.update()
-                    
+                self.renderer.resize(width, height)                    
                 self.threaded_rendering()
         self.bind("<Configure>", resizing)
         
@@ -119,11 +102,9 @@ class MapView(tk.Canvas):
                 self.rect = self.create_rectangle(startx, starty, startx+1, starty+1, fill=None)
 
         def mousemoving(event):
-            if self.statusbar:
+            if self.onmousemove:
                 # mouse coords
-                mouse = self.canvasx(event.x), self.canvasy(event.y)
-                xcoord,ycoord = self.renderer.pixel2coord(*mouse)
-                self.statusbar.mouse.set_text("%3.8f , %3.8f" %(xcoord,ycoord) )
+                self.onmousemove(event)
             if self.mouse_mode == "pan":
                 if self.mousepressed:
                     startx,starty = self.startxy
@@ -194,6 +175,10 @@ class MapView(tk.Canvas):
         self.bind("<Leave>", mouseleave)
         self.winfo_toplevel().bind("<Escape>", cancel)
 
+    def add_control(self, control):
+        control.mapview = self
+        self.controls.append(control)
+
     def zoom_global(self):
         layerbboxes = (layer.bbox for layer in self.renderer.layers)
         xmins,ymins,xmaxs,ymaxs = zip(*layerbboxes)
@@ -209,29 +194,11 @@ class MapView(tk.Canvas):
         self.renderer.zoom_bbox(*bbox)
         self.threaded_rendering()
 
-    def assign_statusbar(self, statusbar):
-        statusbar.mapview = self
-        self.statusbar = statusbar
-
-##    def threaded_resize(self, width, height):
-##        def task():
-##            self.renderer.resize(width, height)
-##        pending = self.master.new_thread(task)
-##
-##        def finish(result):
-##            if isinstance(result, Exception):
-##                tk2.messagebox.showerror(self, "Resize error: " + str(result) )
-##            else:
-##                # update renderings
-##                self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
-##                self.update_image()
-##
-##        self.master.process_thread(pending, finish)
-
     def threaded_rendering(self):
         # perform render/zoom in separate thread
-        if self.statusbar:
-            self.statusbar.task.start("Rendering layers...")
+        if self.onstart:
+            self.onstart()
+        print "rendering thread..."
         pending = self.master.new_thread(self.renderer.render_all)
 
         def finish(result):
@@ -242,17 +209,46 @@ class MapView(tk.Canvas):
                 self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
                 self.update_image()
                 # display zoom scale
-                if self.statusbar:
-                    self.statusbar.zoom.set_text("1:"+str(self.renderer.drawer.coordspace_units) )
+                if self.onsuccess:
+                    self.onsuccess()
             # stop progbar
-            if self.statusbar:
-                self.statusbar.task.stop()
+            if self.onfinish:
+                self.onfinish()
             
         self.master.process_thread(pending, finish)
 
     def update_image(self):
         self.tkimg = self.renderer.get_tkimage()
         self.itemconfig(self.image_on_canvas, image=self.tkimg )
+
+    def zoom_in(self):
+        self.zoomfactor += 1
+        self.zoomcenter = None
+        self.zoomdir = "in"
+        # record zoom time
+        self.last_zoomed = time.time()
+        # schedule to check if finished zooming after x millisecs
+        self.after(300, self.zoom_if_finished)
+
+    def zoom_out(self):
+        self.zoomfactor += 1
+        self.zoomcenter = None
+        self.zoomdir = "out"
+        # record zoom time
+        self.last_zoomed = time.time()
+        # schedule to check if finished zooming after x millisecs
+        self.after(300, self.zoom_if_finished)
+
+    def zoom_if_finished(self):
+        if time.time() - self.last_zoomed >= 0.3:
+            if self.zoomdir == "out":
+                self.renderer.zoom_out(self.zoomfactor)
+            else:
+                self.renderer.zoom_in(self.zoomfactor)
+            self.threaded_rendering()
+            # reset zoomfactor
+            self.zoomfactor = 1
+            self.last_zoomed = None
 
 
 

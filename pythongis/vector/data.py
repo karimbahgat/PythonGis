@@ -615,22 +615,30 @@ class VectorData:
         if bbox:
             mapp.zoom_bbox(*bbox)
         else:
-            mapp.zoom_auto()
+            mapp.zoom_bbox(*mapp.layers.bbox)
         mapp.render_all()
         return mapp
 
-    def view(self, width=None, height=None, bbox=None, flipy=True, **styleoptions):
-        mapp = self.render(width, height, bbox, flipy, **styleoptions)
+    def view(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
+        import tk2
+        from .. import app
+        win = tk2.Tk()
+        mapp = self.render(width, height, bbox, flipy, title=title, background=background, **styleoptions)
+        mapview = app.miniapps.MiniGUI(win, mapp)
+        mapview.pack(fill="both", expand=1)
+        win.mainloop()
         
-        import Tkinter as tk
-        import PIL.ImageTk
-        
-        app = tk.Tk()
-        tkimg = PIL.ImageTk.PhotoImage(mapp.img)
-        lbl = tk.Label(image=tkimg)
-        lbl.tkimg = tkimg
-        lbl.pack()
-        app.mainloop()
+##        mapp = self.render(width, height, bbox, flipy, **styleoptions)
+##        
+##        import Tkinter as tk
+##        import PIL.ImageTk
+##        
+##        app = tk.Tk()
+##        tkimg = PIL.ImageTk.PhotoImage(mapp.img)
+##        lbl = tk.Label(image=tkimg)
+##        lbl.tkimg = tkimg
+##        lbl.pack()
+##        app.mainloop()
 
 
     
