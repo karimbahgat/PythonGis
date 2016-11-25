@@ -176,10 +176,23 @@ def ID_generator():
         i += 1
 
 
+def Name_generator():
+    i = 1
+    while True:
+        yield "Untitled%s" % i
+        i += 1
+
+
+NAMEGEN = Name_generator()
+
+
 
 class VectorData:
-    def __init__(self, filepath=None, type=None, **kwargs):
+    def __init__(self, filepath=None, type=None, name=None, **kwargs):
         self.filepath = filepath
+        self.name = name or filepath
+        if not self.name:
+            self.name = next(NAMEGEN)
 
         # type is optional and will make the features ensure that all geometries are of that type
         # if None, type enforcement will be based on first geometry found
@@ -327,8 +340,17 @@ class VectorData:
 
     ### FILTERING ###
 
+    def get(self, func):
+        """Iterates over features that meet filter conditions"""
+        new = VectorData()
+        new.fields = [field for field in self.fields]
+        
+        for feat in self:
+            if func(feat):
+                yield feat
+
     def select(self, func):
-        """Returns new filtered vectordata instance"""
+        """Returns new filtered VectorData instance"""
         new = VectorData()
         new.fields = [field for field in self.fields]
         
@@ -620,12 +642,10 @@ class VectorData:
         return mapp
 
     def view(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
-        import tk2
         from .. import app
-        win = tk2.Tk()
         mapp = self.render(width, height, bbox, flipy, title=title, background=background, **styleoptions)
-        mapview = app.miniapps.MiniGUI(win, mapp)
-        mapview.pack(fill="both", expand=1)
+        # make gui
+        win = app.builder.MultiLayerGUI(mapp)
         win.mainloop()
         
 ##        mapp = self.render(width, height, bbox, flipy, **styleoptions)

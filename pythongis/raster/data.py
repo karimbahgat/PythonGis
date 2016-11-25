@@ -540,6 +540,20 @@ class RasterData(object):
         new._cached_mask = self._cached_mask
         return new
 
+    def get(self, x, y, band):
+        if not isinstance(band, Band):
+            band = self.bands[band]
+
+        col,row = self.geo_to_cell(x, y)
+        return band.get(col,row)
+
+    def set(self, x, y, value, band):
+        if not isinstance(band, Band):
+            band = self.bands[band]
+
+        col,row = self.geo_to_cell(x, y)
+        band.set(col,row,value)
+
     def add_band(self, band=None, **kwargs):
         """
         band is an existing Band() class, or use kwargs as init args for Band() class

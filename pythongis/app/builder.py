@@ -1,27 +1,17 @@
 
 from .map import MapView
 
-
-
-##def view_data(data, width=None, height=None, bbox=None, flipy=True, **styleoptions):
-##    mapp = data.render(width, height, bbox, flipy, **styleoptions)
-##    
-##    import tk2
-##    
-##    win = tk2.Tk()
-##
-##    mapview = MapView(win, mapp)
-##    mapview.pack(fill="both", expand=1)
-##    
-##    return win
-
-
-
-
 import pythongis as pg
 import tk2
 
-class MiniGUI(tk2.basics.Label):
+class MultiLayerGUI(tk2.Tk):
+    def __init__(self, mapp, *args, **kwargs):
+        tk2.basics.Tk.__init__(self, *args, **kwargs)
+
+        self.map = MultiLayerMap(self, mapp)
+        self.map.pack(fill="both", expand=1)
+
+class MultiLayerMap(tk2.basics.Label):
     def __init__(self, master, mapp, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
@@ -29,6 +19,7 @@ class MiniGUI(tk2.basics.Label):
         mapview.pack(fill="both", expand=1)
 
         layerscontrol = pg.app.controls.LayersControl(mapview)
+        layerscontrol.layers = mapp.layers
         layerscontrol.place(relx=0.98, rely=0.02, anchor="ne")
         mapview.add_control(layerscontrol)
 
@@ -49,4 +40,15 @@ class MiniGUI(tk2.basics.Label):
             progbar.stop()
         mapview.onstart = startprog
         mapview.onfinish = stopprog
+
+class TableBrowser(tk2.basics.Window):
+    def __init__(self, *args, **kwargs):
+        tk2.basics.Window.__init__(self, *args, **kwargs)
+
+        self.table = tk2.scrollwidgets.Table(self)
+        self.table.pack(fill="both", expand=1)
+
+        
+
+
 

@@ -45,13 +45,16 @@ class MapView(tk.Canvas):
             # record resize time
             self.last_resized = time.time()
             # schedule to check if finished resizing after x millisecs
-            self.after(300, process_if_finished)
+            self.after(300, lambda: process_if_finished(event))
             
-        def process_if_finished():
+        def process_if_finished(event):
             # only if x time since last resize event
             if time.time() - self.last_resized > 0.3:
-                width, height = self.winfo_width(), self.winfo_height()
-                self.renderer.resize(width, height)                    
+                self.last_resized = time.time()
+                width, height = event.width, event.height #self.winfo_width(), self.winfo_height()
+                self.renderer.resize(width, height)
+                #self.renderer.width = width
+                #self.renderer.height = height
                 self.threaded_rendering()
         self.bind("<Configure>", resizing)
         
@@ -77,6 +80,18 @@ class MapView(tk.Canvas):
             # schedule to check if finished zooming after x millisecs
             self.after(300, zoom_if_finished)
 
+        def mousewheel(event):
+            # FIX: since we bind to all, event coordinates are captured by root
+            # so it seems these are not what canvasx/y expect, leading to wacky zooms... 
+            d = event.delta
+            #print event.x,event.y
+            #event.x,event.y = self.winfo_pointerxy()
+            #print event.x,event.y
+            if d < 0:
+                doubleright(event)
+            else:
+                doubleleft(event)
+
         def zoom_if_finished():
             if time.time() - self.last_zoomed >= 0.3:
                 if self.zoomdir == "out":
@@ -90,6 +105,11 @@ class MapView(tk.Canvas):
 
         self.bind("<Double-Button-1>", doubleleft)
         self.bind("<Double-Button-3>", doubleright)
+        # Warning: had to bind to all, since wasn't firing on just the canvas,
+        # so mousewheel will trigger zoom even when pointer outside the map
+        #self.bind_all("<MouseWheel>", mousewheel)
+        #self.bind_all("<Button-4>", mousewheel)
+        #self.bind_all("<Button-5>", mousewheel)
 
         # bind interactive pan and rectangle-zoom events
 

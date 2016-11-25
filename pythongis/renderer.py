@@ -250,6 +250,7 @@ class Map:
 
     def _create_drawer(self):
         # get coordspace bbox aspect ratio of all layers
+        autosize = not self.width or not self.height
         if self.width and self.height:
             pass
         elif self.layers.is_empty():
@@ -276,15 +277,17 @@ class Map:
         self.drawer.geographic_space()
         for zoom in self.zooms:
             zoom()
-        # determine drawer pixel size based on these
-        bbox = self.drawer.coordspace_bbox
-        w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
-        aspect = w/float(h)
-        if aspect < 1:
-            self.width = int(self.height * aspect)
-        else:
-            self.height = int(self.width / float(aspect))
-        self.drawer.resize(self.width, self.height, lock_ratio=False)
+        # determine drawer pixel size based on zoom area
+        # WARNING: when i changed this, it led to some funky misalignments...
+        if autosize:
+            bbox = self.drawer.coordspace_bbox
+            w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
+            aspect = w/float(h)
+            if aspect < 1:
+                self.width = int(self.height * aspect)
+            else:
+                self.height = int(self.width / float(aspect))
+            self.drawer.resize(self.width, self.height, lock_ratio=False)
 
     def copy(self):
         dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy())
@@ -516,7 +519,11 @@ class Map:
             self.render_all()
         elif self.layers.changed:
             self.update_draworder()
-        self.drawer.view()
+        # make gui
+        from . import app
+        mapp = self
+        win = app.builder.MultiLayerGUI(mapp)
+        win.mainloop()
 
     def save(self, savepath):
         if self.changed:

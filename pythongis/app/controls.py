@@ -10,8 +10,60 @@ class LayersControl(tk2.basics.Label):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
         self.layersbut = tk2.basics.Button(self)
+        self.layersbut["command"] = self.toggle_layers
         self.layersbut.set_icon(iconpath("layers.png"), width=40, height=40)
         self.layersbut.pack()
+
+        self.layers = []
+
+        w = self
+        while w.master:
+            w = w.master
+        self._root = w
+        self.layerslist = tk2.scrollwidgets.OrderedList(self._root)
+
+    def toggle_layers(self):
+        if self.layerslist.winfo_ismapped():
+            self.hide_layers()
+        else:
+            self.show_layers()
+
+    def show_layers(self):
+        for w in self.layerslist.items:
+            w.destroy()
+        for lyr in self.layers:
+            self.layerslist.add_item(lyr, self.layer_decor)
+        screenx,screeny = self.layersbut.winfo_rootx(),self.layersbut.winfo_rooty()
+        x,y = screenx - self._root.winfo_rootx(), screeny - self._root.winfo_rooty()
+        self.layerslist.place(anchor="ne", x=x, y=y)
+
+    def hide_layers(self):
+        self.layerslist.place_forget()
+
+    def layer_decor(self, widget):
+        """
+        Default way to decorate each layer with extra widgets
+        Override method to customize. 
+        """
+        text = widget.item.data.name
+        if len(text) > 50:
+            text = text[47]+"..."
+        name = tk2.basics.Label(widget, text=text)
+        name.pack(side="left", fill="x", expand=1)
+        
+        def browse():
+            from . import builder
+            browsewin = builder.TableBrowser()
+            lyr = widget.item
+            fields = lyr.data.fields
+            rows = (feat.row for feat in lyr.features()) # respects the filter
+            browsewin.table.populate(fields, rows)
+            
+        browse = tk2.basics.Button(widget, text="Browse", command=browse)
+        browse.pack(side="right")
+
+    def move_layer(self):
+        pass
 
 class NavigateControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
