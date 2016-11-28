@@ -4,6 +4,14 @@ from .map import MapView
 import pythongis as pg
 import tk2
 
+class TableGUI(tk2.Tk):
+    def __init__(self, *args, **kwargs):
+        tk2.basics.Tk.__init__(self, *args, **kwargs)
+
+        self.browser = TableBrowser(self)
+        self.browser.pack(fill="both", expand=1)
+        
+
 class MultiLayerGUI(tk2.Tk):
     def __init__(self, mapp, *args, **kwargs):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
@@ -41,9 +49,9 @@ class MultiLayerMap(tk2.basics.Label):
         mapview.onstart = startprog
         mapview.onfinish = stopprog
 
-class TableBrowser(tk2.basics.Window):
-    def __init__(self, *args, **kwargs):
-        tk2.basics.Window.__init__(self, *args, **kwargs)
+class TableBrowser(tk2.basics.Label):
+    def __init__(self, master, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
         self.table = tk2.scrollwidgets.Table(self)
         self.table.pack(fill="both", expand=1)

@@ -641,6 +641,13 @@ class VectorData:
         mapp.render_all()
         return mapp
 
+    def browse(self):
+        from .. import app
+        win = app.builder.TableGUI()
+        rows = (f.row for f in self)
+        win.browser.table.populate(self.fields, rows)
+        win.mainloop()
+
     def view(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
         from .. import app
         mapp = self.render(width, height, bbox, flipy, title=title, background=background, **styleoptions)
