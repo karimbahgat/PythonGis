@@ -53,11 +53,13 @@ class LayersControl(tk2.basics.Label):
         
         def browse():
             from . import builder
-            browsewin = builder.TableBrowser()
+            win = tk2.Window()
+            browser = builder.TableBrowser(win)
+            browser.pack(fill="both", expand=1)
             lyr = widget.item
             fields = lyr.data.fields
             rows = (feat.row for feat in lyr.features()) # respects the filter
-            browsewin.table.populate(fields, rows)
+            browser.table.populate(fields, rows)
             
         browse = tk2.basics.Button(widget, text="Browse", command=browse)
         browse.pack(side="right")
@@ -101,4 +103,23 @@ class IdentifyControl(tk2.basics.Label):
         #self.identifybut.set_icon(iconpath("layers.png"), width=40, height=40)
         self.identifybut["text"] = "?"
         self.identifybut.pack()
+
+class TimeControl(tk2.basics.Label):
+    def __init__(self, master, key=None, start=None, end=None, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.slider = tk2.Slider(self)
+        self.slider.pack(fill="both", expand=1)
+
+##    def gg
+##        for lyr in self.mapview.layers:
+##            alldates = key(f) for f in self.mapview.la
+##
+##        if not start:
+##            start = min(
+
+
+
+
+
 

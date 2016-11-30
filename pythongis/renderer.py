@@ -191,7 +191,14 @@ class Layout:
         for layer in self.foregroundgroup:
             layer.render()
             if layer.img:
-                self.drawer.paste(layer.img, **layer.pasteoptions)
+                pasteoptions = layer.pasteoptions.copy()
+                if isinstance(layer, Title):
+                    # since title is rendered on separate img then pasted,
+                    # some titleoptions needs to be passed to pasteoptions
+                    # instead of the rendering method
+                    extraargs = dict([(k,self.titleoptions[k]) for k in ["xy","anchor"] if k in self.titleoptions])
+                    pasteoptions.update(extraargs)
+                self.drawer.paste(layer.img, **pasteoptions)
             
         self.img = self.drawer.get_image()
 
@@ -504,7 +511,14 @@ class Map:
         # paste the foreground decorations
         for layer in self.foregroundgroup:
             if layer.img:
-                self.drawer.paste(layer.img, **layer.pasteoptions)
+                pasteoptions = layer.pasteoptions.copy()
+                if isinstance(layer, Title):
+                    # since title is rendered on separate img then pasted,
+                    # some titleoptions needs to be passed to pasteoptions
+                    # instead of the rendering method
+                    extraargs = dict([(k,self.titleoptions[k]) for k in ["xy","anchor"] if k in self.titleoptions])
+                    pasteoptions.update(extraargs)
+                self.drawer.paste(layer.img, **pasteoptions)
 
         self.layers.changed = False
         self.img = self.drawer.get_image()
@@ -545,6 +559,13 @@ class LayerGroup:
     def __iter__(self):
         for layer in self._layers:
             yield layer
+
+    def __getitem__(self, i):
+        return self._layers[i]
+
+    def __setitem__(self, i, value):
+        self.changed = True
+        self._layers[i] = value
 
     def is_empty(self):
         return all((lyr.is_empty() for lyr in self))
@@ -1198,7 +1219,13 @@ class Title:
 
     def render(self):
         if self.layout.title:
-            rendered = pyagg.legend.Label(self.layout.title, **self.layout.titleoptions).render() # pyagg label indeed implements a render method()
+            # since title is rendered on separate img then pasted,
+            # some titleoptions needs to be passed to pasteoptions
+            # instead of the rendering method
+            titleoptions = self.layout.titleoptions.copy()
+            titleoptions.pop("xy", None)
+            titleoptions.pop("anchor", None)
+            rendered = pyagg.legend.Label(self.layout.title, **titleoptions).render() # pyagg label indeed implements a render method()
             self.img = rendered.get_image()
 
 

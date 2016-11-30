@@ -13,14 +13,16 @@ class TableGUI(tk2.Tk):
         
 
 class MultiLayerGUI(tk2.Tk):
-    def __init__(self, mapp, *args, **kwargs):
+    def __init__(self, mapp, time=False, *args, **kwargs):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 
-        self.map = MultiLayerMap(self, mapp)
+        self.map = MultiLayerMap(self, mapp, time=time)
         self.map.pack(fill="both", expand=1)
 
+# move below to "widgets.py"..?
+
 class MultiLayerMap(tk2.basics.Label):
-    def __init__(self, master, mapp, *args, **kwargs):
+    def __init__(self, master, mapp, time=False, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
         mapview = pg.app.map.MapView(self, mapp)
@@ -48,6 +50,12 @@ class MultiLayerMap(tk2.basics.Label):
             progbar.stop()
         mapview.onstart = startprog
         mapview.onfinish = stopprog
+
+        if True:#time:
+            # must be dict
+            timecontrol = pg.app.controls.TimeControl(mapview)#, **time)
+            timecontrol.place(relx=0.5, rely=0.98, anchor="s")
+            mapview.add_control(timecontrol)
 
 class TableBrowser(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
