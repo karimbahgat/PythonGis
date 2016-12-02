@@ -277,6 +277,7 @@ class VectorData:
     def add_feature(self, row, geometry=None):
         feature = Feature(self, row, geometry)
         self[feature.id] = feature
+        return feature
 
     def add_field(self, field, index=None):
         if index is None:

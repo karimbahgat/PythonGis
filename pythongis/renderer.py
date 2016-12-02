@@ -10,6 +10,9 @@ from .raster.data import RasterData
 
 from .exceptions import UnknownFileError
 
+# TODO:
+# all copys need to be systematically checked, not fully correct right now
+
 DEFAULTSTYLE = "pastelle"
 
 COLORSTYLES = dict([("strong", dict( [("intensity",1), ("brightness",0.5)]) ),

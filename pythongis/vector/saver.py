@@ -174,7 +174,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
         import csv
         
         # TODO: Add option of saving geoms as strings in separate fields
-        with open(filepath, "w") as fileobj:
+        with open(filepath, "wb") as fileobj:
             csvopts = dict()
             csvopts["delimiter"] = kwargs.get("delimiter", "\t") # tab is best for automatically opening in excel...
             writer = csv.writer(fileobj, **csvopts)
