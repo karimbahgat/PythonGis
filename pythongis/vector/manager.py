@@ -197,7 +197,7 @@ def merge(*datalist):
     #add the rest of the files
     for data in datalist:
         for feature in data:
-            geometry = feature.geometry.copy()
+            geometry = feature.geometry.copy() if feature.geometry else None
             row = []
             for field in outfile.fields:
                 if field in data.fields:
