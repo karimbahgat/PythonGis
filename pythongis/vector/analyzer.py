@@ -12,7 +12,7 @@ from shapely.prepared import prep as supershapely
 
 # Overlay Analysis (transfer of values, but no clip)
 
-def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, key=None, **kwargs):
+def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegroup=None, key=None, **kwargs):
     """
     Summarizes the values of "valuedata" that overlap "groupbydata",
     and adds the summary statistics to the output data.
@@ -42,7 +42,6 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, key=N
 ##        if groupfeat["CNTRY_NAME"] not in ("Taiwan",):
 ##            continue
         
-        newrow = list(groupfeat.row)
         geom = groupfeat.get_shapely()
         supergeom = supershapely(geom)
         valuefeats = ((valfeat,valfeat.get_shapely()) for valfeat in valuedata.quick_overlap(groupfeat.bbox))
@@ -86,18 +85,35 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, key=N
 ##            intsec = groupfeat.get_shapely().intersection(vf.get_shapely())
 ##            print intsec.area
 ##            Feature(groupbydata, [], intsec.__geo_interface__).view(1000,500,bbox=groupfeat.bbox, fillcolor="yellow")
-            
-        if matches:
-            aggreg = sql.aggreg(matches, fieldmapping)
 
-        # add
-        if matches:
-            newrow.extend( aggreg )
-            out.add_feature(newrow, geom.__geo_interface__)
+        if valuegroup:
+            if matches:
+                for group in sql.groupby(matches, valuegroup):
+                    aggreg = sql.aggreg(group, fieldmapping)
 
-        elif keepall:
-            newrow.extend( ("" for _ in fieldmapping) )
-            out.add_feature(newrow, geom.__geo_interface__)
+                    newrow = list(groupfeat.row)
+                    newrow.extend( aggreg )
+                    out.add_feature(newrow, geom.__geo_interface__)
+
+            elif keepall:
+                newrow = list(groupfeat.row)
+                newrow.extend( ("" for _ in fieldmapping) )
+                out.add_feature(newrow, geom.__geo_interface__)
+
+        else:
+            if matches:
+                aggreg = sql.aggreg(matches, fieldmapping)
+
+            # add
+            if matches:
+                newrow = list(groupfeat.row)
+                newrow.extend( aggreg )
+                out.add_feature(newrow, geom.__geo_interface__)
+
+            elif keepall:
+                newrow = list(groupfeat.row)
+                newrow.extend( ("" for _ in fieldmapping) )
+                out.add_feature(newrow, geom.__geo_interface__)
         
 ##    # insert groupby data fields into fieldmapping
 ##    basefm = [(name,lambda f:f[name],"first") for name in groupbydata.fields]

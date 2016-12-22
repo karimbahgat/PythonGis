@@ -19,7 +19,9 @@ def _to_multicentroids(data):
     # loop features
     if "LineString" in data.type or "Polygon" in data.type:
         for feat in data:
-            if "Multi" in feat.geometry["type"]:
+            if not feat.geometry:
+                outfile.add_feature(feat.row, None)
+            elif "Multi" in feat.geometry["type"]:
                 multishape = feat.get_shapely()
                 for geom in multishape.geoms:
                     shapelypoint = geom.centroid
@@ -43,7 +45,9 @@ def _to_centroids(data):
     
     # loop features
     for feat in data:
-        if feat.geometry["type"] != "Point":
+        if not feat.geometry:
+            outfile.add_feature(feat.row, None)
+        elif feat.geometry["type"] != "Point":
             shapelypoint = feat.get_shapely().centroid
             geoj = shapelypoint.__geo_interface__
             outfile.add_feature(feat.row, geoj)
@@ -59,7 +63,9 @@ def _to_vertexes(data):
     # loop points
     if "LineString" in data.type:
         for feat in data:
-            if "Multi" in feat.geometry["type"]:
+            if not feat.geometry:
+                outfile.add_feature(feat.row, None)
+            elif "Multi" in feat.geometry["type"]:
                 for linestring in feat.geometry["coordinates"]:
                     for point in linsetring:
                         geoj = {"type": "Point",
@@ -74,7 +80,9 @@ def _to_vertexes(data):
                         
     elif "Polygon" in data.type:
         for feat in data:
-            if "Multi" in feat.geometry["type"]:
+            if not feat.geometry:
+                outfile.add_feature(feat.row, None)
+            elif "Multi" in feat.geometry["type"]:
                 for polygon in feat.geometry["coordinates"]:
                     for ext_or_hole in polygon:
                         for point in ext_or_hole:

@@ -180,7 +180,24 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             writer = csv.writer(fileobj, **csvopts)
             writer.writerow([f.encode(encoding) for f in fields])
             for row,geometry in itertools.izip(rows, geometries):
-                writer.writerow([val.encode(encoding) if isinstance(val, unicode) else val for val in row])
+                writer.writerow([encode(val) for val in row])
+
+    elif filepath.endswith(".xls"):
+        import xlwt
+        
+        with open(filepath, "wb") as fileobj:
+            wb = xlwt.Workbook(encoding=encoding) # module takes care of encoding for us
+            sheet = wb.add_sheet("Data")
+            # fields
+            for c,f in enumerate(fields):
+                sheet.write(0, c, f)
+            # rows
+            for r,(row,geometry) in enumerate(itertools.izip(rows, geometries)):
+                for c,val in enumerate(row):
+                    # TODO: run val through encode() func, must spit out dates as well
+                    sheet.write(r+1, c, val)
+            # save
+            wb.save(filepath)
             
     else:
         raise Exception("Could not save the vector data to the given filepath: the filetype extension is either missing or not supported")

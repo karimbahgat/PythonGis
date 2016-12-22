@@ -93,10 +93,22 @@ def from_file(filepath, encoding="utf8", **kwargs):
                 else:
                     sheet = wb.sheet_by_index(0)
                 rows = ([cell.value for cell in row] for row in sheet.get_rows())
-                fields = next(rows)
                 
             elif filepath.endswith(".xlsx"):
                 raise NotImplementedError()
+
+            # some excel files may contain junk metadata near top and bottom rows that should be skipped
+            # TODO: maybe change API/keywords here...
+            
+            if "skip" in kwargs:
+                for _ in range(kwargs["skip"]):
+                    next(rows)
+
+            if "last" in kwargs:
+                last = kwargs["last"]
+                rows = (r for i,r in enumerate(rows) if i <= last)
+
+            fields = next(rows)
         
         geokey = kwargs.get("geokey")
         xfield = kwargs.get("xfield")

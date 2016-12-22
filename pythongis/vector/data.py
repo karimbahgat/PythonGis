@@ -312,6 +312,44 @@ class VectorData:
             for feat in self:
                 feat[field] = valfunc(feat)
 
+    def interpolate(self, step):
+        # maybe one for inserting new rows in between gaps
+        # another for just filling missing values in between gaps
+        # maybe it does both
+        # and finally a separate for interpolating one value based on values in another...
+        # ...
+        pass
+
+    def moving_window(self, n, fieldmapping, groupby=None):
+        # general flexible method that cursors over a window of rows and runs arbitrary function on them
+        for name,valfunc,statfunc in fieldmapping:
+            if not name in self.fields:
+                self.add_field(name)
+        prevs = []
+
+        from . import sql
+
+        def calc(f, prevs, fieldmapping):
+            prevs.append(f)
+            if len(prevs) > n:
+                prevs.pop(0)
+            row = sql.aggreg(prevs, fieldmapping)
+            for (name,_,_),val in zip(fieldmapping,row):
+                f[name] = val
+
+        if groupby:
+            for _,feats in self.group(groupby):
+                prevs = []
+                for f in feats:
+                    calc(f, prevs, fieldmapping)
+
+        else:
+            prevs = []
+            for f in self:
+                calc(f, prevs, fieldmapping)
+        
+        return self
+
     def drop_field(self, field):
         fieldindex = self.fields.index(field)
         del self.fields[fieldindex]
@@ -339,6 +377,9 @@ class VectorData:
             val = feat.row[fieldindex]
             feat.row[fieldindex] = valfunc(val)
 
+    def sort(self, key, reverse=False):
+        self.features = OrderedDict([ (feat.id,feat) for feat in sorted(self.features.values(), key=key, reverse=reverse) ])
+
     ### FILTERING ###
 
     def get(self, func):
@@ -349,6 +390,12 @@ class VectorData:
         for feat in self:
             if func(feat):
                 yield feat
+
+    def group(self, key):
+        for uid,feats in itertools.groupby(sorted(self, key=key), key=key):
+            yield uid, list(feats)
+
+    ### OTHER ###
 
     def select(self, func):
         """Returns new filtered VectorData instance"""

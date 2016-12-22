@@ -685,6 +685,8 @@ class VectorLayer:
                     val = dict(val)
                     val["classvalues"] = val.pop("symbolvalues")
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
+                    if "color" in key and notclassified != None:
+                        notclassified = Color(notclassified)
 
                     # convert any text symbolvalues to pure numeric so can be handled by classipy
                     if "color" in key:

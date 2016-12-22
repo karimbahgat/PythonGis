@@ -559,39 +559,39 @@ def cut(data, cutter):
 
 # Compare operations
 
-##def intersection(data, clipper, key=None):
-##    """
-##    Clips the data to the parts that it has in common with the clipper polygon.
-##
-##    Key is a function for determining if a pair of features should be processed, taking feat and clipfeat as input args and returning True or False
-##    """
-##
-##    # create spatial index
-##    if not hasattr(data, "spindex"): data.create_spatial_index()
-##    if not hasattr(clipper, "spindex"): clipper.create_spatial_index()
-##
-##    out = VectorData()
-##    out.fields = list(data.fields)
-##
-##    iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
-##    for feat,geom in iterable:
-##        
-##        supergeom = supershapely(geom)
-##        iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
-##
-##        for clipfeat,clipgeom in iterable2:
-##            if key:
-##                if key(feat,clipfeat) and supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
-##                    intsec = geom.intersection(clipgeom)
-##                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:                        
-##                        out.add_feature(feat.row, intsec.__geo_interface__)
-##            else:
-##                if supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
-##                    intsec = geom.intersection(clipgeom)
-##                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:
-##                        out.add_feature(feat.row, intsec.__geo_interface__)
-##
-##    return out
+def intersection(data, clipper, key=None):
+    """
+    Clips the data to the parts that it has in common with the clipper polygon.
+
+    Key is a function for determining if a pair of features should be processed, taking feat and clipfeat as input args and returning True or False
+    """
+
+    # create spatial index
+    if not hasattr(data, "spindex"): data.create_spatial_index()
+    if not hasattr(clipper, "spindex"): clipper.create_spatial_index()
+
+    out = VectorData()
+    out.fields = list(data.fields)
+
+    iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
+    for feat,geom in iterable:
+        
+        supergeom = supershapely(geom)
+        iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
+
+        for clipfeat,clipgeom in iterable2:
+            if key:
+                if key(feat,clipfeat) and supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
+                    intsec = geom.intersection(clipgeom)
+                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:                        
+                        out.add_feature(feat.row, intsec.__geo_interface__)
+            else:
+                if supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
+                    intsec = geom.intersection(clipgeom)
+                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:
+                        out.add_feature(feat.row, intsec.__geo_interface__)
+
+    return out
 ##
 ##def difference(data, other):
 ##    """
