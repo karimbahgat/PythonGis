@@ -41,6 +41,14 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
         # testing
 ##        if groupfeat["CNTRY_NAME"] not in ("Taiwan",):
 ##            continue
+
+        if not groupfeat.geometry:
+            if keepall:
+                newrow = list(groupfeat.row)
+                newrow.extend( ("" for _ in fieldmapping) )
+                out.add_feature(newrow, None)
+
+            continue
         
         geom = groupfeat.get_shapely()
         supergeom = supershapely(geom)
@@ -151,6 +159,7 @@ def near_summary(groupbydata, valuedata,
                  radius=None,   # only those within radius dist
                  fieldmapping=[], 
                  n=None,   # only include n nearest
+                 keepall=True, 
                  **kwargs):
     """
     Summarizes the values of "valuedata" that are nearest "groupbydata",
@@ -176,6 +185,9 @@ def near_summary(groupbydata, valuedata,
 
     from . import sql
 
+    if not hasattr(valuedata, "spindex"):
+        valuedata.create_spatial_index()
+
     out = VectorData()
 
     # add fields
@@ -185,29 +197,48 @@ def near_summary(groupbydata, valuedata,
     # loop
     for groupfeat in groupbydata:
         print(groupfeat)
+
+        if not groupfeat.geometry:
+            if keepall:
+                newrow = list(groupfeat.row)
+                newrow.extend( ("" for _ in fieldmapping) )
+                out.add_feature(newrow, None)
+
+            continue
+        
         newrow = list(groupfeat.row)
         geom = groupfeat.get_shapely()
 
-        # precalc all distances (so that iterable is a feat-dist tuple)
-        matches = ((valfeat, geom.distance(valfeat.get_shapely())) for valfeat in valuedata)
+        # should first test for overlap which is much faster
+        matches = [valfeat for valfeat in valuedata.quick_overlap(groupfeat.bbox)]
 
-        # filter to only those within radius
-        if radius: 
-            matches = sql.where(matches, lambda((f,d)): d <= radius)
+        if not matches:
+            # if not, then test for distance...
+            
+            # precalc all distances (so that iterable is a feat-dist tuple) 
+            matches = ((valfeat, geom.distance(valfeat.get_shapely())) for valfeat in valuedata.quick_nearest(groupfeat.bbox, n=n))
 
-        # filter to only n nearest
-        if n:
-            matches = sorted(matches, key=lambda((f,d)): d)
-            matches = sql.limit(matches, n)
+            # filter to only those within radius
+            if radius: 
+                matches = sql.where(matches, lambda((f,d)): d <= radius)
 
-        # remove distance from iterable so only feats remain for aggregating
-        matches = (f for f,d in matches)
+            # filter to only n nearest
+            if n:
+                matches = sorted(matches, key=lambda((f,d)): d)
+                matches = sql.limit(matches, n)
+
+            # remove distance from iterable so only feats remain for aggregating
+            matches = [f for f,d in matches]
 
         # aggregate
-        newrow.extend( sql.aggreg(matches, fieldmapping) )
+        if matches:
+            newrow.extend( sql.aggreg(matches, fieldmapping) )
+            out.add_feature(newrow, geom.__geo_interface__)
 
-        # add
-        out.add_feature(newrow, geom.__geo_interface__)
+        elif keepall:
+            newrow = list(groupfeat.row)
+            newrow.extend( ("" for _ in fieldmapping) )
+            out.add_feature(newrow, None)       
 
 ##    # insert groupby data fields into fieldmapping
 ##    basefm = [(name,lambda f:f[name],"first") for name in groupbydata.fields]

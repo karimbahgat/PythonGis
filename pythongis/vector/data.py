@@ -605,23 +605,28 @@ class VectorData:
         disjoint = allids.difference(overlaps)
         return (self[id] for id in disjoint)
 
-##    def quick_nearest(self, bbox, n=None, radius=None):
-##        """
-##        Quickly get n features whose bbox are nearest the specified bbox via the spatial index.
-##        """
-##        # TODO: special handling if points data, might be faster to just test all.
-##        # ...
-##        
-##        if not hasattr(self, "spindex"):
-##            raise Exception("You need to create the spatial index before you can use this method")
-##        
-##        # ensure min,min,max,max pattern
-##        xs = bbox[0],bbox[2]
-##        ys = bbox[1],bbox[3]
-##        bbox = [min(xs),min(ys),max(xs),max(ys)]
-##        # return generator over results
-##        if not n:
-##            n = len(self)
+    def quick_nearest(self, bbox, n=None, radius=None):
+        """
+        Quickly get n features whose bbox are nearest the specified bbox via the spatial index.
+        """
+        # TODO: special handling if points data, might be faster to just test all.
+        # ...
+        
+        if not hasattr(self, "spindex"):
+            raise Exception("You need to create the spatial index before you can use this method")
+        
+        # ensure min,min,max,max pattern
+        xs = bbox[0],bbox[2]
+        ys = bbox[1],bbox[3]
+        bbox = [min(xs),min(ys),max(xs),max(ys)]
+        # return generator over results
+        if not n:
+            n = len(self)
+
+        for id in self.spindex.nearest(bbox, num_results=n): # radius not yet respected
+            feat = self[id]
+            yield feat
+           
 ##        if radius:
 ##            window = shapely.geometry.box(*bbox)
 ##            for id in self.spindex.nearest(bbox, num_results=n):
