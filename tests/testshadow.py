@@ -3,7 +3,7 @@
 
 import pythongis as pg
 
-cshapes = pg.VectorData(r"C:\Users\karbah\Downloads\cshapes_0.5-1\cshapes.shp", select=lambda f:f["GWCODE"] != -1)
+cshapes = pg.VectorData(r"C:\Users\kimo\Downloads\cshapes_0.6\cshapes.shp", select=lambda f:f["GWCODE"] != -1)
 print cshapes
 
 mapp = pg.renderer.Map(width=1000)

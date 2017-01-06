@@ -6,9 +6,11 @@ import PIL, PIL.Image
 import colour
 
 from .vector.data import VectorData
+from .vector.loader import detect_filetype as vector_filetype
 from .raster.data import RasterData
+from .raster.loader import detect_filetype as raster_filetype
 
-from .exceptions import UnknownFileError
+
 
 # TODO:
 # all copys need to be systematically checked, not fully correct right now
@@ -594,11 +596,27 @@ class LayerGroup:
 
     def add_layer(self, layer, **options):
         self.changed = True
+        
         if not isinstance(layer, (VectorLayer,RasterLayer)):
-            try:
+            # if data instance
+            if isinstance(layer, VectorData):
                 layer = VectorLayer(layer, **options)
-            except UnknownFileError:
+            elif isinstance(layer, RasterData):
                 layer = RasterLayer(layer, **options)
+                
+            # or if path string to data
+            elif isinstance(layer, basestring):
+                if vector_filetype(layer):
+                    layer = VectorLayer(layer, **options)
+                elif raster_filetype(layer):
+                    layer = RasterLayer(layer, **options)
+                else:
+                    raise Exception("Filetype not supported")
+
+            # invalid input
+            else:
+                raise Exception("Adding a layer requires either an existing layer instance, a data instance, or a filepath.")
+            
         self._layers.append(layer)
 
         return layer

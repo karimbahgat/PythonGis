@@ -5,10 +5,36 @@ import sys, os, itertools, operator
 # import PIL as the image loader
 import PIL.Image
 
-from ..exceptions import UnknownFileError
+file_extensions = {".asc": "ASCII",
+                   ".ascii": "ASCII",
+                   ".tif": "GeoTIFF",
+                   ".tiff": "GeoTIFF",
+                   ".geotiff": "GeoTIFF",
+                   ".jpg": "JPG",
+                   ".jpeg": "JPEG",
+                   ".png": "PNG",
+                   ".bmp": "BMP",
+                   ".gif": "GIF",
+                   ".ncf": "NETCDF",
+                   ".nc": "NETCDF",
+                   ".bil": "BIL",
+                   ".adf": "Arc/INFO",
+                   ".txt": "Cell-Table",
+                   }
+
+def detect_filetype(filepath):
+    for ext in file_extensions.keys():
+        if filepath.lower().endswith(ext):
+            return file_extensions[ext]
+    else:
+        return None
+
+
 
 
 def from_file(filepath, **georef):
+
+    filetype = detect_filetype(filepath)
 
     def check_world_file(filepath):
         worldfilepath = None
@@ -50,7 +76,7 @@ def from_file(filepath, **georef):
                 xscale,yskew,xskew,yscale,xoff,yoff = worldfile.read().split()
             return [xscale,yskew,xskew,yscale,xoff,yoff]
 
-    if filepath.lower().endswith((".asc",".ascii")):
+    if filetype == "ASCII":
         georef_orig = georef.copy()
         
         with open(filepath) as tempfile:
@@ -163,7 +189,7 @@ def from_file(filepath, **georef):
 
         return georef, nodataval, bands, crs
 
-    elif filepath.lower().endswith((".tif",".tiff",".geotiff")):
+    elif filetype == "GeoTIFF":
         main_img = PIL.Image.open(filepath)
         raw_tags = dict(main_img.tag.items())
         
@@ -256,7 +282,7 @@ def from_file(filepath, **georef):
 
         return georef, nodataval, bands, crs
 
-    elif filepath.lower().endswith((".jpg",".jpeg",".png",".bmp",".gif")):
+    elif filetype in ("JPG","JPEG","PNG","BPM","GIF"):
         
         # pure image, so needs either manual georef args, or a world file
         main_img = PIL.Image.open(filepath)
@@ -284,7 +310,7 @@ def from_file(filepath, **georef):
 
         return georef, nodataval, bands, crs
 
-    elif filepath.lower().endswith(".ncf"):
+    elif filetype == "NETCDF":
         # netcdf format files
         # should be simple enough with the struct and array.array modules
         # to read the binary data
@@ -311,14 +337,14 @@ def from_file(filepath, **georef):
         # ...
         pass 
 
-    elif filepath.lower().endswith(".bil"):
+    elif filetype == "BIL":
         raise Exception("Not yet implemented")
 
-    elif filepath.lower().endswith(".adf"):
+    elif filetype == "Arc/INFO":
         # arcinfo raster: http://support.esri.com/en/knowledgebase/techarticles/detail/30616
         raise Exception("Not yet implemented")
 
-    elif filepath.lower().endswith(".txt"):
+    elif filetype == "Cell-Table":
         # cell by cell table format
         with open(filepath) as reader:
             nodataval = georef.pop("nodataval", None)

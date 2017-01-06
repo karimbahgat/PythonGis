@@ -10,13 +10,31 @@ import warnings
 import shapefile as pyshp
 import pygeoj
 
-from ..exceptions import UnknownFileError
+file_extensions = {".shp": "Shapefile",
+                   ".json": "GeoJSON",
+                   ".geojson": "GeoJSON",
+                   ".xls": "Excel 97",
+                   ".xlsx": "Excel",
+                   ".csv": "CSV",
+                   ".txt": "Text-Delimited",
+                   }
+
+def detect_filetype(filepath):
+    for ext in file_extensions.keys():
+        if filepath.lower().endswith(ext):
+            return file_extensions[ext]
+    else:
+        return None
+
+
 
 
 def from_file(filepath, encoding="utf8", **kwargs):
 
     # TODO: for geoj and delimited should detect and force consistent field types in similar manner as when saving
 
+    filetype = detect_filetype(filepath)
+    
     select = kwargs.get("select")
 
     def decode(value):
@@ -25,7 +43,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         else: return value
     
     # shapefile
-    if filepath.endswith(".shp"):
+    if filetype == "Shapefile":
         shapereader = pyshp.Reader(filepath, **kwargs) # TODO: does pyshp take kwargs?
         
         # load fields, rows, and geometries
@@ -44,7 +62,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         else: crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
 
     # geojson file
-    elif filepath.endswith((".geojson",".json")):
+    elif filetype == "GeoJSON":
         geojfile = pygeoj.load(filepath, encoding=encoding, **kwargs)
 
         # load fields, rows, and geometries
@@ -57,10 +75,10 @@ def from_file(filepath, encoding="utf8", **kwargs):
         crs = geojfile.crs
 
     # table files without geometry
-    elif filepath.endswith((".txt",".csv",".xls",".xlsx")):
+    elif filetype in ("Text-Delimited","CSV","Excel 97","Excel"):
 
         # txt or csv
-        if filepath.endswith((".txt",".csv")):
+        if filetype in ("Text-Delimited","CSV"):
             delimiter = kwargs.get("delimiter")
             fileobj = open(filepath, "rU")
             if delimiter is None:
@@ -84,8 +102,8 @@ def from_file(filepath, encoding="utf8", **kwargs):
             fields = next(rows)
 
         # excel
-        elif filepath.endswith((".xls",".xlsx")):
-            if filepath.endswith(".xls"):
+        elif filetype in ("Excel","Excel 97"):
+            if filetype == "Excel 97":
                 import xlrd
                 wb = xlrd.open_workbook(filepath, encoding_override=encoding, on_demand=True)
                 if "sheet" in kwargs:
@@ -94,7 +112,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
                     sheet = wb.sheet_by_index(0)
                 rows = ([cell.value for cell in row] for row in sheet.get_rows())
                 
-            elif filepath.endswith(".xlsx"):
+            elif filetype == "Excel":
                 raise NotImplementedError()
 
             # some excel files may contain junk metadata near top and bottom rows that should be skipped
@@ -140,7 +158,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         crs = None
     
     else:
-        raise UnknownFileError("Could not create vector data from the given filepath: the filetype extension is either missing or not supported")
+        raise Exception("Could not create vector data from the given filepath: the filetype extension is either missing or not supported")
 
     # filter if needed
     if select:
