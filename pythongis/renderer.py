@@ -1033,6 +1033,8 @@ class RasterLayer:
         #rendered.mask.show()
 
         img.paste(0, mask=rendered.mask) # sets all bands to 0 incl the alpha band
+        # TODO: maybe instead do:   img.putalpha(self.rendered.mask)
+        # ...
 
         # final
         self.img = img
