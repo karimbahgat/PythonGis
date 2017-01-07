@@ -51,15 +51,15 @@ def from_file(filepath, **georef):
         # if not, check filetype-specific world file extensions
         else:
             # get filetype-specific world file extension
-            if extension in ("tif","tiff","geotiff"):
+            if filetype == "GeoTIFF":
                 extension = ".tfw"
-            elif extension in ("jpg","jpeg"):
+            elif filetype in ("JPG","JPEG"):
                 extension = ".jgw"
-            elif extension == "png":
+            elif filetype == "PNG":
                 extension = ".pgw"
-            elif extension == "bmp":
+            elif filetype == "BMP":
                 extension = ".bpw"
-            elif extension == "gif":
+            elif filetype == "GIF":
                 extension = ".gfw"
             else:
                 return None

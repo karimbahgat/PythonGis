@@ -25,7 +25,7 @@ COLORSTYLES = dict([("strong", dict( [("intensity",1), ("brightness",0.5)]) ),
                     ("pastelle", dict( [("intensity",0.5), ("brightness",0.6)] ) )
                     ])
 
-def Color(basecolor, intensity=None, brightness=None, opacity=None, style=None):
+def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
     """
     Returns an rgba color tuple of the color options specified.
 
@@ -120,7 +120,7 @@ class Layout:
         self.changed = True
 
         # create the drawer with a default percent space
-        background = Color(background)
+        background = rgb(background)
         self.drawer = pyagg.Canvas(width, height, background)
         self.drawer.percent_space() 
 
@@ -238,7 +238,7 @@ class Map:
         if background:
             obj = Background(self)
             self.backgroundgroup.add_layer(obj)
-        self.background = Color(background)
+        self.background = rgb(background)
 
         # create the drawer with a default unprojected lat-long coordinate system
         # setting width and height locks the ratio, otherwise map size will adjust to the coordspace
@@ -680,7 +680,7 @@ class VectorLayer:
         self.datafilter = datafilter
         
         # by default, set random style color
-        randomcolor = Color("random")
+        randomcolor = rgb("random")
         self.styleoptions = {"fillcolor": randomcolor,
                              "sortorder": "incr"}
             
@@ -693,27 +693,31 @@ class VectorLayer:
         for key,val in self.styleoptions.copy().items():
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
                 if isinstance(val, dict):
-                    # random colors if not specified in unique algo
-                    if val["breaks"] == "unique" and "symbolvalues" not in val:
-                        rand = random.randrange
-                        val["symbolvalues"] = [Color("random")
-                                                 for _ in range(20)]
+                    # random colors if not specified
+                    if "symbolvalues" not in val:
+                        if val["breaks"] == "unique":
+                            val["symbolvalues"] = [rgb("random") for _ in range(20)]
+                        else:
+                            val["symbolvalues"] = [rgb("random"),rgb("random")]
 
                     # remove args that are not part of classipy
                     val = dict(val)
+                    if isinstance(val.get("key"), basestring):
+                        fieldname = val["key"]
+                        val["key"] = lambda f,fn=fieldname: f[fn] # turn field name into callable
                     val["classvalues"] = val.pop("symbolvalues")
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
                     if "color" in key and notclassified != None:
-                        notclassified = Color(notclassified)
+                        notclassified = rgb(notclassified)
 
                     # convert any text symbolvalues to pure numeric so can be handled by classipy
                     if "color" in key:
                         if isinstance(val["classvalues"], dict):
                             # value color dict mapping for unique breaks
-                            val["classvalues"] = dict([(k,Color(v)) for k,v in val["classvalues"].items()])
+                            val["classvalues"] = dict([(k,rgb(v)) for k,v in val["classvalues"].items()])
                         else:
                             # color gradienr
-                            val["classvalues"] = [Color(col) for col in val["classvalues"]]
+                            val["classvalues"] = [rgb(col) for col in val["classvalues"]]
                     else:
                         pass #val["classvalues"] = [Unit(col) for col in val["classvalues"]]
 
@@ -733,7 +737,7 @@ class VectorLayer:
                 else:
                     # convert any text symbolvalues to pure numeric so can be handled by classipy
                     if "color" in key:
-                        val = Color(val)
+                        val = rgb(val)
                     else:
                         pass #val = Unit(val)
                     self.styleoptions[key] = val
@@ -745,12 +749,14 @@ class VectorLayer:
                 if isinstance(val, dict):
                     # random colors if not specified in unique algo
                     if val["breaks"] == "unique" and "symbolvalues" not in val:
-                        rand = random.randrange
-                        val["symbolvalues"] = [Color("random")
+                        val["symbolvalues"] = [rgb("random")
                                                  for _ in range(20)]
 
                     # remove args that are not part of classipy
                     val = dict(val)
+                    if isinstance(val.get("key"), basestring):
+                        fieldname = val["key"]
+                        val["key"] = lambda f,fn=fieldname: f[fn] # turn field name into callable
                     val["classvalues"] = val.pop("symbolvalues")
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
 
@@ -965,10 +971,7 @@ class RasterLayer:
 
             # set random gradient
             if not "gradcolors" in options:
-                rand = random.randrange
-                randomcolor = (rand(255), rand(255), rand(255), 255)
-                randomcolor2 = (rand(255), rand(255), rand(255), 255)
-                options["gradcolors"] = [randomcolor,randomcolor2]
+                options["gradcolors"] = [rgb("random"),rgb("random")]
 
         elif options["type"] == "rgb":
             options["r"] = options.get("r", 0)
