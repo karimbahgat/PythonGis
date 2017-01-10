@@ -139,6 +139,9 @@ class Band(object):
                 self._nodataval = float(nodataval)
         else:
             self._nodataval = nodataval
+            
+        # reset mask cache
+        self._cached_mask = None
 
     def get(self, col, row):
         return Cell(self, col, row)
@@ -157,12 +160,15 @@ class Band(object):
             nodata = self.nodataval
             if nodata != None:
                 # mask out nodata
-                mask = self._conditional("val == %s" %nodata)
+                print "cond..."
+                mask = self._conditional("val != %s" %nodata)
+                print "getmask",mask,nodata
+                mask.save("getmask.png")
                 
-            else:
+            else: 
                 # EVEN IF NO NODATA, NEED TO CREATE ORIGINAL MASK,
                 # TO PREVENT INFINITE OUTSIDE BORDER AFTER GEOTRANSFORM
-                mask = PIL.Image.new("1", self.img.size, 0)
+                mask = PIL.Image.new("1", self.img.size, 1)
                 
             self._cached_mask = mask
             return self._cached_mask
@@ -172,10 +178,10 @@ class Band(object):
         """Note, newmask must be PIL image and match band dimensions"""
         
         # paste nodatavals where mask is true
-        self.img.paste(self.nodataval, mask=newmask)
+        self.img.paste(self.nodataval, mask=newmask) #todo, invert mask, since true means valid
         
         # cache it
-        self._cached_mask = value
+        self._cached_mask = newmask
 
     def compute(self, expr):
         """Apply the given expression to recompute all values"""
@@ -433,11 +439,28 @@ class Band(object):
         lbl.pack()
         app.mainloop()
 
+
+
+def Name_generator():
+    i = 1
+    while True:
+        yield "Untitled%s" % i
+        i += 1
+
+
+NAMEGEN = Name_generator()
+
+
+
 class RasterData(object):
-    def __init__(self, filepath=None, data=None, image=None,
+    def __init__(self, filepath=None, data=None, name=None,
+                 image=None,
                  mode=None, tilesize=None, tiles=None,
                  **kwargs):
         self.filepath = filepath
+        self.name = name or filepath
+        if not self.name:
+            self.name = next(NAMEGEN)
 
         # load
         if filepath:

@@ -985,6 +985,9 @@ class RasterLayer:
     def bbox(self):
         return self.data.bbox
 
+    def is_empty(self):
+        return False # for now
+
     def render(self, resampling="nearest", lock_ratio=True, **georef):
         # position in space
         # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
@@ -1053,12 +1056,20 @@ class RasterLayer:
         #img.show()
         #rendered.mask.show()
 
-        img.paste(0, mask=rendered.mask) # sets all bands to 0 incl the alpha band
-        # TODO: maybe instead do:   img.putalpha(self.rendered.mask)
+        #img.paste(0, mask=rendered.mask) # sets all bands to 0 incl the alpha band
+        #print img, rendered.mask, rendered.mask.histogram()
+        rendered.mask.save('rendmask.png')
+        print "rendmask",rendered.mask
+        img.save("prealph.png")
+        img.putalpha(rendered.mask)
+        img.save("postalph.png")
         # ...
 
         # final
         self.img = img
+
+    def render_text(self, resampling="nearest", lock_ratio=True, **georef):
+        self.img_text = None
 
 
 class Legend:

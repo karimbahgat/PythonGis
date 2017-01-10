@@ -112,10 +112,12 @@ def resample(raster, algorithm="nearest", **rasterdef):
                                             resample=algocode)
             # if mask
             if band.nodataval != None:
-                datatrans.paste(band.nodataval, mask=masktrans)
+                pass #datatrans.paste(band.nodataval, mask=masktrans)
                 
             # store image
             targetrast.add_band(img=datatrans, nodataval=band.nodataval)
+
+        targetrast.mask = masktrans
 
     else:
         raise Exception("Not yet implemented")
