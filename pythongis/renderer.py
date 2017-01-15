@@ -2,7 +2,7 @@
 import random
 import itertools
 import pyagg, pyagg.legend
-import PIL, PIL.Image
+import PIL, PIL.Image, PIL.ImageChops
 import colour
 
 from .vector.data import VectorData
@@ -1036,6 +1036,11 @@ class RasterLayer:
             gband = rendered.bands[self.styleoptions["g"]].img.convert("L")
             bband = rendered.bands[self.styleoptions["b"]].img.convert("L")
             img = PIL.Image.merge("RGB", [rband,gband,bband])
+            #rendered.bands[self.styleoptions["r"]].img.show()
+            #rendered.bands[self.styleoptions["g"]].img.show()
+            #rendered.bands[self.styleoptions["b"]].img.show()
+            #img.show()
+            #fdsfdsf
             img = img.convert("RGBA")
 
         elif self.styleoptions["type"] == "3d surface":
@@ -1058,11 +1063,11 @@ class RasterLayer:
 
         #img.paste(0, mask=rendered.mask) # sets all bands to 0 incl the alpha band
         #print img, rendered.mask, rendered.mask.histogram()
-        rendered.mask.save('rendmask.png')
-        print "rendmask",rendered.mask
-        img.save("prealph.png")
-        img.putalpha(rendered.mask)
-        img.save("postalph.png")
+        #rendered.mask.save('rendmask.png')
+        #print "rendmask",rendered.mask
+        #img.save("prealph.png")
+        img.putalpha(PIL.ImageChops.invert(rendered.mask.convert("L"))) # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        #img.save("postalph.png")
         # ...
 
         # final

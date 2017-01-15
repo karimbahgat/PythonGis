@@ -99,22 +99,26 @@ def resample(raster, algorithm="nearest", **rasterdef):
         # on raster, perform quad transform
         flattened = [xory for point in targetcorners_pixels for xory in point]
 
-        # make mask over
-        masktrans = raster.mask.transform((targetrast.width,targetrast.height),
+        # transform the mask too
+        # note: if we don't invert the mask, the transform will form a nontransparent outer edge
+        masktrans = PIL.ImageChops.invert(raster.mask.convert("L"))
+        masktrans = masktrans.transform((targetrast.width,targetrast.height),
                                             PIL.Image.QUAD,
                                             flattened,
                                             resample=algocode)
+        masktrans = PIL.ImageChops.invert(masktrans).convert("1") # invert back
 
+        # transform each band
         for band in raster.bands:
             datatrans = band.img.transform((targetrast.width,targetrast.height),
                                             PIL.Image.QUAD,
                                             flattened,
                                             resample=algocode)
-            # if mask
+            # set mask cells to nullvalue
             if band.nodataval != None:
-                pass #datatrans.paste(band.nodataval, mask=masktrans)
+                datatrans.paste(band.nodataval, mask=masktrans)
                 
-            # store image
+            # add band
             targetrast.add_band(img=datatrans, nodataval=band.nodataval)
 
         targetrast.mask = masktrans

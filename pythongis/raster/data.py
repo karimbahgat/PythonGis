@@ -9,6 +9,13 @@ from . import saver
 # import PIL as the data container
 import PIL.Image, PIL.ImageMath, PIL.ImageStat
 
+# TODO:
+# not sure if setting mask should paste nodatavals, or if only as a temporary overlay so that underlying values be kept (and only changed via compute etc)...
+# also if conditional should query valid values only or all raw values...
+# ie a strategy of convenience behind-the-scene handling or give direct raw handling of values and masks... 
+# compute should only affect valid values, not nullvalues. 
+# ...
+
 
 class Cell(object):
     def __init__(self, band, col, row):
@@ -95,10 +102,11 @@ class Band(object):
         
         self.img = img
 
-        self.nodataval = nodataval # calls on the setter method
         self._pixelaccess = None
         self._cached_mask = None
         self._rast = None  # reference to owning raster, internal only
+
+        self.nodataval = nodataval # calls on the setter method
 
     def __iter__(self):
         width,height = self.img.size
@@ -143,6 +151,10 @@ class Band(object):
         # reset mask cache
         self._cached_mask = None
 
+        # also reset the mask cache of the parent raster
+        if self._rast:
+            self._rast._cached_mask = None
+
     def get(self, col, row):
         return Cell(self, col, row)
 
@@ -160,15 +172,12 @@ class Band(object):
             nodata = self.nodataval
             if nodata != None:
                 # mask out nodata
-                print "cond..."
-                mask = self._conditional("val != %s" %nodata)
-                print "getmask",mask,nodata
-                mask.save("getmask.png")
+                mask = self._conditional("val == %s" %nodata)
                 
             else: 
                 # EVEN IF NO NODATA, NEED TO CREATE ORIGINAL MASK,
                 # TO PREVENT INFINITE OUTSIDE BORDER AFTER GEOTRANSFORM
-                mask = PIL.Image.new("1", self.img.size, 1)
+                mask = PIL.Image.new("1", self.img.size, 0)
                 
             self._cached_mask = mask
             return self._cached_mask
@@ -178,10 +187,14 @@ class Band(object):
         """Note, newmask must be PIL image and match band dimensions"""
         
         # paste nodatavals where mask is true
-        self.img.paste(self.nodataval, mask=newmask) #todo, invert mask, since true means valid
+        self.img.paste(self.nodataval, mask=newmask)
         
         # cache it
         self._cached_mask = newmask
+
+        # also reset the mask cache of the parent raster
+        if self._rast:
+            self._rast._cached_mask = None
 
     def compute(self, expr):
         """Apply the given expression to recompute all values"""
@@ -239,8 +252,9 @@ class Band(object):
         result = self._conditional(condition)
 
         # set conditional to false for pixels covered by nodatamask
-        if self.nodataval != None:
-            result.paste(0, (0,0), self.mask)
+        #if self.nodataval != None:
+        #    # TODO: should conditional really ignore nodatavals??? Prob not actually, should query actual raw values
+        #    result.paste(0, (0,0), self.mask)
 
         band = Band(result, self.nodataval)
         return band
@@ -662,8 +676,7 @@ class RasterData(object):
             if len(self) == 1:
                 mask = self.bands[0].mask
             elif len(self) > 1:
-                # mask out where all bands have nodata value
-                # NOTE: wont work for floats, need another method...
+                # mask out where all band masks are true
                 masks_namedict = dict([("mask%i"%i, band.mask) for i,band in enumerate(self.bands) ])
                 expr = " & ".join(masks_namedict.keys())
                 mask = PIL.ImageMath.eval(expr, **masks_namedict).convert("1")
