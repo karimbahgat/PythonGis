@@ -1009,6 +1009,7 @@ class RasterLayer:
             # ...
             
             band = rendered.bands[self.styleoptions["bandnum"]]
+            mask = band.mask
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
@@ -1020,6 +1021,7 @@ class RasterLayer:
 
         elif self.styleoptions["type"] == "colorscale":
             band = rendered.bands[self.styleoptions["bandnum"]]
+            mask = band.mask
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
@@ -1032,6 +1034,8 @@ class RasterLayer:
             img = canv.get_image()
 
         elif self.styleoptions["type"] == "rgb":
+            mask = rendered.mask
+            
             rband = rendered.bands[self.styleoptions["r"]].img.convert("L")
             gband = rendered.bands[self.styleoptions["g"]].img.convert("L")
             bband = rendered.bands[self.styleoptions["b"]].img.convert("L")
@@ -1066,7 +1070,7 @@ class RasterLayer:
         #rendered.mask.save('rendmask.png')
         #print "rendmask",rendered.mask
         #img.save("prealph.png")
-        img.putalpha(PIL.ImageChops.invert(rendered.mask.convert("L"))) # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        img.putalpha(PIL.ImageChops.invert(mask.convert("L"))) # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
         #img.save("postalph.png")
         # ...
 

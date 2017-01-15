@@ -26,7 +26,10 @@ mapp = pg.renderer.Map()
 vect = pg.vector.data.VectorData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\shp\domestic.shp")
 print vect.fields
 
-mapp.add_layer(rast) #, type="colorscale")  
+mapp.add_layer(rast,
+               bandnum=1,
+               type="colorscale",
+               gradcolors=[(222,222,222),(222,0,0)])  
 mapp.add_layer(vect,
             fillsize={"breaks":"headtail",
                         "key":lambda f: float(f["Average_nk"]),
