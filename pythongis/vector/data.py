@@ -1,6 +1,6 @@
 
 # import builtins
-import sys, os, itertools, operator
+import sys, os, itertools, operator, math
 from collections import OrderedDict
 import datetime
 
@@ -38,6 +38,14 @@ class _ModuleFuncsAsClassMethods(object):
                         return func(*args, **kwargs)
                     return firstarg_inserted
                 self.__dict__[k] = as_method(func)
+
+
+
+
+
+def is_missing(val):
+    return val is None or (isinstance(val, float) and math.isnan(val))
+
 
 
 
@@ -377,6 +385,83 @@ class VectorData:
             val = feat.row[fieldindex]
             feat.row[fieldindex] = valfunc(val)
 
+    def inspect_field(self, field):
+        """Returns more detailed stats unique values freq for a single field."""
+
+        # TODO: split into multiple methods, eg field_stats vs field_values/frequencies
+        # TODO: standardize table string formatting, eg as a vectordata.stringformat() method, and simply populate a stats vectordata table and call its method
+        # TODO: sort freq table by percentages
+        # TODO: fix unicode print error
+        
+        typ = self.field_type(field)
+        getval = lambda v: v
+        values = [f[field] for f in self]
+
+        def getmissing(v):
+            """Sets valid values to none so that only missing values are counted in stats"""
+            v = is_missing(getval(v))
+            v = True if v else None 
+            return v
+
+        from . import sql
+        
+        if typ in ("text",):
+            printfields = ["", "frequency", "percent"]
+            printrows = []
+
+            for uniq in sorted(set(values)):
+                freq = values.count(uniq)
+                perc = freq / float(len(self)) * 100
+                perc = "%.2f%%" % perc
+                printrow = [uniq, freq, perc]
+                printrows.append(printrow)
+            
+        elif typ in ("int","float"):
+            printfields = ["", "type", "min/minority", "max/majority", "mean", "stdev", "missing"]
+            printrows = []
+            fieldmapping = [("min",getval,"min"),
+                            ("max",getval,"max"),
+                            ("mean",getval,"mean"),
+                            #("stdev",getval,"stddev"),
+                            ("missing",getmissing,"count"),]
+            _min,_max,mean,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
+            missing = missing if missing else 0
+            missing = "%s (%.2f%%)" % (missing, missing/float(len(self))*100 )
+            printrow = [field, typ, _min, _max, mean, None, missing]
+            printrows.append(printrow)
+
+        # format outputstring
+        outstring = "Inspecting field: '%s' \n" % field
+        outstring += "type: %s \n" % typ
+        outstring += "values: " + "\n"
+
+        row_format = "{:>15}" * (len(printfields))
+        outstring += row_format.format(*printfields) + "\n"
+        for row in printrows:
+            outstring += row_format.format(*row) + "\n"
+
+        return outstring
+
+    def field_type(self, field):
+        """Returns field type of field based on its values (ignoring missing values)"""
+        values = (f[field] for f in self)
+        values = (v for v in values if not is_missing(v))
+        # approach: at first assume int, if fails then assume float,
+        # ...if fails then assume text and stop checking (lowest possible dtype)
+        typ = "int"
+        for v in values:
+            # TODO: also detect other types eg datetime, etc
+            try:
+                v = float(v)
+                if v.is_integer():
+                    pass
+                else:
+                    typ = "float"
+            except:
+                typ = "text"
+                break
+        return typ
+
     def sort(self, key, reverse=False):
         self.features = OrderedDict([ (feat.id,feat) for feat in sorted(self.features.values(), key=key, reverse=reverse) ])
 
@@ -668,20 +753,67 @@ class VectorData:
         new.fields = [field for field in self.fields]
         featureobjs = (Feature(new, feat.row, feat.geometry) for feat in self )
         new.features = OrderedDict([ (feat.id,feat) for feat in featureobjs ])
-        if hasattr(self, "spindex"): new.spindex = self.spindex.copy()
+        #if hasattr(self, "spindex"): new.spindex = self.spindex.copy() # NO SUCH METHOD
         return new
 
-    def inspect(self, fields=None, maxvals=30):
-        """Returns a dict of all fields and unique values for each."""
-        # TODO: Allow only some fields
-        # TODO: Maybe provide stats for numeric fields...
-        cols = dict(zip(self.fields, zip(*self)))
-        for field,vals in cols.items():
-            uniqvals = set(vals)
-            cols[field] = list(sorted(uniqvals))[:maxvals]
+    def describe(self, *fields):
+        """Returns table of fieldname, type, min/minority, max/majority, stdev, missing"""
 
-        import pprint
-        return "Vector data contents:\n" + pprint.pformat(cols, indent=4)
+        # TODO: maybe not use all those stats...
+
+        printfields = ["", "type", "min/minority", "max/majority", "mean", "stdev", "missing"]
+        printrows = []
+
+        from . import sql
+        if not fields:
+            fields = self.fields
+        
+        for field in fields:
+            
+            values = [feat[field] for feat in self]
+            typ = self.field_type(field)
+            getval = lambda v: v
+            
+            def getmissing(v):
+                """Sets valid values to none so that only missing values are counted in stats"""
+                v = is_missing(getval(v))
+                v = True if v else None 
+                return v
+            
+            if typ in ("text",):
+                fieldmapping = [("min/minority",getval,"minority"),
+                                ("max/majority",getval,"majority"),
+                                ("missing",getmissing,"count"),]
+                minor,major,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
+                printrow = [field, typ, minor, major, None, None, missing]
+                
+            elif typ in ("int","float"):
+                fieldmapping = [("min/minority",getval,"min"),
+                                ("max/majority",getval,"max"),
+                                ("mean",getval,"mean"),
+                                #("stdev",getval,"stddev"),
+                                ("missing",getmissing,"count"),]
+                _min,_max,mean,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
+                missing = missing if missing else 0
+                missing = "%s (%.2f%%)" % (missing, missing/float(len(self))*100 )
+                printrow = [field, typ, _min, _max, mean, None, missing]
+                
+            printrows.append(printrow)
+
+        # format outputstring
+        outstring = "Describing vector data:" + "\n"
+        outstring += "filepath: %s \n" % self.filepath
+        outstring += "type: %s \n" % self.type
+        outstring += "length: %s \n" % len(self) 
+        outstring += "bbox: %s \n" % repr(self.bbox) if self.has_geometry else None       
+        outstring += "fields:" + "\n"
+        
+        row_format = "{:>15}" * (len(printfields))
+        outstring += row_format.format(*printfields) + "\n"
+        for row in printrows:
+            outstring += row_format.format(*row) + "\n"
+            
+        return outstring
     
     def render(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
         from .. import renderer

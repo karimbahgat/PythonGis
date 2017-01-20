@@ -281,8 +281,8 @@ def rasterize(vectordata, valuekey=None, **rasterdef):
     # the last feature. Maybe provide aggfunc option?
     # See further below.
 
-    if valuekey:
-        raise Exception("Rasterizing with valuekey not yet implemented")
+    #if valuekey:
+    #    raise Exception("Rasterizing with valuekey not yet implemented")
 
     mode = "float32" if valuekey else "1bit"
     raster = data.RasterData(mode=mode, **rasterdef)
@@ -297,6 +297,8 @@ def rasterize(vectordata, valuekey=None, **rasterdef):
 
     # draw the vector data
     for feat in vectordata:
+        if not feat.geometry: continue
+        
         val = float(valuekey(feat)) if valuekey else 1.0
         geotype = feat.geometry["type"]
 

@@ -21,24 +21,24 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
 
     # handle zonaldata being vector type
     if not isinstance(zonaldata, RasterData):
-        zonaldata = manager.rasterize(zonaldata, **valuedata.meta)
+        zonaldata = manager.rasterize(zonaldata, **valuedata.rasterdef)
     
     # resample value grid into zonal grid
     if zonaldata.affine != valuedata.affine:
-        valuedata = manager.resample(valuedata, **zonaldata.meta)
+        valuedata = manager.resample(valuedata, **zonaldata.rasterdef)
 
     # pick one band for each
     zonalband = zonaldata.bands[zonalband]
     valueband = valuedata.bands[valueband]
 
     # create output image, using nullzone as nullvalue
-    georef = dict(width=valueband.width, height=valueband.height,
-                  affine=valueband.affine)
-    outrast = Raster(mode="float32", **georef)
+    georef = dict(width=valuedata.width, height=valuedata.height,
+                  affine=valuedata.affine)
+    outrast = RasterData(mode="float32", **georef)
     outrast.add_band(nodataval=valueband.nodataval)
 
     # get stats for each unique value in zonal data
-    zonevalues = (val for count,val in zonalband.img.getcolors(self.width*self.height))
+    zonevalues = (val for count,val in zonalband.img.getcolors(zonaldata.width*zonaldata.height))
     zonesdict = {}
     for zoneval in zonevalues:
         # exclude nullzone
@@ -50,14 +50,14 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
         
         # also exclude null values from calculations
         curzone.mask = valueband.mask   # pastes additional nullvalues
-        del curzone._cached_mask    # force having to recreate the mask using the combined old and pasted nullvals
+        curzone._cached_mask = None    # force having to recreate the mask using the combined old and pasted nullvals
 
         # retrieve stats
         stats = curzone.summarystats(outstat)
         zonesdict[zoneval] = stats
 
         # write chosen stat to outimg
-        outrast.bands[0].img.paste(statsdict[outstat], mask=curzone.mask)
+        outrast.bands[0].img.paste(stats[outstat], mask=curzone.mask)
         
     return zonesdict, outrast
 

@@ -16,15 +16,19 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
     Aggregfuncs is a series of 3-tuples: an output column name, a value function or value hash index on which to base the aggregation, and a valid string or custom function for aggregating the retieved values.
     """
     def lookup_aggfunc(agg):
+        # handle aliases
+        if agg in ("average","avg"):
+            agg = "mean"
+
+        # detect
         if agg == "count": return len
         elif agg == "sum": return sum
         elif agg == "max": return max
         elif agg == "min": return min
         elif agg == "first": return lambda seq: seq.__getitem__(0)
         elif agg == "last": return lambda seq: seq.__getitem__(-1)
-        elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))
-        elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))
-        elif agg == "average": return lambda seq: sum(seq)/float(len(seq))
+        elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))[0]
+        elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))[0]
         elif agg == "mean": return lambda seq: sum(seq)/float(len(seq))
         elif hasattr(agg, "__call__"):
             # agg is not a string but a function
@@ -48,12 +52,18 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
         try: return float(value)
         except: return None
 
+    def is_missing(val):
+        return val is None or (isinstance(val, float) and math.isnan(val))
+
     iterable = list(iterable)
     row = []
     for _,valfunc,aggname,aggfunc in aggregfuncs:
-        values = [valfunc(item) for item in iterable]
+        values = (valfunc(item) for item in iterable)
+
+        # missing values are not considered when calculating stats
+        values = [val for val in values if not is_missing(val)] 
         
-        if aggname in ("sum","max","min","average"):
+        if aggname in ("sum","max","min","mean"):
             # only consider number values if numeric stats
             values = [make_number(value) for value in values if make_number(value) != None]
 

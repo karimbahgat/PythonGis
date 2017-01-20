@@ -275,7 +275,18 @@ def from_file(filepath, **georef):
         nodataval = read_nodata(raw_tags)
 
         # group image bands into band tuples
-        bands = [im for im in main_img.split()]
+        if len(main_img.mode) == 1:
+            bands = [main_img]
+        else:
+            bands = [im for im in main_img.split()]
+            
+            # Alternative: optionally try below in case of split's unnecessary copying leading to memoryerror for large images
+            #bands = []
+            #flat = main_img.getdata()
+            #for bandnum in range(len(main_img.mode)):
+            #    banddata = [px[bandnum] for px in flat]
+            #    bandim = PIL.Image.frombytes(main_img.mode, main_img.size, banddata)
+            #    bands.append(bandim)
 
         # read coordinate ref system
         crs = read_crs(raw_tags)

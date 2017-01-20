@@ -2,11 +2,14 @@
 
 # import builtins
 import itertools
+import math
 
 # import fileformats
 import shapefile as pyshp
 import pygeoj
 
+
+NaN = float("nan")
 
 
 def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12, **kwargs):
@@ -18,6 +21,8 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
         elif isinstance(value, float):
             if value.is_integer():
                 return int(value)
+            elif math.isnan(value):
+                return None
             else:
                 # floats are rounded
                 return round(value, maxprecision)
@@ -40,10 +45,27 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             fieldtype = "N" # assume number until proven otherwise
             for row in rows:
                 value = row[fieldindex]
-                if value not in (None,""):
+                
+                if value in (None,"") or (isinstance(value, float) and math.isnan(value)):
+                    # empty value, so just keep assuming same type
+                    pass
+                
+                else:
                     try:
                         # make nr fieldtype if content can be made into nr
+
+                        # convert to nr or throw exception if text
                         value = float(value)
+
+                        # rare special case where text is 'nan', is a valid input to float, so raise exception to treat as text
+                        if math.isnan(value):
+                            raise ValueError()
+
+                        # TODO: also how to handle inf? math.isinf(). Treat as text or nr? 
+                        if math.isinf(value):
+                            raise NotImplementedError("Saving infinity values not yet implemented")
+
+                        # detect nr type
                         if value.is_integer():
                             _strnr = bytes(value)
                         else:
@@ -56,14 +78,12 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                         fieldtype = "C"
                         value = value if isinstance(value, unicode) else bytes(value)
                         fieldlen = max(( len(value), fieldlen ))
-                else:
-                    # empty value, so just keep assuming same type
-                    pass
+                        
             if fieldtype == "N" and decimals == 0:
                 fieldlen -= 2 # bc above we measure lengths for ints as if they were floats, ie with an additional ".0"
-                func = lambda v: "" if v in (None,"") else int(v)
+                func = lambda v: "" if (v in (None,"") or math.isnan(v)) else int(v)
             elif fieldtype == "N" and decimals:
-                func = lambda v: "" if v in (None,"") else float(v)
+                func = lambda v: "" if (v in (None,"") or math.isnan(v)) else float(v)
             elif fieldtype == "C":
                 func = lambda v: v #encoding are handled later
             else:
@@ -87,7 +107,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             # create empty pyshp shape
             shape = pyshp._Shape()
             # set shapetype
-            geojtype = geoj["type"]
+            geojtype = geoj["type"] if geoj else "Null"
             if geojtype == "Null":
                 pyshptype = pyshp.NULL
             elif geojtype == "Point":

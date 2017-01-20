@@ -1,5 +1,6 @@
 
 import itertools, operator, math
+import gc   # garbage collector
 from .data import *
 
 import shapely, shapely.ops, shapely.geometry
@@ -16,6 +17,8 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
     """
     Summarizes the values of "valuedata" that overlap "groupbydata",
     and adds the summary statistics to the output data.
+
+    "groupbydata" must be vector instance, but "valuedata" can be either either a vector or raster instance. 
 
     "fieldmapping" is a list of ('outfieldname', 'getvaluefunction', 'statistic name or function') tuples that decides which
     variables to summarize and how to do so. Valid statistics are count,
@@ -34,116 +37,119 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
 
     # loop
     if not hasattr(groupbydata, "spindex"): groupbydata.create_spatial_index()
-    if not hasattr(valuedata, "spindex"): valuedata.create_spatial_index()
     groupfeats = groupbydata if keepall else groupbydata.quick_overlap(valuedata.bbox) # take advantage of spindex if not keeping all
-    for groupfeat in groupfeats: 
 
-        # testing
-##        if groupfeat["CNTRY_NAME"] not in ("Taiwan",):
-##            continue
-
-        if not groupfeat.geometry:
-            if keepall:
-                newrow = list(groupfeat.row)
-                newrow.extend( ("" for _ in fieldmapping) )
-                out.add_feature(newrow, None)
-
-            continue
+    if isinstance(valuedata, VectorData):
+        # vector in vector
         
-        geom = groupfeat.get_shapely()
-        supergeom = supershapely(geom)
-        valuefeats = ((valfeat,valfeat.get_shapely()) for valfeat in valuedata.quick_overlap(groupfeat.bbox))
+        if not hasattr(valuedata, "spindex"): valuedata.create_spatial_index()
+        for groupfeat in groupfeats: 
 
-        # aggregate
-        if groupbydata.type == valuedata.type == "Polygon":
-            # when comparing polys to polys, dont count neighbouring polygons that just touch on the edge
-            def overlaps(valgeom):
-                if supergeom.intersects(valgeom) and not geom.touches(valgeom):
-                    intsec = geom.intersection(valgeom)
-                    if not intsec.is_empty and groupbydata.type in intsec.geom_type and intsec.area > 0.00000000001:
-                        return True
-        else:
-            # for lines and points, ok that just touches on the edge
-            def overlaps(valgeom):
-                return supergeom.intersects(valgeom)
+            if not groupfeat.geometry:
+                if keepall:
+                    newrow = list(groupfeat.row)
+                    newrow.extend( ("" for _ in fieldmapping) )
+                    out.add_feature(newrow, None)
+
+                continue
             
-        if key:
-            matches = (valfeat for valfeat,valgeom in valuefeats
-                       if key(groupfeat,valfeat) and overlaps(valgeom))
-        else:
-            matches = ((valfeat,valgeom) for valfeat,valgeom in valuefeats
-                       if overlaps(valgeom))
+            geom = groupfeat.get_shapely()
+            supergeom = supershapely(geom)
+            valuefeats = ((valfeat,valfeat.get_shapely()) for valfeat in valuedata.quick_overlap(groupfeat.bbox))
 
-        # clean potential junk, maybe allow user setting of minimum area (put on hold for now, maybe user should make sure of this in advance?)
-        def cleaned():
-            for valfeat,valgeom in matches:
-##                intsec = geom.intersection(valgeom)
-##                if groupbydata.type in intsec.geom_type and intsec.area > 0.00000000001:
-##                    yield valfeat
-                yield valfeat
-        matches = list(cleaned())
+            # aggregate
+            if groupbydata.type == valuedata.type == "Polygon":
+                # when comparing polys to polys, dont count neighbouring polygons that just touch on the edge
+                def overlaps(valgeom):
+                    if supergeom.intersects(valgeom) and not geom.touches(valgeom):
+                        intsec = geom.intersection(valgeom)
+                        if not intsec.is_empty and groupbydata.type in intsec.geom_type and intsec.area > 0.00000000001:
+                            return True
+            else:
+                # for lines and points, ok that just touches on the edge
+                def overlaps(valgeom):
+                    return supergeom.intersects(valgeom)
+                
+            if key:
+                matches = (valfeat for valfeat,valgeom in valuefeats
+                           if key(groupfeat,valfeat) and overlaps(valgeom))
+            else:
+                matches = ((valfeat,valgeom) for valfeat,valgeom in valuefeats
+                           if overlaps(valgeom))
 
-        # testing...
-##        print "groupfeat",zip(groupbydata.fields,groupfeat.row)
-##        groupfeat.view(1000,600,bbox=groupfeat.bbox, fillcolor="red")
-##        for vf in matches:
-##            print "valfeat",zip(valuedata.fields,vf.row)
-##            vf.view(1000,600,bbox=groupfeat.bbox, fillcolor="blue")
-##            from .data import Feature
-##            intsec = groupfeat.get_shapely().intersection(vf.get_shapely())
-##            print intsec.area
-##            Feature(groupbydata, [], intsec.__geo_interface__).view(1000,500,bbox=groupfeat.bbox, fillcolor="yellow")
+            # clean potential junk, maybe allow user setting of minimum area (put on hold for now, maybe user should make sure of this in advance?)
+            def cleaned():
+                for valfeat,valgeom in matches:
+                    yield valfeat
+            matches = list(cleaned())
 
-        if valuegroup:
-            if matches:
-                for group in sql.groupby(matches, valuegroup):
-                    aggreg = sql.aggreg(group, fieldmapping)
+            if valuegroup:
+                if matches:
+                    for group in sql.groupby(matches, valuegroup):
+                        aggreg = sql.aggreg(group, fieldmapping)
 
+                        newrow = list(groupfeat.row)
+                        newrow.extend( aggreg )
+                        out.add_feature(newrow, geom.__geo_interface__)
+
+                elif keepall:
+                    newrow = list(groupfeat.row)
+                    newrow.extend( ("" for _ in fieldmapping) )
+                    out.add_feature(newrow, geom.__geo_interface__)
+
+            else:
+                if matches:
+                    aggreg = sql.aggreg(matches, fieldmapping)
+
+                # add
+                if matches:
                     newrow = list(groupfeat.row)
                     newrow.extend( aggreg )
                     out.add_feature(newrow, geom.__geo_interface__)
 
-            elif keepall:
-                newrow = list(groupfeat.row)
-                newrow.extend( ("" for _ in fieldmapping) )
-                out.add_feature(newrow, geom.__geo_interface__)
+                elif keepall:
+                    newrow = list(groupfeat.row)
+                    newrow.extend( ("" for _ in fieldmapping) )
+                    out.add_feature(newrow, geom.__geo_interface__)
 
-        else:
-            if matches:
-                aggreg = sql.aggreg(matches, fieldmapping)
+    else:
+        # raster in vector
+        # TODO: For very large files, something in here produces a crash after returning output even though memory use seems low...
+        output = group.copy()
+        for statfield in outstats.keys():
+            output.compute(statfield, None)
 
-            # add
-            if matches:
-                newrow = list(groupfeat.row)
-                newrow.extend( aggreg )
-                out.add_feature(newrow, geom.__geo_interface__)
+        output.create_spatial_index()
 
-            elif keepall:
-                newrow = list(groupfeat.row)
-                newrow.extend( ("" for _ in fieldmapping) )
-                out.add_feature(newrow, geom.__geo_interface__)
-        
-##    # insert groupby data fields into fieldmapping
-##    basefm = [(name,lambda f:f[name],"first") for name in groupbydata.fields]
-##    fieldmapping = basefm + fieldmapping
-##    out.fields = [name for name,valfunc,aggfunc in fieldmapping]
-##
-##    # group by each groupby feature
-##    iterable = ([(feat,feat.get_shapely()),(otherfeat,otherfeat.get_shapely())]
-##                for feat in groupbydata.quick_intersect(valuedata.bbox)
-##                for otherfeat in valuedata.quick_intersect(feat.bbox))
-##    for group in sql.groupby(iterable, lambda([(f,g),(of,og)]): id(f)):
-##
-##        # filter to only those that intersect
-##        group = sql.where(group, lambda([(f,g),(of,og)]): g.intersects(og))
-##
-##        # make iter as usually expected by fieldmapping
-##        group = ((of,og) for [(f,g),(of,og)] in group)
-##
-##        # aggregate and add
-##        # (not sure if will be correct, in terms of args expected by fieldmapping...?)
-##        row,geom = sql.aggreg(group, fieldmapping, lambda(itr): next(itr)[1])
-##        out.add_feature(row, geom)
+        for tile in pg.raster.manager.tiled(rast):
+            print tile
+            
+            for f in output.quick_overlap(tile.bbox):
+                fdata = pg.VectorData()
+                fdata.add_feature([], f.geometry)
+                subtile = pg.raster.manager.clip(tile, fdata)
+                ##subtile.view(1000,500)
+                stats = subtile.bands[0].summarystats(*outstats.values())
+                for statfield,stat in outstats.items():
+                    # TODO: ACTUALLY NOT DONE, MAYBE HAVE TO ABONDON TILE-FEAT SEQ, INSTEAD FEAT-TILE? 
+                    # wrong to just pluss? what if mean? need to take mean of means? or store all values?
+                    if f[statfield] != None:
+                        # add to existing value
+                        if stats[stat] != None:
+                            # check for nullstat due to tile with only nullvalues, dont add
+                            f[statfield] += stats[stat]
+                    else:
+                        # add for first time
+                        f[statfield] = stats[stat]
+
+                del fdata
+                del subtile.bands[0].img
+                del subtile
+                gc.collect()
+
+            del tile.bands[0].img
+            del tile
+            gc.collect()
 
     return out
 

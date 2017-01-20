@@ -331,19 +331,18 @@ class Band(object):
                 # but do not include counts of nodataval
                 
                 nodata = self.nodataval
-                def valuecountsgen():
-                    return ((cnt,val) for cnt,val in self.img.getcolors(self.width*self.height) if val != nodata)
+                valuecounts = [(cnt,val) for cnt,val in self.img.getcolors(self.width*self.height) if val != nodata]
                 
                 def _count():
-                    return sum((cnt for cnt,val in valuecountsgen()))
+                    return sum((cnt for cnt,val in valuecounts)) if valuecounts else 0
                 def _sum():
-                    return sum((cnt*val for cnt,val in valuecountsgen()))
+                    return sum((cnt*val for cnt,val in valuecounts)) if valuecounts else None
                 def _mean():
-                    return _sum()/float(_count())
+                    return _sum()/float(_count()) if valuecounts else None
                 def _min():
-                    return min((val for cnt,val in valuecountsgen()))
+                    return min((val for cnt,val in valuecounts)) if valuecounts else None
                 def _max():
-                    return max((val for cnt,val in valuecountsgen()))
+                    return max((val for cnt,val in valuecounts)) if valuecounts else None
                     
                 if not stattypes or "count" in stattypes:
                     statsdict["count"] = _count()
@@ -357,14 +356,14 @@ class Band(object):
                     statsdict["max"] = _max()
                 # some more stats
                 if not stattypes or "median" in stattypes:
-                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[1]))
-                    statsdict["median"] = sortedvals[len(sortedvals)//2][1]
+                    sortedvals = list(sorted(valuecounts, key=lambda e: e[1]))
+                    statsdict["median"] = sortedvals[len(sortedvals)//2][1] if sortedvalues else None
                 if not stattypes or "majority" in stattypes:
-                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
-                    statsdict["majority"] = sortedvals[-1][1]
+                    sortedvals = list(sorted(valuecounts, key=lambda e: e[0]))
+                    statsdict["majority"] = sortedvals[-1][1] if sortedvalues else None
                 if not stattypes or "minority" in stattypes:
-                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
-                    statsdict["minority"] = sortedvals[0][1]
+                    sortedvals = list(sorted(valuecounts, key=lambda e: e[0]))
+                    statsdict["minority"] = sortedvals[0][1] if sortedvalues else None
                 
             except MemoryError:
 
@@ -375,20 +374,19 @@ class Band(object):
                     self._pixelaccess = self.img.load()
 
                 nodata = self.nodataval
-                def valuecountsgen():
-                    allvals = (self._pixelaccess[x,y] for y in range(self.height) for x in range(self.width))
-                    return (val for val in allvals if val != nodata)
+                allvals = (self._pixelaccess[x,y] for y in range(self.height) for x in range(self.width))
+                values = [val for val in allvals if val != nodata]
 
                 def _count():
-                    return sum((1 for val in valuecountsgen()))
+                    return sum((1 for val in values)) if values else 0
                 def _sum():
-                    return sum((val for val in valuecountsgen()))
+                    return sum((val for val in values)) if values else None
                 def _mean():
-                    return _sum()/float(_count())
+                    return _sum()/float(_count()) if values else None
                 def _min():
-                    return min(valuecountsgen())
+                    return min(values) if values else None
                 def _max():
-                    return max(valuecountsgen())
+                    return max(values) if values else None
                 
                 if not stattypes or "count" in stattypes:
                     statsdict["count"] = _count()
@@ -402,14 +400,14 @@ class Band(object):
                     statsdict["min"] = _min()
                 # some more stats
                 if not stattypes or "median" in stattypes:
-                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[1]))
-                    statsdict["median"] = sortedvals[len(sortedvals)//2][1]
+                    sortedvals = list(sorted(values))
+                    statsdict["median"] = sortedvals[len(sortedvals)//2] if sortedvalues else None
                 if not stattypes or "majority" in stattypes:
-                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
-                    statsdict["majority"] = sortedvals[-1][1]
+                    sortedvals = list(sorted(values))
+                    statsdict["majority"] = sortedvals[-1] if sortedvalues else None
                 if not stattypes or "minority" in stattypes:
-                    sortedvals = list(sorted(valuecountsgen(), key=lambda e: e[0]))
-                    statsdict["minority"] = sortedvals[0][1]
+                    sortedvals = list(sorted(values))
+                    statsdict["minority"] = sortedvals[0] if sortedvalues else None
                 
         return statsdict
 
@@ -547,8 +545,10 @@ class RasterData(object):
             yield band
 
     def __repr__(self):
-        import pprint
-        return "RasterData object:\n" + pprint.pformat(self.meta, indent=4)
+        return "<Raster data: mode={mode} bands={bands} size={size} bbox={bbox}>".format(mode=self.mode,
+                                                                                         bands=len(self),
+                                                                                         size=(self.width,self.height),
+                                                                                         bbox=self.bbox)
 
     @property
     def nodatavals(self):
@@ -561,6 +561,14 @@ class RasterData(object):
                         width=self.width,
                         height=self.height,
                         nodatavals=self.nodatavals,
+                        affine=self.affine,
+                        bbox=self.bbox)
+        return metadict
+
+    @property
+    def rasterdef(self):
+        metadict = dict(width=self.width,
+                        height=self.height,
                         affine=self.affine)
         return metadict
 
@@ -732,10 +740,10 @@ def pilmode_to_rastmode(mode):
                 "L":"int8",
                 "P":"int8",
                 
-                "I:16":"int16",
+                "I;16":"int16",
                 "I":"int32",
                 
-                "F:16":"float16",
+                "F;16":"float16",
                 "F":"float32"}[mode]
     
     return rastmode
@@ -746,10 +754,10 @@ def rastmode_to_pilmode(mode):
                 "int8":"L",
                 "int8":"L",
                 
-                "int16":"I:16",
+                "int16":"I;16",
                 "int32":"I",
                 
-                "float16":"F:16",
+                "float16":"F;16",
                 "float32":"F"}[mode]
     
     return pilmode
