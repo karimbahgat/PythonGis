@@ -10,6 +10,21 @@ pg.renderer.DEFAULTSTYLE = "pastelle"
 # ADD PROPORTIONAL CLASSIFICATION, USING REAL PROPORTIONAL DIFFERENCES WITHOUT ANY CLASS GROUPINGS, ONLY MAX VS MIN
 
 
+
+###
+print("\n"+"legend test")
+rast = pg.raster.data.RasterData(r"C:\Users\kimo\Dropbox\Work\Workplace\Geobook15\pygeo book 2\code\(raw sandbox,incl abondoned ideas)\test_files\geotiff\TrueMarble.16km.2700x1350.tif")
+rast.bands[0].nodataval = 0
+mapp = pg.renderer.Map()
+mapp.add_layer(rast, type="colorscale", gradcolors=["yellow","red"], legendoptions=dict(direction="n", title="Red band"))
+mapp.add_legend(xy=("2%w","50%h"), anchor="w")
+mapp.view()
+
+fsdsfsdfsd
+
+
+
+
 ###
 
 print("\n"+"feature labels test")

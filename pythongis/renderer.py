@@ -944,7 +944,7 @@ class RasterLayer:
 
         # by default, set random style color
         if not "type" in options:
-            if len(data.bands) == 3:
+            if len(data.bands) >= 3:
                 options["type"] = "rgb"
             else:
                 options["type"] = "colorscale"
@@ -969,8 +969,10 @@ class RasterLayer:
             if not "maxval" in options:
                 options["maxval"] = band.summarystats("max")["max"]
 
-            # set random gradient
-            if not "gradcolors" in options:
+            # process gradient
+            if "gradcolors" in options:
+                options["gradcolors"] = [rgb(col) for col in options["gradcolors"]]
+            else:
                 options["gradcolors"] = [rgb("random"),rgb("random")]
 
         elif options["type"] == "rgb":
@@ -1086,14 +1088,15 @@ class Legend:
         self.map = map
         self.img = None
         self.autobuild = autobuild
-        self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **options)
+        self.options = options
+        self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **self.options)
 
     def add_fillcolors(self, layer, **override):
+        # use layer's legendoptions and possibly override
+        options = dict(layer.legendoptions)
+        options.update(override)
+            
         if isinstance(layer, VectorLayer):
-            # use layer's legendoptions and possibly override
-            options = dict(layer.legendoptions)
-            options.update(override)
-
             shape = options.pop("shape", None)
             shape = shape or layer.styleoptions.get("shape")
             if not shape:
@@ -1129,9 +1132,18 @@ class Legend:
                 self.add_single_symbol(shape, **options)
 
         elif isinstance(layer, RasterLayer):
-            shape = "polygon"
-            # ...
-            raise Exception("Legend layer for raster data not yet implemented")
+            if layer.styleoptions["type"] in ("grayscale","colorscale"):
+                if layer.styleoptions["type"] == "grayscale":
+                    gradient = [rgb("black"),rgb("white")]
+                else:
+                    gradient = layer.styleoptions["gradcolors"]
+                ticks = options.get("ticks", [layer.styleoptions["minval"], layer.styleoptions["maxval"]])
+                length = options.get("length", "40%min")
+                thickness = options.get("thickness", "4%min")
+                options["direction"] = options.get("direction", "e")
+                self._legend.add_fillcolors(shape=None, breaks=ticks, classvalues=gradient,
+                                            valuetype="proportional", length=length, thickness=thickness,
+                                            **options)
 
     def add_fillsizes(self, layer, **override):
         if isinstance(layer, VectorLayer):
@@ -1211,28 +1223,33 @@ class Legend:
 
     def _autobuild(self):
         # maybe somehow clear itself in case autobuild and rendering multiple times for updating
-        # ...
+        self._legend = pyagg.legend.Legend(refcanvas=self.map.drawer, **self.options)
         
         # build the legend automatically
         for layer in self.map:
             if not layer.nolegend:
-                # Todo: better handling when more than one classipy option for same layer
-                # perhaps grouping into basegroup under same layer label
-                # ...
-                anydynamic = False
-                if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
-                    # is dynamic and should be highlighted specially
-                    #print 999,layer,layer.legendoptions
-                    self.add_fillcolors(layer, **layer.legendoptions)
-                    anydynamic = True
-                if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
-                    # is dynamic and should be highlighted specially
-                    self.add_fillsizes(layer, **layer.legendoptions)
-                    anydynamic = True
-                    
-                # add as static symbol if none of the dynamic ones
-                if not anydynamic:
-                    self.add_single_symbol(layer, **layer.legendoptions)
+                if isinstance(layer, VectorLayer):
+                    # Todo: better handling when more than one classipy option for same layer
+                    # perhaps grouping into basegroup under same layer label
+                    # ...
+                    anydynamic = False
+                    if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
+                        # is dynamic and should be highlighted specially
+                        #print 999,layer,layer.legendoptions
+                        self.add_fillcolors(layer, **layer.legendoptions)
+                        anydynamic = True
+                    if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
+                        # is dynamic and should be highlighted specially
+                        self.add_fillsizes(layer, **layer.legendoptions)
+                        anydynamic = True
+                        
+                    # add as static symbol if none of the dynamic ones
+                    if not anydynamic:
+                        self.add_single_symbol(layer, **layer.legendoptions)
+
+                elif isinstance(layer, RasterLayer):
+                    if layer.styleoptions["type"] in ("grayscale","colorscale"):
+                        self.add_fillcolors(layer, **layer.legendoptions)
 
     def render(self):
         # ensure the drawer is created so pyagg legend can use it to calculate sizes etc
