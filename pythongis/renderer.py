@@ -496,7 +496,8 @@ class Map:
         self.update_draworder()
 
     def update_draworder(self):
-        if not self.drawer: self._create_drawer()
+        if self.drawer: self.drawer.clear()
+        else: self.drawer = self._create_drawer()
 
         # paste the background decorations
         for layer in self.backgroundgroup:

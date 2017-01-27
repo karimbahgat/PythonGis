@@ -214,6 +214,11 @@ class MapView(tk.Canvas):
         self.renderer.zoom_bbox(*bbox)
         self.threaded_rendering()
 
+    def mouse2coords(self, x, y):
+        px,py = self.canvasx(x), self.canvasy(y)
+        x,y = self.renderer.pixel2coord(px, py)
+        return x,y
+
     def threaded_rendering(self):
         # perform render/zoom in separate thread
         if self.onstart:

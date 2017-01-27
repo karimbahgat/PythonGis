@@ -2,6 +2,10 @@
 import os
 import tk2
 
+import pythongis as pg
+from . import dialogs
+from . import builder
+
 def iconpath(name):
     return os.path.join(os.path.dirname(__file__), "icons", name)
 
@@ -33,6 +37,24 @@ class LayersControl(tk2.basics.Label):
             w.destroy()
         for lyr in self.layers:
             self.layerslist.add_item(lyr, self.layer_decor)
+            
+        def add_layer():
+            # TODO: maybe open another dialogue where can set encoding, filtering, etc, before adding
+            filepath = tk2.filedialog.askopenfilename()
+            datawin = dialogs.LoadDataDialog(filepath=filepath)
+            def onsuccess(data):
+                # TODO: should prob be threaded...
+                lyr = self.mapview.renderer.add_layer(data)
+                self.show_layers()
+                self.mapview.renderer.render_one(lyr)
+                self.mapview.renderer.update_draworder()
+                self.mapview.update_image()
+            datawin.onsuccess = onsuccess
+        def buttondecor(w):
+            but = tk2.Button(w, text="Add Layer", command=add_layer)
+            but.pack()
+        self.layerslist.add_item(None, buttondecor)
+        
         screenx,screeny = self.layersbut.winfo_rootx(),self.layersbut.winfo_rooty()
         x,y = screenx - self._root.winfo_rootx(), screeny - self._root.winfo_rooty()
         self.layerslist.place(anchor="ne", x=x, y=y)
@@ -45,9 +67,23 @@ class LayersControl(tk2.basics.Label):
         Default way to decorate each layer with extra widgets
         Override method to customize. 
         """
+        widget.pack(fill="x", expand=1)
+        
+        visib = tk2.basics.Checkbutton(widget)
+        visib.select()
+        def toggle():
+            lyr = widget.item
+            lyr.visible = not lyr.visible
+            if lyr.visible:
+                self.mapview.renderer.render_one(lyr)
+            self.mapview.renderer.update_draworder()
+            self.mapview.update_image()
+        visib["command"] = toggle
+        visib.pack(side="left")
+        
         text = widget.item.data.name
         if len(text) > 50:
-            text = text[47]+"..."
+            text = "..."+text[-47:]
         name = tk2.basics.Label(widget, text=text)
         name.pack(side="left", fill="x", expand=1)
         
@@ -99,10 +135,69 @@ class IdentifyControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
-        self.identifybut = tk2.basics.Button(self)
-        #self.identifybut.set_icon(iconpath("layers.png"), width=40, height=40)
-        self.identifybut["text"] = "?"
+        self.identifybut = tk2.basics.Button(self, command=self.begin_identify)
+        self.identifybut.set_icon(iconpath("identify.png"), width=40, height=40)
         self.identifybut.pack()
+
+    def begin_identify(self):
+        print "begin identify..."
+        def callident(event):
+            x,y = self.mapview.mouse2coords(event.x, event.y)
+            self.identify(x, y)
+        self.winfo_toplevel().bind_once("<Button-1>", callident, "+")
+
+    def identify(self, x, y):
+        print "identify: ",x, y
+        infowin = tk2.Window()
+        infoframe = tk2.ScrollFrame(infowin)
+        infoframe.pack(fill="both", expand=1)
+
+        title = tk2.Label(infoframe, text="Hits for coordinates: %s, %s" % (x, y))
+        title.pack(fill="x", expand=1)
+        
+        anyhits = None        
+        for layer in self.mapview.renderer.layers:
+            print layer
+            if isinstance(layer.data, pg.VectorData):
+                feats = None
+                if layer.data.type == "Polygon":
+                    from shapely.geometry import Point
+                    p = Point(x, y)
+                    feats = [feat for feat in layer.data.quick_overlap([x,y,x,y]) if feat.get_shapely().intersects(p)]
+                            
+                else:
+                    # need a closest algorithm
+                    raise NotImplementedError("Point and line identify not yet implemented")
+
+                if feats:
+                    anyhits = True
+                    layerframe = tk2.Frame(infoframe, label=layer.data.name)
+                    layerframe.pack(fill="both", expand=1)
+                    
+                    browser = builder.TableBrowser(layerframe)
+                    browser.pack(fill="both", expand=1)
+                    browser.table.populate(fields=layer.data.fields, rows=[f.row for f in feats])
+                    
+            elif isinstance(layer.data, pg.RasterData):
+                values = [layer.data.get(x, y, band).value for band in layer.data.bands]
+                if any(values):
+                    anyhits = True
+                    layerframe = tk2.Frame(infoframe, label=layer.data.name)
+                    layerframe.pack(fill="both", expand=1)
+                    
+                    col,row = layer.data.geo_to_cell(x, y)
+                    cellcol = tk2.Label(layerframe, text="Column: %s" % col )
+                    cellcol.pack(fill="x", expand=1)
+                    cellrow = tk2.Label(layerframe, text="Row: %s" % row )
+                    cellrow.pack(fill="x", expand=1)
+
+                    for bandnum,val in enumerate(values):
+                        text = "Band %i: \n\t%s" % (bandnum, val)
+                        valuelabel = tk2.Label(layerframe, text=text)
+                        valuelabel.pack(fill="both", expand=1)
+
+        if not anyhits:
+            infowin.destroy()
 
 class TimeControl(tk2.basics.Label):
     def __init__(self, master, key=None, start=None, end=None, *args, **kwargs):

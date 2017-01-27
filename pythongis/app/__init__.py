@@ -1,2 +1,2 @@
 
-from . import map, controls, builder
+from . import map, controls, builder, dialogs

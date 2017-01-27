@@ -115,40 +115,36 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
     else:
         # raster in vector
         # TODO: For very large files, something in here produces a crash after returning output even though memory use seems low...
-        output = group.copy()
-        for statfield in outstats.keys():
-            output.compute(statfield, None)
+        from .. import raster
 
-        output.create_spatial_index()
-
-        for tile in pg.raster.manager.tiled(rast):
-            print tile
+        for f in groupfeats:
+            try:
+                cropped = raster.manager.crop(valuedata, f.bbox)
+            except:
+                continue
+            # TODO: only check overlapping tiles
+            # TODO: how to calc stat on multiple overlapping tiles           
+            fdata = VectorData()
+            fdata.add_feature([], f.geometry)
             
-            for f in output.quick_overlap(tile.bbox):
-                fdata = pg.VectorData()
-                fdata.add_feature([], f.geometry)
-                subtile = pg.raster.manager.clip(tile, fdata)
-                ##subtile.view(1000,500)
-                stats = subtile.bands[0].summarystats(*outstats.values())
-                for statfield,stat in outstats.items():
-                    # TODO: ACTUALLY NOT DONE, MAYBE HAVE TO ABONDON TILE-FEAT SEQ, INSTEAD FEAT-TILE? 
-                    # wrong to just pluss? what if mean? need to take mean of means? or store all values?
-                    if f[statfield] != None:
-                        # add to existing value
-                        if stats[stat] != None:
-                            # check for nullstat due to tile with only nullvalues, dont add
-                            f[statfield] += stats[stat]
-                    else:
-                        # add for first time
-                        f[statfield] = stats[stat]
+            clipped = raster.manager.clip(cropped, fdata)
+            
+            #mapp = clipped.render(1000,500,title="clipped")
+            #mapp.add_layer(fdata, fillcolor=None)
+            #mapp.add_legend()
+            #mapp.view()
 
-                del fdata
-                del subtile.bands[0].img
-                del subtile
-                gc.collect()
+            del fdata
+            del cropped
+            gc.collect()
+            
+            row = f.row + [None for _ in fieldmapping]
+            outfeat = out.add_feature(row, f.geometry)
+            for statfield,bandnum,outstat in fieldmapping:
+                stat = clipped.bands[bandnum].summarystats(outstat)[outstat]
+                outfeat[statfield] = stat
 
-            del tile.bands[0].img
-            del tile
+            del clipped
             gc.collect()
 
     return out

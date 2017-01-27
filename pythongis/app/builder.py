@@ -33,6 +33,10 @@ class MultiLayerMap(tk2.basics.Label):
         layerscontrol.place(relx=0.98, rely=0.02, anchor="ne")
         mapview.add_control(layerscontrol)
 
+        identcontrol = pg.app.controls.IdentifyControl(mapview)
+        identcontrol.place(relx=0.98, rely=0.98, anchor="se")
+        mapview.add_control(identcontrol)
+
         navigcontrol = pg.app.controls.NavigateControl(mapview)
         navigcontrol.place(relx=0.5, rely=0.02, anchor="n")
         mapview.add_control(navigcontrol)
@@ -41,8 +45,11 @@ class MultiLayerMap(tk2.basics.Label):
         zoomcontrol.place(relx=0.02, rely=0.02, anchor="nw")
         mapview.add_control(zoomcontrol)
 
+        #bottom = tk2.Label(self)
+        #bottom.pack(fill="x", expand=1)
+        
         progbar = tk2.progbar.NativeProgressbar(self)
-        progbar.pack()
+        progbar.pack(side="left", padx=4, pady=4)
 
         def startprog():
             progbar.start()
@@ -50,6 +57,14 @@ class MultiLayerMap(tk2.basics.Label):
             progbar.stop()
         mapview.onstart = startprog
         mapview.onfinish = stopprog
+
+        coords = tk2.Label(self)
+        coords.pack(side="right", padx=4, pady=4)
+
+        def showcoords(event):
+            x,y = mapview.mouse2coords(event.x, event.y)
+            coords["text"] = "%s, %s" % (x,y)
+        self.winfo_toplevel().bind("<Motion>", showcoords, "+")
 
         if True:#time:
             # must be dict

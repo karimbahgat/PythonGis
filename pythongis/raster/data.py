@@ -452,6 +452,29 @@ class Band(object):
         app.mainloop()
 
 
+    def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        from .. import renderer
+        
+        rast = self._rast
+        styleoptions.update(bandnum=rast.bands.index(self))
+        
+        mapp = renderer.Map(width, height, title=title, background=background)
+        mapp.add_layer(rast, **styleoptions)
+        if bbox:
+            mapp.zoom_bbox(*bbox)
+        else:
+            mapp.zoom_bbox(*mapp.layers.bbox)
+        mapp.render_all()
+        return mapp
+
+    def view(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        from .. import app
+        mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
+        # make gui
+        win = app.builder.MultiLayerGUI(mapp)
+        win.mainloop()
+
+
 
 def Name_generator():
     i = 1
@@ -712,26 +735,23 @@ class RasterData(object):
         kwargs["raster"] = self
         return manager.resample(**kwargs)
 
-    def render(self, width, height, **options):
+    def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
         from .. import renderer
-        lyr = renderer.RasterLayer(self,
-                                   **options
-                                   )
-        lyr.render(width=width, height=height, resampling="nearest")
-        return lyr
+        mapp = renderer.Map(width, height, title=title, background=background)
+        mapp.add_layer(self, **styleoptions)
+        if bbox:
+            mapp.zoom_bbox(*bbox)
+        else:
+            mapp.zoom_bbox(*mapp.layers.bbox)
+        mapp.render_all()
+        return mapp
 
-    def view(self, width, height, **options):
-        lyr = self.render(width, height, **options)
-
-        import Tkinter as tk
-        import PIL.ImageTk
-        
-        app = tk.Tk()
-        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
-        lbl = tk.Label(image=tkimg)
-        lbl.tkimg = tkimg
-        lbl.pack()
-        app.mainloop()
+    def view(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        from .. import app
+        mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
+        # make gui
+        win = app.builder.MultiLayerGUI(mapp)
+        win.mainloop()
 
 
 def pilmode_to_rastmode(mode):

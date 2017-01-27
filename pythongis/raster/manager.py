@@ -136,8 +136,11 @@ def roll(raster, x, y, worldcoords=True):
     if worldcoords:
         x = int(round( x / float(xscale) ))
         y = int(round( y / float(yscale) ))
+    premask = out.mask
     for band in out.bands:
         band.img = PIL.ImageChops.offset(band.img, x, y)
+        band.mask = PIL.ImageChops.offset(band.mask, x, y)
+    out.mask = PIL.ImageChops.offset(premask, x, y)
 
     # roll the georef
     # TODO: unsure if should roll the geotransform, possibly also wrap around if extending outside the edge of coordsys, depending on coordsys and extent not obvious where to wrap around, also not all wraps can be represented with a bbox/affine
@@ -477,7 +480,7 @@ def crop(raster, bbox, worldcoords=True):
         outrast.add_band(img=img, nodataval=band.nodataval)
 
     # update output affine offset based on new upperleft corner
-    x1,y1 = raster.cell_to_geo(px1,py1)
+    x1,y1 = raster.cell_to_geo(pxmin,pymin)
     outrast.set_geotransform(xoffset=x1, yoffset=y1)
 
     return outrast
