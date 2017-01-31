@@ -26,7 +26,7 @@ class LoadDataDialog(tk2.Window):
         optionsarea = tk2.Frame(self)
         optionsarea.pack(fill="both", expand=1)
 
-        self.encoding = tk2.basics.Dropdown(optionsarea, values=["latin","utf8"])
+        self.encoding = tk2.basics.Dropdown(optionsarea, label="Encoding", values=["latin","utf8"])
         self.encoding.set("latin")
         self.encoding.pack()
 

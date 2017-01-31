@@ -3,7 +3,7 @@ import itertools, operator
 from .data import *
 from . import manager
 
-import PIL.Image, PIL.ImageMath, PIL.ImageStat
+import PIL.Image, PIL.ImageMath, PIL.ImageStat, PIL.ImageMorph
 import math
 
 
@@ -319,9 +319,122 @@ def density(pointdata, rasterdef, algorithm="radial", **kwargs):
 
 # Distance Analysis
 
-def proximity(vectordata, **rasterdef):
-    # aka showing distances to nearest feature
-    pass
+def distance(data, **rasterdef):
+    """Calculates raster of distances to nearest feature in data"""
+    # TODO: allow max dist limit
+    if isinstance(data, RasterData):
+        raise NotImplementedError("Distance tool requires vector data")
+
+    from shapely.geometry import Point, MultiPoint, LineString, asShape
+
+    outrast = RasterData(mode="float32", **rasterdef)
+    outband = outrast.add_band() # make sure all values are set to 0 dist at outset
+
+    fillband = manager.rasterize(data, **rasterdef).bands[0]
+
+    # ALT1: each pixel to each feat
+    # TODO: this approach is super slow...
+
+##    geoms = [feat.get_shapely() for feat in data]
+##    for cell in fillband:
+##        if cell.value == 0:
+##            # only calculate where vector is absent
+##            #print "calc..."
+##            point = Point(cell.x,cell.y) #asShape(cell.point)
+##            dist = point.distance(geoms[0]) #min((point.distance(g) for g in geoms))
+##            #print cell.col,cell.row,dist
+##            outband.set(cell.col, cell.row, dist)
+##        else:
+##            pass #print "already set", cell.value
+
+    # ALT2: each pixel to union
+##    # TODO: this approach gets stuck...
+##
+##    import shapely
+##    outline = shapely.ops.cascaded_union([feat.get_shapely() for feat in data])
+##    for cell in fillband:
+##        if cell.value == 0:
+##            # only calculate where vector is absent
+##            #print "calc..."
+##            point = Point(cell.x,cell.y) 
+##            dist = point.distance(outline) 
+##            print cell.col,cell.row,dist
+##            outband.set(cell.col, cell.row, dist)
+##        else:
+##            pass #print "already set", cell.value
+
+    # ALT3: each pixel to each rasterized edge pixel
+    # Pixel to pixel inspiration from: https://trac.osgeo.org/postgis/wiki/PostGIS_Raster_SoC_Idea_2012/Distance_Analysis_Tools/document
+    # TODO: maybe shouldnt be outline points but outline line, to calc dist between points too?
+    # TODO: current morphology approach gets crazy for really large rasters
+    # maybe optimize by simplifying multiple points on straight line, and make into linestring
+    
+    #outlineband = manager.rasterize(data.convert.to_lines(), **rasterdef).bands[0]
+##    outlinepixels = PIL.ImageMorph.MorphOp(op_name="edge").match(fillband.img)
+##    print "outlinepixels",len(outlinepixels)
+##    
+##    outlinepoints = MultiPoint([outrast.cell_to_geo(*px) for px in outlinepixels])
+##    
+##    for cell in fillband:
+##        if cell.value == 0:
+##            # only calculate where vector is absent
+##            point = Point(cell.x,cell.y)
+##            dist = point.distance(outlinepoints)
+##            outband.set(cell.col, cell.row, dist)
+
+    # ALT4: each pixel to each rasterized edge pixel, with spindex
+    
+    #outlineband = manager.rasterize(data.convert.to_lines(), **rasterdef).bands[0]
+    outlinepixels = PIL.ImageMorph.MorphOp(op_name="edge").match(fillband.img)
+    print "outlinepixels",len(outlinepixels)
+
+    import rtree
+    spindex = rtree.index.Index()
+    
+    outlinepoints = [Point(*outrast.cell_to_geo(*px)) for px in outlinepixels]
+    for i,p in enumerate(outlinepoints):
+        bbox = p.bounds 
+        spindex.insert(i, bbox)
+
+    for cell in fillband:
+        if cell.value == 0:
+            # only calculate where vector is absent
+            bbox = [cell.x, cell.y, cell.x, cell.y]
+            nearestid = next(spindex.nearest(bbox, num_results=1))
+            point = Point(cell.x,cell.y)
+            dist = point.distance(outlinepoints[nearestid])
+            outband.set(cell.col, cell.row, dist)
+
+    # ALT5: each pixel to reconstructed linestring of rasterized edge pixels, superfast if can reconstruct
+##    outlinepixels = PIL.ImageMorph.MorphOp(op_name="edge").match(fillband.img)
+##    
+##    # TODO: reconstruct linestring from outlinepixels...
+##    outline = LineString([outrast.cell_to_geo(*px) for px in outlinepixels])
+##
+##    # TODO: simplify linestring...
+####    print "outlinepixels",len(outlinepixels)
+####    simplified = PIL.ImagePath.Path(outlinepixels)
+####    simplified.compact(2) # 2 px    
+####    outlinepixels = simplified.tolist()
+####    print "simplified",len(outlinepixels)
+##    
+##    for cell in fillband:
+##        if cell.value == 0:
+##            # only calculate where vector is absent
+##            point = Point(cell.x,cell.y)
+##            dist = point.distance(outline)
+##            outband.set(cell.col, cell.row, dist)
+
+    # ALT6: incremental neighbour growth check overlap
+    # ie
+    #im = fillband.img
+    #for _ in range(32):
+    #    count,im = PIL.ImageMorph.MorphOp(op_name="erosion4").apply(im)
+    #im.show()
+    # ...
+
+    return outrast
+    
 
 
 
@@ -332,6 +445,7 @@ def proximity(vectordata, **rasterdef):
 
 def least_cost_path(point1, point2, **options):
     # use https://github.com/elemel/python-astar
+    # maybe also: https://www.codeproject.com/articles/9040/maze-solver-shortest-path-finder
     pass
 
 

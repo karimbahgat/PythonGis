@@ -429,30 +429,51 @@ class Band(object):
             band._cached_mask = self._cached_mask.copy()
         return band
 
-    def render(self, width, height, **options):
-        if self._rast:
-            rast = self._rast
-            options.update(bandnum=rast.bands.index(self))
-        else:
-            rast = RasterData(mode=self.mode, width=width, height=height, xoffset=0, yoffset=0, xscale=1, yscale=1)
-            rast.add_band()
-        return rast.render(width, height, **options)
+##    def render(self, width, height, **options):
+##        if self._rast:
+##            rast = self._rast
+##            options.update(bandnum=rast.bands.index(self))
+##        else:
+##            rast = RasterData(mode=self.mode, width=width, height=height, xoffset=0, yoffset=0, xscale=1, yscale=1)
+##            rast.add_band()
+##        return rast.render(width, height, **options)
+##
+##    def view(self, width, height, **options):
+##        lyr = self.render(width, height, **options)
+##
+##        import Tkinter as tk
+##        import PIL.ImageTk
+##        
+##        app = tk.Tk()
+##        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
+##        lbl = tk.Label(image=tkimg)
+##        lbl.tkimg = tkimg
+##        lbl.pack()
+##        app.mainloop()
 
-    def view(self, width, height, **options):
-        lyr = self.render(width, height, **options)
-
-        import Tkinter as tk
-        import PIL.ImageTk
-        
-        app = tk.Tk()
-        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
-        lbl = tk.Label(image=tkimg)
-        lbl.tkimg = tkimg
-        lbl.pack()
-        app.mainloop()
-
+    def histogram(self, width=None, height=None, bins=10):
+        import pyagg
+        stats = self.summarystats("min","max")
+        binsize = (stats["max"] - stats["min"]) / float(bins)
+        bars = []
+        cur = stats["min"]
+        while cur < stats["max"]:
+            below = self.conditional("%s < val" % cur)
+            above = self.conditional("val < %s" % (cur+binsize))
+            maskimg = PIL.ImageMath.eval("b & a", b=below.img, a=above.img)
+            #maskimg.show()
+            mask = Band(img=maskimg)
+            label = "%s to %s" % (cur, cur+binsize)
+            count = mask.summarystats("sum")["sum"]
+            bars.append((label,count))
+            cur += binsize
+        c = pyagg.graph.BarChart()
+        c.add_category(name="Title...", baritems=bars)
+        return c.draw() # draw returns the canvas
 
     def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        # WARNING: CANNOT USE TO GET A MAP AND THEN ADDING OTHER LAYERS,
+        # GETS ALL MISMATCHED AND JUMPS AROUND
         from .. import renderer
         
         rast = self._rast
