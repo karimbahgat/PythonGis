@@ -11,6 +11,8 @@ import pygeoj
 
 NaN = float("nan")
 
+def is_missing(value):
+    return value in (None,"") or (isinstance(value, float) and math.isnan(value))
 
 def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12, **kwargs):
 
@@ -46,7 +48,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             for row in rows:
                 value = row[fieldindex]
                 
-                if value in (None,"") or (isinstance(value, float) and math.isnan(value)):
+                if is_missing(value):
                     # empty value, so just keep assuming same type
                     pass
                 
@@ -81,9 +83,9 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                         
             if fieldtype == "N" and decimals == 0:
                 fieldlen -= 2 # bc above we measure lengths for ints as if they were floats, ie with an additional ".0"
-                func = lambda v: "" if (v in (None,"") or math.isnan(v)) else int(v)
+                func = lambda v: "" if is_missing(v) else int(float(v))
             elif fieldtype == "N" and decimals:
-                func = lambda v: "" if (v in (None,"") or math.isnan(v)) else float(v)
+                func = lambda v: "" if is_missing(v) else float(v)
             elif fieldtype == "C":
                 func = lambda v: v #encoding are handled later
             else:
