@@ -357,13 +357,13 @@ class Band(object):
                 # some more stats
                 if not stattypes or "median" in stattypes:
                     sortedvals = list(sorted(valuecounts, key=lambda e: e[1]))
-                    statsdict["median"] = sortedvals[len(sortedvals)//2][1] if sortedvalues else None
+                    statsdict["median"] = sortedvals[len(sortedvals)//2][1] if sortedvals else None
                 if not stattypes or "majority" in stattypes:
                     sortedvals = list(sorted(valuecounts, key=lambda e: e[0]))
-                    statsdict["majority"] = sortedvals[-1][1] if sortedvalues else None
+                    statsdict["majority"] = sortedvals[-1][1] if sortedvals else None
                 if not stattypes or "minority" in stattypes:
                     sortedvals = list(sorted(valuecounts, key=lambda e: e[0]))
-                    statsdict["minority"] = sortedvals[0][1] if sortedvalues else None
+                    statsdict["minority"] = sortedvals[0][1] if sortedvals else None
                 
             except MemoryError:
 
@@ -401,13 +401,13 @@ class Band(object):
                 # some more stats
                 if not stattypes or "median" in stattypes:
                     sortedvals = list(sorted(values))
-                    statsdict["median"] = sortedvals[len(sortedvals)//2] if sortedvalues else None
+                    statsdict["median"] = sortedvals[len(sortedvals)//2] if sortedvals else None
                 if not stattypes or "majority" in stattypes:
                     sortedvals = list(sorted(values))
-                    statsdict["majority"] = sortedvals[-1] if sortedvalues else None
+                    statsdict["majority"] = sortedvals[-1] if sortedvals else None
                 if not stattypes or "minority" in stattypes:
                     sortedvals = list(sorted(values))
-                    statsdict["minority"] = sortedvals[0] if sortedvalues else None
+                    statsdict["minority"] = sortedvals[0] if sortedvals else None
                 
         return statsdict
 

@@ -146,8 +146,8 @@ class Layout:
             # auto creates and builds legend based on first map (TODO: allow from other maps too)
             legendoptions = legendoptions or dict()
             legend = self.maps[0].get_legend(**legendoptions)
-            
-        legend.pasteoptions = pasteoptions
+
+        legend.pasteoptions.update(pasteoptions)
         self.foregroundgroup.add_layer(legend)
         return legend
 
@@ -411,7 +411,7 @@ class Map:
         self.changed = True
         legendoptions = legendoptions or {}
         legend = self.get_legend(**legendoptions)
-        legend.pasteoptions = pasteoptions
+        legend.pasteoptions.update(pasteoptions)
         self.foregroundgroup.add_layer(legend)
 
     # Batch utilities
@@ -1090,6 +1090,7 @@ class Legend:
         self.img = None
         self.autobuild = autobuild
         self.options = options
+        self.pasteoptions = dict(xy=("2%w","98%h"), anchor="sw")
         self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **self.options)
 
     def add_fillcolors(self, layer, **override):
