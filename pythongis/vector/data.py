@@ -136,6 +136,68 @@ class Feature:
         if self.geometry and self._cached_bbox: geoj["bbox"] = self._cached_bbox
         return Feature(self._data, self.row, geoj)
 
+    def iter_points(self):
+        """Yields every point in the geometry as a flat generator,
+        useful for quick inspecting of dimensions so don't have to
+        worry about nested coordinates and geometry types"""
+        geoj = self.geometry
+        if not geoj:
+            yield None
+
+        geotype = self.geometry["type"]
+        coords = self.geometry["coordinates"]
+        
+        if geotype == "Point":
+            yield geoj["coordinates"]
+        elif geotype in ("MultiPoint","LineString"):
+            for p in coords:
+                yield p
+        elif geotype == "MultiLineString":
+            for line in coords:
+                for p in line:
+                    yield p
+        elif geotype == "Polygon":
+            for ext_or_hole in coords:
+                for p in ext_or_hole:
+                    yield p
+        elif geotype == "MultiPolygon":
+            for poly in coords:
+                for ext_or_hole in poly:
+                    for p in ext_or_hole:
+                        yield p
+
+    def transform(self, func):
+        """
+        Transforms the feature geometry in place.
+        
+        - func: a function that takes a flat list of points, does something, and returns them
+        """
+        geoj = self.geometry
+        if not geoj:
+            return None
+
+        geotype = geoj["type"]
+        coords = geoj["coordinates"]
+        
+        if geotype == "Point":
+            geoj["coordinates"] = func([coords])[0]
+        elif geotype in ("MultiPoint","LineString"):
+            geoj["coordinates"] = func(coords)
+        elif geotype == "MultiLineString":
+            geoj["coordinates"] = [func(line)
+                                   for line in coords]
+        elif geotype == "Polygon":
+            geoj["coordinates"] = [func(ext_or_hole)
+                                   for ext_or_hole in coords]
+        elif geotype == "MultiPolygon":
+            geoj["coordinates"] = [[func(ext_or_hole)
+                                    for ext_or_hole in poly]
+                                   for poly in coords]
+            
+        self._cached_bbox = None
+        
+        return True
+
     # Easy access to shapely methods
 
     @property

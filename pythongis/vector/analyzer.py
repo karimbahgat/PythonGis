@@ -284,6 +284,29 @@ def nearest_identity(groupbydata, valuedata,
     # ...
     pass
 
+def closest_point(data, otherdata):
+    """Returns a dataset of only the closest point to the other"""
+
+    # TODO: not very effective right now
+    # should use multipurpose nearest iterator...
+
+    if not hasattr(otherdata, "spindex"):
+        otherdata.create_spatial_index()
+
+    from shapely.ops import nearest_points
+
+    out = VectorData()
+    out.fields = list(data.fields)
+    
+    for feat in data:
+        shp = feat.get_shapely()
+        othershps = (otherfeat.get_shapely() for otherfeat in otherdata)
+        nearest = sorted(othershps, key=lambda othershp: shp.distance(othershp))[0]
+        npoint = nearest_points(shp, nearest)[0]
+        out.add_feature(feat.row, npoint.__geo_interface__)
+        
+    return out
+
 
 
 

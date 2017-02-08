@@ -9,29 +9,6 @@ from shapely.prepared import prep as supershapely
 
 
 
-#############
-### IDEA: RESTRUCTURING??
-##
-### spatial testing (allow shortcut multiple test conditions with multiple datasets as list in the "where" option in select and join methods)
-##distance, intersects, within, contains, crosses, touches, equals, disjoint
-##
-### spatial shapes (allow shortcut multiple shapes specs with multiple datasets as list in the "clip" option in select and join method [eg where=intersects, clip=intersection, or clip=difference or clip=union])
-##intersection
-##difference
-##union (ie collapse)
-##
-### self: (maybe just via option)
-##
-### self spatial testing
-##
-### self spatial shapes
-##
-################
-
-
-
-
-
 
 # Select extract operations
 
@@ -63,6 +40,8 @@ def where(data, other, condition, **kwargs):
 
     I.e. "spatial select", "select by location". 
     """
+    # TODO: Maybe should only be "join" and "where"...
+    
     # TODO: Maybe rename "select_where"
     # TODO: Maybe simply add optional "where" option to the basic "select" method,
     # passed as list of data-condition tuples (allowing comparing to multiple layers)
@@ -223,10 +202,7 @@ def clean(data, tolerance=0, preserve_topology=True):
     any unfixable ones.
 
     Adds the resulting cleaned data to the layers list.
-    """
-    # TODO: MAYBE ADD PRESERVETOPOLOGY OPTION FOR POLYGON TYPE, WHICH CONVERTS TO UNIQUE LINES, THEN CLEANS THE LINES,
-    # THEN RECOMBINES BACK TO POLYGONS, THEN REASSIGNS ATTRIBUTES BY JOINING WITH CENTERPOINT OF ORIGINAL SHAPES
-    
+    """    
     # create new file
     outfile = VectorData()
     outfile.fields = list(data.fields)
@@ -264,20 +240,32 @@ def clean(data, tolerance=0, preserve_topology=True):
 ##    # ...
 ##
 ##    raise Exception("Not yet implemented")
-##
-##def snap_to(data, other):
-##    """Snaps all vertexes from the features in one layer snap to the vertexes of features in another layer within a certain distance"""
-##                           
-##    raise Exception("Not yet implemented")
 
-def integrate(data, other):
-    """Make features in one layer snap to the edges of features in another layer"""
-    # uses key to decide which main features belong to which snapto features
-    # remove those main polygon areas that go outside their keyed snapto features
-    # for each group of keyed main polygons, make into lines and remove the boundary so only get internal borders
-    # then extend dangling lines until reaches the keyed snapto boundaries
+def snap(data, otherdata, tolerance=0.0000001):
+    """Snaps all vertexes from the features in one layer snap to the vertexes of features in another layer within a certain distance"""
+    
+    # default should be 0.001 meters (1 millimeter), ala ArcGIS
+    # should be calculated based on crs
 
-    raise Exception("Not yet implemented")
+    # TODO: for now just keeps snapping, should only snap to closest parts...
+
+    if not hasattr(otherdata, "spindex"):
+        otherdata.create_spatial_index()
+
+    from shapely.ops import snap as _snap
+
+    out = data.copy()
+    for feat in out:
+        shp = feat.get_shapely()
+        buff = shp.buffer(tolerance)
+        for otherfeat in otherdata.quick_overlap(buff.bounds):
+            othershp = otherfeat.get_shapely()
+            if buff.intersects(othershp):
+                print "snap"
+                shp = _snap(shp, othershp, tolerance)
+        feat.geometry = shp.__geo_interface__
+        
+    return out
 
 
 
@@ -358,7 +346,7 @@ def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, g
     to access the attributes of each feature by writing: feat['fieldname'].
     """
     # get distance func
-    if not hasattr(dist, "__call__"):
+    if hasattr(dist, "__call__"):
         distfunc = dist
     else:
         distfunc = lambda f: dist 
@@ -400,82 +388,15 @@ def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, g
     new.type = "Polygon"
     return new
 
-
-##def collapse(data, by=None, fieldmapping=[], contig=False):
-##    """
-##    Glue and aggregate features in a single layer with same values.
-##    """
-##    # aka dissolve
-##
-##    # for now only designed for polygons
-##    # not sure how lines or points will do
-##    # ...
-##
-##    # match requires neighbouring features (intersects/touches) and possibly same key value
-##    # also cannot be itself
-##
-##    # TODO: allow two versions, one where only contiguous areas with same key are considered a stats group
-##    # and one considering where all areas with same key regardless of contiguous
-##    # ALSO use much faster algorithm if no key, since just need cascaded union on all followed by groupby stats on all
-##
-##    from . import sql
-##
-##    if contig: 
-##        # contiguous dissolve
-##        # requires two combi items in funcs
-##        
-##        raise Exception("Contiguous dissolve not yet implemented")
-##
-##        # cheating approach
-##        # cascade union on all with same key
-##        # then for each single poly in result (ie contiguous),
-##        # ...find overlapping orig geoms and aggregate stats
-##        # ...and expand single poly by unioning with orig geoms that are multipoly (since those should also be part of the contiguous poly)
-##        # just an idea so far
-##        # ...
-##
-##    else:
-##        # non-contiguous dissolve
-##        # much easier and faster
-##        # requires only one combi item in funcs
-##
-##        # TODO: redo so key and fieldmapping funcs only have to expect the feat obj
-##        # maybe by switching away from full sql approach...
-##
-##        if not by: by = lambda x: True # groups together all items
-##
-##        def feats():
-##            for feat in data:
-##                feat._tempgeom = feat.get_shapely() # temporary store it for repeated use
-##                yield feat
-##
-##        def _geomselect(feats):
-##            geoms = [feat._tempgeom for feat in feats]
-##            
-##            union = shapely.ops.cascaded_union(geoms)
-##            if not union.is_empty:
-##                return union.__geo_interface__
-##
-##        q = sql.query(_from=[feats()],
-##                     _groupby=by,
-##                     _select=fieldmapping,
-##                     _geomselect=_geomselect,
-##                    )
-##
-##        res = sql.query_to_data(q)
-##
-##        return res
-
 def cut(data, cutter):
     """
     Cuts apart a layer by the lines of another layer
     """
 
-    # TODO: not sure if correct, quite slow
+    # TODO: not sure if correct yet
+    # NOTE: requires newest version of shapely
 
-    # FOR NOW, only cuts poly by poly or poly by line
-    # not yet handling line by line, how to do that...?
-    # ...
+    from shapely.ops import split as _split
 
     outdata = VectorData()
     outdata.fields = list(data.fields)
@@ -492,493 +413,39 @@ def cut(data, cutter):
     for feat in data.quick_overlap(cutter.bbox):
         geom = feat.get_shapely()
 
-        # if polygon, main geom should be just the exterior without holes
-        if "Polygon" in geom.type:
-            geomlines = geom.boundary
-        elif "LineString" in geom.type:
-            geomlines = geom
-
-        # get and prep relevant cut lines
-        def get_as_lines(cutgeom):
-            if "Polygon" in cutgeom.type:
-                # exterior boundary
-                lines = cutgeom.boundary
-                
-                # holes should also be used for cutting
-                if "Multi" in cutgeom.type:
-                    holes = [hole for multigeom in cutgeom.geoms for hole in multigeom.interiors]
-                else:
-                    holes = cutgeom.interiors
-                if holes:
-                    # combine with exterior
-                    holelines = shapely.geometry.MultiLineString([hole.boundary for hole in holes])
-                    lines = lines.union(holelines)
-
-            elif "LineString" in cutgeom.type:
-                lines = cutgeom
-                
-            return lines
-
         cutgeoms = (cutfeat.get_shapely() for cutfeat in cutter.quick_overlap(feat.bbox))
         cutgeoms = (cutgeom for cutgeom in cutgeoms if cutgeom.intersects(geom))
-        cutgeoms_lines = [get_as_lines(cutgeom) for cutgeom in cutgeoms]
-        cutunion = shapely.ops.cascaded_union(cutgeoms_lines)
-
-        if "Polygon" in geom.type:
-            # union main and cutter and make into new polygons
-            result = shapely.ops.polygonize(geomlines.union(cutunion))
-            polys = list(result)
-            if len(polys) == 1:
-                newgeom = polys[0]
+        def flat(g):
+            if hasattr(g, "geoms"):
+                return g.geoms
             else:
-                newgeom = shapely.geometry.MultiPolygon(polys)
-
-            # the above only cut from the exterior of the main data,
-            # so subtract main data's holes from the results
-            if "Multi" in cutgeom.type:
-                holes = [hole for multigeom in cutgeom.geoms for hole in multigeom.interiors]
-            else:
-                holes = cutgeom.interiors
-            if holes:
-                # subtract from the exterior
-                holes = shapely.geometry.MultiPolygon(holes)
-                newgeom = newgeom.difference(holes)
-                
-        elif "LineString" in geom.type:
-            raise Exception("Cutting of linestrings not yet implemented")
+                return [g]
+        cutgeom = shapely.geom.MultiPolygon(sum((flat(g) for g in cutgeoms)))
+        newgeom = _split(geom, cutgeom)
 
         # add feature
         outdata.add_feature(feat.row, newgeom.__geo_interface__)
         
     return outdata
 
+def reproject(data, fromcrs, tocrs):
+    """Reprojects from one crs to another"""
+    import pyproj
 
+    def _project(points):
+        xs,ys = itertools.izip(*points)
+        xs,ys = pyproj.transform(pyproj.Proj(fromcrs),
+                                    pyproj.Proj(tocrs),
+                                    xs, ys)
+        newpoints = list(itertools.izip(xs, ys))
+        return newpoints
 
-
-
-
-# Compare operations
-
-def intersection(data, clipper, key=None):
-    """
-    Clips the data to the parts that it has in common with the clipper polygon.
-
-    Key is a function for determining if a pair of features should be processed, taking feat and clipfeat as input args and returning True or False
-    """
-
-    # create spatial index
-    if not hasattr(data, "spindex"): data.create_spatial_index()
-    if not hasattr(clipper, "spindex"): clipper.create_spatial_index()
-
-    out = VectorData()
-    out.fields = list(data.fields)
-
-    iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
-    for feat,geom in iterable:
-        
-        supergeom = supershapely(geom)
-        iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
-
-        for clipfeat,clipgeom in iterable2:
-            if key:
-                if key(feat,clipfeat) and supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
-                    intsec = geom.intersection(clipgeom)
-                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:                        
-                        out.add_feature(feat.row, intsec.__geo_interface__)
-            else:
-                if supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
-                    intsec = geom.intersection(clipgeom)
-                    if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001:
-                        out.add_feature(feat.row, intsec.__geo_interface__)
-
-    return out
-##
-##def difference(data, other):
-##    """
-##    Finds the parts that are unique to the main data, that it does not
-##    have in common with the other data. 
-##    """
-##    # TODO: Fix ala where("disjoint")
-##
-##    out = VectorData()
-##    out.fields = list(data.fields)
-##
-##    for feat in data:
-##        geom = feat.get_shapely()
-##        for otherfeat in other:
-##            othergeom = otherfeat.get_shapely()
-##            diff = geom.difference(othergeom)
-##            if not diff.is_empty:
-##                out.add_feature(feat.row, diff.__geo_interface__)
-##
-##    return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-# FINALLY
-
-# IDEA:
-#       data.select
-#               .by_attributes()
-#               .by_location()
-#       data.compare
-#               .by_
-
-##def select(data, condition=None):
-##    pass
-
-##def modify(data, condition=None, where=None, clip=None):
-##    pass
-
-##def link(data, condition=None, where=None, clip=None, linktype="join"):
-##    # linktype can also be relate
-##    pass
-
-
-
-
-def select(data, condition=None, where=None): # OR attributes=..., location=...
-    data.select #...
-    data = _where(data, condition=where)
-    pass
-
-def clip(data, other, clip_type, condition=None, where=None, by=None):
-    """
-    Pairwise clip operation between each pair of features. 
-
-    - clip_type: intersection, union, or difference
-    """
-
-    # Note: if no by, then pairwise, if by, then accept fieldmapping (and clip_type will be run cumulatively within each group)
-    # ie for union/dissolve/collapse, use clip(data, other, "union", by="ID", fieldmapping=...)
-    # this way can also specify continguous dissolve, overlapping dissolve, disjoint dissolve, etc via the where param...
-    # for isect and diff is different, only geom clip_type will be applied within each group, each row still intact.
-    # hmmm...
+    out = data.copy()
     
-    # create spatial index
-    if not hasattr(data, "spindex"): data.create_spatial_index()
-    if not hasattr(clipper, "spindex"): clipper.create_spatial_index()
-
-    out = VectorData()
-    out.fields = list(data.fields)
-
-    if clip_type == "intersection":
-        iterable = ((feat,feat.get_shapely()) for feat in data.quick_overlap(clipper.bbox))
-        for feat,geom in iterable:
-            
-            supergeom = supershapely(geom)
-            iterable2 = ((clipfeat,clipfeat.get_shapely()) for clipfeat in clipper.quick_overlap(feat.bbox))
-
-            for clipfeat,clipgeom in iterable2:
-                if key:
-                    if key(feat,clipfeat) and supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
-                        intsec = geom.intersection(clipgeom)
-                        if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001: # replace with optional snapping
-                            out.add_feature(feat.row, intsec.__geo_interface__)
-                else:
-                    if supergeom.intersects(clipgeom) and not geom.touches(clipgeom):
-                        intsec = geom.intersection(clipgeom)
-                        if not intsec.is_empty and data.type in intsec.geom_type and intsec.area > 0.00000000001: # replace with optional snapping
-                            out.add_feature(feat.row, intsec.__geo_interface__)
-
-    elif clip_type == "difference":
-        pass
-
-    elif clip_type == "union":
-        pass
+    for feat in out:
+        feat.transform(_project)
 
     return out
-
-def join(data, other, condition=None, where=None, clip=None):
-    pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Self geometric operations (works on a feature level)...
-
-##def selfintersection(data, primkey):
-##    """Clean away any internal overlap of features,
-##    using primkey to decide which feature to keep"""
-##    # duplicate each feature for each feature it matches with, with a unique geometry for each...
-##
-##    raise Exception("Not yet implemented")
-##
-##def selfunion(data, primkey):
-##    """Clean away any internal overlap of features,
-##    using primkey to decide which feature to keep"""
-##    # duplicate each feature for each feature it matches with, with a unique geometry for each...
-##
-##    raise Exception("Not yet implemented")
-##
-##def selfdifference(data, primkey):
-##    """Clean away any internal overlap of features,
-##    using primkey to decide which feature to keep"""
-##    # duplicate each feature for each feature it matches with, with a unique geometry for each...
-##
-##    raise Exception("Not yet implemented")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-########## UNSURE ... 
-
-##def cumulative_selfintersections(self):
-##    # cuts every feature by the intersections with all other features
-##    if not hasattr(self, "spindex"):
-##        self.create_spatial_index()
-##    
-##    out = VectorData()
-##    out.type = self.type
-##    out.fields = list(self.fields)
-##    geoms = dict(((f.id,f.get_shapely()) for f in self))
-##
-##
-##    def getisecs(g, geoms):
-##        isecs = []
-##        for og in geoms:
-##            #if og.area < 0.001: continue # this somehow makes it work....????
-##            if id(og) != id(g):
-##                #print "testing", id(g), id(og)
-##                isec_bool = og.equals(g) or (og.intersects(g) and not og.touches(g)) #og.crosses(g) or og.contains(g) or og.within(g) # not those that touch or equals
-##                if isec_bool:
-##                    isec = g.intersection(og)
-##
-##                    # sifting through dongles etc approach
-####                        incl = []
-####                        if isec.geom_type == "GeometryCollection":
-####                            # only get same types, ie ignore dongles etc
-####                            incl.extend([sub for sub in isec.geoms if out.type in sub.geom_type])
-####                        elif out.type in isec.geom_type:
-####                            # only if same type
-####                            incl.append(isec)
-####                        #viewisecs(g, [og], "pair isec = %s, include = %s" % (isec_bool,bool(incl)) )
-####                        for sub in incl:
-####                            #REMEMBER: this is only the immediate pairwise isecs, and might be further subdivided
-####                            #viewisecs(g, [og], "pair isec = %s" % isec_bool)
-####                            print repr(sub)
-####                            isecs.append( sub )
-##
-##                    # only pure approach
-##                    #print repr(isec)
-##                    if out.type in isec.geom_type:
-##                        #print "included for next step"
-##                        isecs.append(isec)
-##                        
-####                        else:
-####                            ###isecs.append(og)
-####                            if hasattr(isec, "geoms"):
-####                                for i in isec.geoms:
-####                                    if out.type in i.geom_type and i.area >= 0.0001:
-####                                        print str(i)[:200]
-####                                        viewisecs(i, [], str(i.area) + " inside geomcollection, valid = %s" % i.is_valid)
-####                                #viewisecs(og, [i for i in isec.geoms if out.type in i.geom_type], "wrong type")
-##
-##                else:
-##                    pass #viewisecs(g, [og], "isec_bool False")
-##                        
-##        return isecs
-##
-##    DEBUG = False
-##
-##    def viewisecs(g=None, isecs=None, title="[Title]"):
-##        if DEBUG: 
-##            from ..renderer import Map, Color
-##            mapp = Map(width=1000, height=1000, title=title)
-##
-##            if isecs:
-##                d = VectorData()
-##                d.fields = ["dum"]
-##                for i in isecs:
-##                    d.add_feature([1], i.__geo_interface__)
-##                mapp.add_layer(d, fillcolor="blue")
-##
-##            if g:
-##                gd = VectorData()
-##                gd.fields = ["dum"]
-##                gd.add_feature([1], g.__geo_interface__)
-##                mapp.add_layer(gd, fillcolor=Color("red",opacity=155))
-##
-##            mapp.zoom_auto()
-##            mapp.view()
-##
-####        finals = []
-####        compare = [f.get_shapely() for f in self]
-####        for feat in self:
-####            print feat
-####            geom = geoms[feat.id]
-####            compare = getisecs(geom, compare)
-####            for sub in compare:
-####                finals.append((feat,sub))
-####        for feat,geom in finals:
-####            out.add_feature(feat.row, geom.__geo_interface__)
-##
-##    def process(isecs):
-##        parts = []
-##        for g in isecs:
-##            subisecs = getisecs(g, isecs)
-##            viewisecs(g, [], "getting subisecs of g")
-##            viewisecs(None, isecs, "compared to ...")
-##            if not subisecs:
-##                viewisecs(g, [], "node (g) reached, adding" )
-##                parts += [g]
-##            elif len(subisecs) == 1:
-##                viewisecs(subisecs[0], [], "node (subisec) reached, adding" )
-##                parts += [subisecs[0]]
-##            else:
-##                viewisecs(None, subisecs, "going deeper, len = %s" % len(subisecs) )
-##                parts += process(subisecs)
-##                #viewisecs(g, subisecs, str(len(subisecs)) + " were returned as len = %s" % len(parts) )
-##        return parts
-##
-##    for i,feat in enumerate(self):
-##        #if feat["CNTRY_NAME"] != "Russia": continue
-##        #if i >= 10:
-##        #    return out
-##        print feat
-##        geom = geoms[feat.id]
-##        top_isecs = [geoms[otherfeat.id] for otherfeat in self.quick_overlap(feat.bbox)]
-##        
-##        #print self.select(lambda f:f["CNTRY_NAME"]=="USSR")
-##        #top_isecs = [next((f.get_shapely() for f in self.select(lambda f:f["CNTRY_NAME"]=="USSR")))]
-##        #print "spindex",top_isecs
-##        #from ..renderer import Color
-##        #self.select(lambda f:f["CNTRY_NAME"]=="USSR").view(1000,1000,flipy=1,fillcolor=Color("red",opacity=155))
-##        #viewisecs(geom, top_isecs, "spindex to be tested for isecs")
-##        
-##        top_isecs = getisecs(geom, top_isecs)
-##        print "top_isecs",top_isecs
-##        viewisecs(geom, top_isecs, "spindex verified, len = %s" % len(top_isecs) )
-##        parts = process(top_isecs)
-##        for g in parts:
-##            print "adding", id(g)
-##            #viewisecs(g, [], "final isec")
-##            out.add_feature(feat.row, g.__geo_interface__)
-##    
-##
-####        for feat in self:
-####            print feat
-####            geom = geoms[feat.id]
-####            # find all othergeoms that 
-####            othergeoms = (geoms[f.id] for f in self.quick_overlap(feat.bbox))
-####            othergeoms = [og for og in othergeoms if og.intersects(geom)]
-####            for othergeom in othergeoms:
-####                intsec = geom.intersection(othergeom)
-####                if not intsec.is_empty and self.type in intsec.geom_type:
-####                    print intsec.geom_type
-####                    out.add_feature(feat.row, intsec.__geo_interface__)
-####                    out.view(1000, 1000, flipy=1)
-##
-##
-####        def cutup(geom, othergeoms):
-####            parts = []
-####            for othergeom in othergeoms:
-####                # add intsecs
-####                if geom != othergeom and geom.intersects(othergeom):
-####                    intsec = geom.intersection(othergeom)
-####                    if not intsec.is_empty:
-####                        parts.append(intsec)
-####            # add diff
-####            diff = geom.difference(shapely.ops.cascaded_union(parts))
-####            if not diff.is_empty:
-####                parts.append(diff)
-####            return parts
-####
-####        def subparts(geoms):
-####            subs = []
-####            for geom in geoms:
-####                subs += cutup(geom, geoms)
-####            return subs
-####
-####        def recur(geoms):
-####            prevparts = []
-####            parts = subparts(geoms)
-####            while len(parts) != len(prevparts):
-####                print len(parts)
-####                prevparts = list(parts)
-####                parts = subparts(parts)
-####                break
-####            return parts
-####                
-####        for feat in self:
-####            geom = geoms[feat.id]
-####            # find all othergeoms that 
-####            othergeoms = (geoms[f.id] for f in self.quick_overlap(feat.bbox))
-####            othergeoms = [og for og in othergeoms if og.intersects(geom)]
-####            print feat
-####            parts = recur([geom]+othergeoms)
-####            print len(parts)
-##
-##
-####        def flatten(geom):
-####            if "Multi" in geom.geom_type:
-####                for g in geom.geoms:
-####                    yield g
-####            else:
-####                yield geom
-####        for feat in self:
-####            geom = geoms[feat.id]
-####            # find all othergeoms that 
-####            othergeoms = []
-####            for otherfeat in self.quick_overlap(feat.bbox):
-####                if otherfeat == feat: continue
-####                if not geoms[otherfeat.id].intersects(geom): continue
-####                othergeoms += list(flatten(geoms[otherfeat.id]))
-####            # combine into one so only have to make one spatial test
-####            if "Polygon" in self.type:
-####                othergeom = shapely.geometry.MultiPolygon(othergeoms)
-####            elif "LineString" in self.type:
-####                othergeom = shapely.geometry.MultiLineString(othergeoms)
-####            elif "Point" in self.type:
-####                othergeom = shapely.geometry.MultiPoint(othergeoms)
-####            else:
-####                raise Exception()
-####            print all((g.is_valid for g in othergeoms))
-####            print othergeom.is_valid
-####            # add intsecs
-####            intsec = geom.intersection(othergeom)
-####            if not intsec.is_empty:
-####                for g in flatten(intsec):
-####                    out.add_feature(feat.row, g)
-####            # add diffs
-####            diff = geom.difference(othergeom)
-####            if not diff.is_empty:
-####                for g in flatten(diff):
-####                    out.add_feature(feat.row, g)
-##
-##    return out
 
 
 
