@@ -33,6 +33,40 @@ def crop(data, bbox):
 
     return out
 
+def tiled(data, tilesize=None, tiles=(5,5)):
+    width = abs(data.bbox[2] - data.bbox[0])
+    height = abs(data.bbox[3] - data.bbox[1])
+    
+    if tilesize:
+        tw,th = tilesize
+
+    elif tiles:
+        tw,th = width / float(tiles[0]), height / float(tiles[1])
+
+    startx,starty,stopx,stopy = data.bbox
+
+    def _floatrange(fromval,toval,step):
+        "handles both ints and flots"
+        # NOTE: maybe not necessary to test low-high/high-low
+        # since vector bbox is always min-max
+        val = fromval
+        if fromval < toval:
+            while val <= toval:
+                yield val, val+step
+                val += step
+        else:
+            while val >= toval:
+                yield val, val-step
+                val -= step
+    
+    for y1,y2 in _floatrange(starty, stopy, th):
+        y2 = y2 if y2 <= stopy else stopy # cap
+        for x1,x2 in _floatrange(startx, stopx, tw):
+            x2 = x2 if x2 <= stopx else stopx # cap
+            tile = crop(data, [x1,y1,x2,y2])
+            if len(tile) > 0:
+                yield tile
+
 def where(data, other, condition, **kwargs):
     """
     Locates and returns those features that match some spatial condition
