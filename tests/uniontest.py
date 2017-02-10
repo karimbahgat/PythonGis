@@ -25,18 +25,20 @@ from time import time
 ##union.view()
 
 
+
 # test tiled
 def tiled_union(data):
     for tile in data.manage.tiled(tiles=(5,5)):
+        print len(tile)
         union = tile.aggregate(key=lambda x: True,
-                               geomfunc=lambda fs: shapely.ops.cascaded_union(getshps(fs)).__geo_interface__,
+                               geomfunc="union", #lambda fs: shapely.ops.cascaded_union(getshps(fs)).__geo_interface__,
                                )
         yield union
 
 t = time()
 merged = pg.vector.manager.merge(*list(tiled_union(data)))
 final = merged.aggregate(key=lambda x: True,
-                           geomfunc=lambda fs: shapely.ops.cascaded_union(getshps(fs)).__geo_interface__,
+                           geomfunc="union", #lambda fs: shapely.ops.cascaded_union(getshps(fs)).__geo_interface__,
                            )
 print "final time", time() - t
 final.view()

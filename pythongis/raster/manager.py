@@ -485,8 +485,16 @@ def crop(raster, bbox, worldcoords=True):
 
     return outrast
 
-def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False):
-    """Yields raster as a series of subtile rasters"""
+def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
+    """
+    Yields raster as a series of subtile rasters. 
+    Bbox is optional and will check so only yields tiles relevant to
+    the given bbox. However, tiles will not be cropped, so may extend
+    outside area of interest. 
+    """
+    # TODO: not sure if tiles should be cropped to the bbox or just
+    # used as selection criteria...
+    
     if tilesize:
         tw,th = tilesize
 
@@ -496,6 +504,11 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False):
 
     else:
         raise Exception("Either tiles or tilesize must be specified")
+
+    if bbox:
+        x1,y1,x2,y2 = bbox
+        bcol1,brow1 = raster.geo_to_cell(x1,y1)
+        bcol2,brow2 = raster.geo_to_cell(x2,y2)        
 
     if worldcoords:
         xscale,xskew,xoffset, yskew,yscale,yoffset = raster.meta["affine"]
@@ -517,8 +530,18 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False):
     
     for row in _floatrange(minh, maxh, th):
         row2 = row+th if row+th <= maxh else maxh
+
+        if bbox and (brow2 <= row or brow1 >= row2):
+            # dont yield if outside desired bbox
+            continue
+        
         for col in _floatrange(minw, maxw, tw):
             col2 = col+tw if col+tw <= maxw else maxw
+
+            if bbox and (bcol2 <= col or bcol1 >= col2):
+                # dont yield if outside desired bbox
+                continue
+
             try:
                 tile = crop(raster, [col,row,col2,row2], False)
                 yield tile

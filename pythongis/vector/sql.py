@@ -15,6 +15,50 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
     """Each func must be able to take an iterable and return a single item.
     Aggregfuncs is a series of 3-tuples: an output column name, a value function or value hash index on which to base the aggregation, and a valid string or custom function for aggregating the retieved values.
     """
+    def lookup_geomfunc(agg):
+        # handle aliases
+        if agg == "dissolve":
+            agg = "union"
+        elif agg == "unique":
+            agg = "difference"
+
+        # detect
+        if agg == "intersection":
+            def _func(fs):
+                gs = (f.get_shapely() for f in fs if f.geometry)
+                cur = next(gs)
+                for g in gs:
+                    if not g.is_empty:
+                        cur = cur.intersection(g)
+                return cur.__geo_interface__
+            
+        elif agg == "difference":
+            def _func(fs):
+                gs = (f.get_shapely() for f in fs if f.geometry)
+                cur = next(gs)
+                for g in gs:
+                    if not g.is_empty:
+                        cur = cur.difference(g)
+                return cur.__geo_interface__
+
+        elif agg == "union":
+            def _func(fs):
+                gs = [f.get_shapely() for f in fs if f.geometry]
+                if len(gs) > 1:
+                    from shapely.ops import cascaded_union
+                    return cascaded_union(gs).__geo_interface__
+                elif len(gs) == 1:
+                    return gs[0].__geo_interface__
+
+        elif hasattr(agg, "__call__"):
+            # agg is not a string but a custom function
+            return agg
+
+        else:
+            raise Exception("geomfunc must be a callable function or a valid set geometry string name")
+
+        return _func
+    
     def lookup_aggfunc(agg):
         # handle aliases
         if agg in ("average","avg"):
@@ -75,6 +119,7 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
         row.append(aggval)
 
     if geomfunc:
+        geomfunc = lookup_geomfunc(geomfunc)
         geom = geomfunc(iterable)
         return row,geom
 
