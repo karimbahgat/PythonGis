@@ -434,6 +434,27 @@ def distance(data, **rasterdef):
     # ...
 
     return outrast
+
+
+
+
+
+
+# Morphology
+
+def morphology(raster, selection, pattern, bandnum=0):
+    """
+    General purpose morphology pattern operations, returning binary raster.
+    Selection is the conditional expression to be interpreted as on-values. 
+    Valid patterns include "edge", "dilation", "erosion", and
+    manual input as expected by PIL.ImageMorph.
+    """
+    premask = raster.mask
+    cond = raster.bands[bandnum].conditional(selection)
+    count,im = PIL.ImageMorph.MorphOp(op_name=pattern).apply(cond.img)
+    out = RasterData(image=im, **raster.rasterdef)
+    out.mask = premask
+    return out
     
 
 

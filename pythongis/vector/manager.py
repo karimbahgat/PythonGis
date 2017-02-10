@@ -281,7 +281,8 @@ def snap(data, otherdata, tolerance=0.0000001):
     # default should be 0.001 meters (1 millimeter), ala ArcGIS
     # should be calculated based on crs
 
-    # TODO: for now just keeps snapping, should only snap to closest parts...
+    # NOTSURE: for now, if multiple within tolerance, snaps first to furtherst away, then to next farthest, etc.
+    # this means might be snapped back and forth multiple times, but at least the closest one will have the final say.
 
     if not hasattr(otherdata, "spindex"):
         otherdata.create_spatial_index()
@@ -292,11 +293,12 @@ def snap(data, otherdata, tolerance=0.0000001):
     for feat in out:
         shp = feat.get_shapely()
         buff = shp.buffer(tolerance)
-        for otherfeat in otherdata.quick_overlap(buff.bounds):
-            othershp = otherfeat.get_shapely()
-            if buff.intersects(othershp):
-                print "snap"
-                shp = _snap(shp, othershp, tolerance)
+        withindist = (otherfeat.get_shapely() for otherfeat in otherdata.quick_overlap(buff.bounds))
+        withindist = (othershp for othershp in withindist if buff.intersects(othershp))
+        withindist = ((othershp,shp.distance(othershp)) for othershp in withindist)
+        for othershp,dist in sorted(withindist, key=lambda(shp,dist): dist, reverse=True):
+            print "snap"
+            shp = _snap(shp, othershp, tolerance)
         feat.geometry = shp.__geo_interface__
         
     return out
