@@ -55,6 +55,7 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
             
             geom = groupfeat.get_shapely()
             supergeom = supershapely(geom)
+            print groupfeat
             valuefeats = ((valfeat,valfeat.get_shapely()) for valfeat in valuedata.quick_overlap(groupfeat.bbox))
 
             # aggregate
@@ -62,9 +63,7 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
                 # when comparing polys to polys, dont count neighbouring polygons that just touch on the edge
                 def overlaps(valgeom):
                     if supergeom.intersects(valgeom) and not geom.touches(valgeom):
-                        intsec = geom.intersection(valgeom)
-                        if not intsec.is_empty and groupbydata.type in intsec.geom_type and intsec.area > 0.00000000001:
-                            return True
+                        return True
             else:
                 # for lines and points, ok that just touches on the edge
                 def overlaps(valgeom):

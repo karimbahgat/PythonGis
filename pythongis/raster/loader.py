@@ -150,28 +150,31 @@ def from_file(filepath, **georef):
             def grouper(iterable, n):
                 args = [iter(iterable)] * n
                 return itertools.izip(*args)
-            reshaped = itertools.izip(*grouper(data, cols))
-            data = [cell for row in reshaped for cell in row]
-
-        georef = dict()
+            #reshaped = itertools.izip(*grouper(data, cols))
+            #data = [cell for row in reshaped for cell in row]
 
         # Build geotransform
-        try:
-            # first try manual override georef options
-            georef["affine"] = compute_affine(**georef_orig)
-        except:
-            # worldfile geotransform takes priority over file params
-            transform_coeffs = check_world_file(filepath)
-            if transform_coeffs:
-                # rearrange the world file param sequence to match affine transform
-                xscale,yskew,xskew,yscale,xoff,yoff = transform_coeffs
-                georef["affine"] = xscale,xskew,xoff,yskew,yscale,yoff
-            else:
-                # finally try file georef params
-                try:
-                    georef["affine"] = compute_affine(**georef)
-                except:
-                    raise Exception("Couldn't find the manual georef options, world file, or file georef parameters needed to position the image in space")
+        if "affine" in georef_orig:
+            georef["affine"] = georef_orig["affine"]
+
+        else:
+            georef.update(**georef_orig)
+            try:
+                # first try manual override georef options
+                georef["affine"] = compute_affine(**georef_orig)
+            except:
+                # worldfile geotransform takes priority over file params
+                transform_coeffs = check_world_file(filepath)
+                if transform_coeffs:
+                    # rearrange the world file param sequence to match affine transform
+                    xscale,yskew,xskew,yscale,xoff,yoff = transform_coeffs
+                    georef["affine"] = xscale,xskew,xoff,yskew,yscale,yoff
+                else:
+                    # finally try file georef params
+                    try:
+                        georef["affine"] = compute_affine(**georef)
+                    except:
+                        raise Exception("Couldn't find the manual georef options, world file, or file georef parameters needed to position the image in space")
 
         # Read coordinate ref system
         # esri ascii doesnt have any crs so assume default
@@ -182,7 +185,7 @@ def from_file(filepath, **georef):
         
         # load the data as an image
         tempfile.close()
-        img = PIL.Image.new("F", (rows, cols))
+        img = PIL.Image.new("F", (cols, rows))
         img.putdata(data=data)
         # make a single-band tuple
         bands = [img]
@@ -534,7 +537,8 @@ def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
         if (xy_cell and xy_geo):
             xcell,ycell = xy_cell
             xgeo,ygeo = xy_geo
-            xoffset,yoffset = xgeo - xcell, ygeo - ycell
+            xoffset = xgeo-(xcell*xscale)
+            yoffset = ygeo-(ycell*yscale)
         elif bbox:
             xoffset,yoffset = bbox[0],bbox[1]
 
