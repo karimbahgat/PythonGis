@@ -580,7 +580,8 @@ def clip(raster, clipdata, bbox=None, bandnum=0):
     for band in raster.bands:
         
         # paste data onto blank image where 'valid' is true
-        img = PIL.Image.new(band.img.mode, band.img.size, band.nodataval)
+        img = PIL.Image.new(band.img.mode, band.img.size, 0) # avoid initializing with None, bc sometimes results in pixel noise
+        if band.nodataval != None: img.paste(band.nodataval) # set background to nodataval
         img.paste(band.img, mask=valid.img)
         outrast.add_band(img=img, nodataval=band.nodataval)
 

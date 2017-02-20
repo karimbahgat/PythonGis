@@ -127,8 +127,10 @@ def overlap_summary(groupbydata, valuedata, fieldmapping=[], keepall=True, value
             fdata.add_feature([], f.geometry)
             
             clipped = raster.manager.clip(cropped, fdata)
-            
-            #mapp = clipped.render(1000,500,title="clipped")
+
+            #import pythongis as pg
+            #mapp = pg.renderer.Map()
+            #mapp.add_layer(clipped)
             #mapp.add_layer(fdata, fillcolor=None)
             #mapp.add_legend()
             #mapp.view()
