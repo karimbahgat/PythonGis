@@ -110,8 +110,7 @@ def algebra(mathexpr, rasters):
 # Interpolation
 
 def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs):
-    """Interpolation between point data values. Bins and aggregates point data
-    values, followed by simple value smearing to produce a smooth surface raster"""
+    """Exact interpolation between point data values. Original values are kept intact"""
 
     # some links
     #http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.interpolate.RegularGridInterpolator.html
@@ -120,6 +119,11 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
     #http://www.qgistutorials.com/en/docs/creating_heatmaps.html
     #see especially: http://resources.arcgis.com/en/help/main/10.1/index.html#//009z0000000v000000
 
+    # TODO: require aggfunc with exception...
+
+    if not pointdata.type == "Point":
+        raise Exception("Pointdata must be of type point")
+
     if rasterdef["mode"] == "1bit":
         raise Exception("Cannot do interpolation to a 1bit raster")
 
@@ -127,56 +131,61 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
     
     if algorithm == "idw":
 
-        raise Exception("Not yet implemented")
+        # create output raster
+        raster = RasterData(**rasterdef)
+        newband = raster.add_band() # add empty band
 
-        ##        raster = RasterData(**rasterdef)
-        ##
-        ##        neighbours = kwargs.get("neighbours")
-        ##        sensitivity = kwargs.get("sensitivity")
-        ##        gridxs = (raster.cell_to_geo(px,0) for px in range(raster.width))
-        ##        gridys = (raster.cell_to_geo(0,py) for py in range(raster.height))
-        ##
-        ##        #retrieve input options
-        ##        if neighbours == None:
-        ##            # TODO: not yet implemented
-        ##            neighbours = int(len(points)*0.10) #default neighbours is 10 percent of known points
-        ##        if sensitivity == None:
-        ##            sensitivity = 3 #same as power, ie that high sensitivity means much more effect from far away pointss
-        ##
-        ##        # some precalcs
-        ##        senspow = (-sensitivity/2.0)
-        ##        
-        ##        #some defs
-        ##        def _calcvalue(gridx, gridy, points):
-        ##            weighted_values_sum = 0.0
-        ##            sum_of_weights = 0.0
-        ##            for px,py,pval in points:
-        ##                weight = ((gridx-px)**2 + (gridy-py)**2)**senspow
-        ##                sum_of_weights += weight
-        ##                weighted_values_sum += weight * pval
-        ##            return weighted_values_sum / sum_of_weights
-        ##        
-        ##        # calculate values
-        ##        for gridy in gridys:
-        ##            newrow = []
-        ##            for gridx in gridxs:
-        ##                try:
-        ##                    # main calc
-        ##                    newval = _calcvalue(gridx, gridy, points)
-        ##                except:
-        ##                    # gridxy to calculate is exact same as one of the point xy, so just use same value
-        ##                    newval = next(pval for px,py,pval in points if gridx == px and gridy == py) 
-        ##                newrow.append(newval)
-        ##
-        ##        # finish off
-        ##        # ...
+        # default options
+        neighbours = kwargs.get("neighbours")
+        sensitivity = kwargs.get("sensitivity")
+        aggfunc = kwargs.get("aggfunc", "mean")
+        
+        # collect counts or sum field values
+        from ..vector import sql
+        def key(feat):
+            x,y = feat.geometry["coordinates"]
+            px,py = raster.geo_to_cell(x,y)
+            return px,py
+        def valfunc(feat):
+            val = feat[valuefield] if valuefield else 1
+            return val
+        fieldmapping = [("aggval",valfunc,aggfunc)]
+        points = []
+        for (px,py),feats in itertools.groupby(pointdata, key=key):
+            aggval = sql.aggreg(feats, fieldmapping)[0]
+            points.append((px,py,aggval))
 
-    elif algorithm == "kdtree":
-        # https://github.com/stefankoegl/kdtree
-        # http://rosettacode.org/wiki/K-d_tree
-        
-        raise Exception("Not yet implemented")
-        
+        # retrieve input options
+        if neighbours == None:
+            # TODO: not yet implemented
+            neighbours = int(len(points)*0.10) #default neighbours is 10 percent of known points
+        if sensitivity == None:
+            sensitivity = 3 #same as power, ie that high sensitivity means much more effect from far away pointss
+
+        # some precalcs
+        senspow = (-sensitivity/2.0)
+
+        # some defs
+        def _calcvalue(gridx, gridy, points):
+            weighted_values_sum = 0.0
+            sum_of_weights = 0.0
+            for px,py,pval in points:
+                weight = ((gridx-px)**2 + (gridy-py)**2)**senspow
+                sum_of_weights += weight
+                weighted_values_sum += weight * pval
+            return weighted_values_sum / sum_of_weights
+
+        # calculate values
+        for gridy in range(raster.height):
+            for gridx in range(raster.width):
+                try:
+                    # main calc
+                    newval = _calcvalue(gridx, gridy, points)
+                except:
+                    # gridxy to calculate is exact same as one of the point xy, so just use same value
+                    newval = next(pval for px,py,pval in points if gridx == px and gridy == py) 
+                newband.set(gridx,gridy,newval)
+
     elif algorithm == "spline":
         # see C scripts at http://davis.wpi.edu/~matt/courses/morph/2d.htm
         # looks simple enough
@@ -184,12 +193,38 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
 
         raise Exception("Not yet implemented")
 
+    elif algorithm == "kdtree":
+        # https://github.com/stefankoegl/kdtree
+        # http://rosettacode.org/wiki/K-d_tree
+        
+        raise Exception("Not yet implemented")
+
     elif algorithm == "kriging":
         # ...?
         
         raise Exception("Not yet implemented")
 
-    elif algorithm == "radial":
+    else:
+        raise Exception("Not a valid interpolation algorithm")
+
+    return raster
+
+def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
+    """
+    Bins and aggregates point data values, followed by simple value smearing to produce a smooth surface raster.
+    Different from interpolation in that the new values do not exactly pass through the original values.
+    Aka heatmap in the proper sense. 
+    """
+
+    if not pointdata.type == "Point":
+        raise Exception("Pointdata must be of type point")
+
+    if rasterdef["mode"] == "1bit":
+        raise Exception("Cannot do interpolation to a 1bit raster")
+
+    algorithm = algorithm.lower()
+
+    if algorithm == "radial":
         # create output raster
         raster = RasterData(**rasterdef)
         raster.add_band() # add empty band
@@ -297,20 +332,20 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
         pass
 
     else:
-        raise Exception("Not a valid interpolation algorithm")
+        raise Exception("Not a valid smoothing algorithm")
 
     return raster
 
 def density(pointdata, rasterdef, algorithm="radial", **kwargs):
     """Creates a raster of the density of points, ie the frequency of their occurance
-    without thinking about the values of each point. Same as using the interpolate method
+    without thinking about the values of each point. Same as using the smooth function
     without setting the valuefield."""
     
     # only difference being no value field contributes to heat
     # TODO: allow density of linear and polygon features too,
     # maybe by counting nearby features
     
-    return interpolate(pointdata, rasterdef, valuefield=None, algorithm=algorithm, **kwargs)
+    return smooth(pointdata, rasterdef, valuefield=None, algorithm=algorithm, **kwargs)
 
 
 
