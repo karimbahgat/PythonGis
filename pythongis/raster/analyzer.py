@@ -150,10 +150,11 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
             val = feat[valuefield] if valuefield else 1
             return val
         fieldmapping = [("aggval",valfunc,aggfunc)]
-        points = []
+        points = dict()
         for (px,py),feats in itertools.groupby(pointdata, key=key):
             aggval = sql.aggreg(feats, fieldmapping)[0]
-            points.append((px,py,aggval))
+            if isinstance(aggval,(int,float)): # only consider numeric values, ignore missing etc
+                points[(px,py)] = aggval
 
         # retrieve input options
         if neighbours == None:
@@ -169,7 +170,7 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
         def _calcvalue(gridx, gridy, points):
             weighted_values_sum = 0.0
             sum_of_weights = 0.0
-            for px,py,pval in points:
+            for (px,py),pval in points.items():
                 weight = ((gridx-px)**2 + (gridy-py)**2)**senspow
                 sum_of_weights += weight
                 weighted_values_sum += weight * pval
@@ -178,12 +179,13 @@ def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs
         # calculate values
         for gridy in range(raster.height):
             for gridx in range(raster.width):
-                try:
+                newval = points.get((gridx,gridy))
+                if newval != None:
+                    # gridxy to calculate is exact same as one of the point xy, so just use same value
+                    pass
+                else:
                     # main calc
                     newval = _calcvalue(gridx, gridy, points)
-                except:
-                    # gridxy to calculate is exact same as one of the point xy, so just use same value
-                    newval = next(pval for px,py,pval in points if gridx == px and gridy == py) 
                 newband.set(gridx,gridy,newval)
 
     elif algorithm == "spline":
