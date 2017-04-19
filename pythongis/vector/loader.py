@@ -15,6 +15,7 @@ file_extensions = {".shp": "Shapefile",
                    ".geojson": "GeoJSON",
                    ".xls": "Excel 97",
                    ".xlsx": "Excel",
+                   ".dta": "Stata",
                    ".csv": "CSV",
                    ".txt": "Text-Delimited",
                    }
@@ -127,6 +128,14 @@ def from_file(filepath, encoding="utf8", **kwargs):
                 rows = (r for i,r in enumerate(rows) if i <= last)
 
             fields = next(rows)
+
+        # stata
+        elif filetype == "Stata":
+            # TODO: how about encoding, manual or pass it on? 
+            from .fileformats.stata import StataFile
+            dta = Statafile(filename, **kwargs)
+            rows = (r for r in dta)
+            fields = list(dta.fieldnames)
         
         geokey = kwargs.get("geokey")
         xfield = kwargs.get("xfield")
