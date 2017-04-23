@@ -5,6 +5,8 @@ import pyagg, pyagg.legend
 import PIL, PIL.Image, PIL.ImageChops
 import colour
 
+import classypie as cp
+
 from .vector.data import VectorData
 from .vector.loader import detect_filetype as vector_filetype
 from .raster.data import RasterData
@@ -690,7 +692,6 @@ class VectorLayer:
 
         # set up symbol classifiers
         features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
-        import classipy as cp
         for key,val in self.styleoptions.copy().items():
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
                 if isinstance(val, dict):
@@ -701,7 +702,7 @@ class VectorLayer:
                         else:
                             val["symbolvalues"] = [rgb("random"),rgb("random")]
 
-                    # remove args that are not part of classipy
+                    # remove args that are not part of classypie
                     val = dict(val)
                     if isinstance(val.get("key"), basestring):
                         fieldname = val["key"]
@@ -711,7 +712,7 @@ class VectorLayer:
                     if "color" in key and notclassified != None:
                         notclassified = rgb(notclassified)
 
-                    # convert any text symbolvalues to pure numeric so can be handled by classipy
+                    # convert any text symbolvalues to pure numeric so can be handled by classypie
                     if "color" in key:
                         if isinstance(val["classvalues"], dict):
                             # value color dict mapping for unique breaks
@@ -736,7 +737,7 @@ class VectorLayer:
                     pass
                 
                 else:
-                    # convert any text symbolvalues to pure numeric so can be handled by classipy
+                    # convert any text symbolvalues to pure numeric so can be handled by classypie
                     if "color" in key:
                         val = rgb(val)
                     else:
@@ -744,7 +745,6 @@ class VectorLayer:
                     self.styleoptions[key] = val
 
         # set up text classifiers
-        import classipy as cp
         if "text" in self.styleoptions and "textoptions" in self.styleoptions:
             for key,val in self.styleoptions["textoptions"].copy().items():
                 if isinstance(val, dict):
@@ -753,7 +753,7 @@ class VectorLayer:
                         val["symbolvalues"] = [rgb("random")
                                                  for _ in range(20)]
 
-                    # remove args that are not part of classipy
+                    # remove args that are not part of classypie
                     val = dict(val)
                     if isinstance(val.get("key"), basestring):
                         fieldname = val["key"]
@@ -1231,7 +1231,7 @@ class Legend:
         for layer in self.map:
             if not layer.nolegend:
                 if isinstance(layer, VectorLayer):
-                    # Todo: better handling when more than one classipy option for same layer
+                    # Todo: better handling when more than one classypie option for same layer
                     # perhaps grouping into basegroup under same layer label
                     # ...
                     anydynamic = False

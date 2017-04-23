@@ -24,10 +24,11 @@ pipy.define_upload(packpath,
                              "PIL==1.1.7",
                              "pyagg",
                              "colour",
-                             "classipy"],
+                             "classypie",
+                             "tk2"],
                    )
 
-#pipy.generate_docs(packpath)
+pipy.generate_docs(packpath)
 #pipy.upload_test(packpath)
 #pipy.upload(packpath)
 
