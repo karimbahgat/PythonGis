@@ -162,7 +162,7 @@ def split(data, key, breaks="unique", **kwargs):
     create a split for each new unique occurance of the key value, but the
     breaks arg can also be set to the name of other classification algorithms
     or to a list of your own custom break values. The key, breaks, and kwargs
-    follow the input and behavior of the Classipy package's split and unique
+    follow the input and behavior of the ClassyPie package's split and unique
     functions. 
 
     Iterates through each new split layer one at a time. 
@@ -177,7 +177,7 @@ def split(data, key, breaks="unique", **kwargs):
         else:
             keywrap = lambda f: f[key]
 
-    import classipy as cp
+    import classypie as cp
     if breaks == "unique":
         grouped = cp.unique(data, key=keywrap, **kwargs)
     else:

@@ -76,7 +76,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         crs = geojfile.crs
 
     # table files without geometry
-    elif filetype in ("Text-Delimited","CSV","Excel 97","Excel"):
+    elif filetype in ("Text-Delimited","CSV","Excel 97","Excel","Stata"):
 
         # txt or csv
         if filetype in ("Text-Delimited","CSV"):
@@ -133,7 +133,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
         elif filetype == "Stata":
             # TODO: how about encoding, manual or pass it on? 
             from .fileformats.stata import StataFile
-            dta = Statafile(filename, **kwargs)
+            dta = StataFile(filepath, encoding=encoding, **kwargs)
             rows = (r for r in dta)
             fields = list(dta.fieldnames)
         
