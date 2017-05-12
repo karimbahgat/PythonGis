@@ -30,7 +30,7 @@ def detect_filetype(filepath):
 
 
 
-def from_file(filepath, encoding="utf8", **kwargs):
+def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
 
     # TODO: for geoj and delimited should detect and force consistent field types in similar manner as when saving
 
@@ -39,8 +39,8 @@ def from_file(filepath, encoding="utf8", **kwargs):
     select = kwargs.get("select")
 
     def decode(value):
-        if isinstance(value, str): 
-            return value.decode(encoding)
+        if isinstance(value, bytes): 
+            return value.decode(encoding, errors=encoding_errors)
         else: return value
     
     # shapefile
@@ -64,11 +64,11 @@ def from_file(filepath, encoding="utf8", **kwargs):
 
     # geojson file
     elif filetype == "GeoJSON":
-        geojfile = pygeoj.load(filepath, encoding=encoding, **kwargs)
+        geojfile = pygeoj.load(filepath, **kwargs)
 
         # load fields, rows, and geometries
-        fields = [field for field in geojfile.common_attributes]
-        rows = ([feat.properties[field] for field in fields] for feat in geojfile)
+        fields = [decode(field) for field in geojfile.common_attributes]
+        rows = ([decode(feat.properties[field]) for field in fields] for feat in geojfile)
         geometries = (feat.geometry.__geo_interface__ for feat in geojfile)
         rowgeoms = itertools.izip(rows, geometries)
 
@@ -98,7 +98,7 @@ def from_file(filepath, encoding="utf8", **kwargs):
                     if string.upper() == "NULL":
                         return None
                     else:
-                        return string.decode(encoding)
+                        return string.decode(encoding, errors=encoding_errors)
             rows = ([parsestring(cell) for cell in row] for row in rows)
             fields = next(rows)
 
