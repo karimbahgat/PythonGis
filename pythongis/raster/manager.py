@@ -278,14 +278,11 @@ def downscale(raster, stat="spread", **rasterdef):
 ##                    ###print aggval
 ##                    cell.value = aggval
 
-def rasterize(vectordata, valuekey=None, **rasterdef):
+def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
     # TODO: When using valuekey, how to choose between/aggregate
     # overlapping or nearby features? Now just overwrites and uses value of
     # the last feature. Maybe provide aggfunc option?
     # See further below.
-
-    #if valuekey:
-    #    raise Exception("Rasterizing with valuekey not yet implemented")
 
     mode = "float32" if valuekey else "1bit"
     raster = data.RasterData(mode=mode, **rasterdef)
@@ -295,15 +292,19 @@ def rasterize(vectordata, valuekey=None, **rasterdef):
     img = PIL.Image.new(mode, (raster.width, raster.height), 0)
     drawer = PIL.ImageDraw.Draw(img)
 
-    # set the coordspace to vectordata bbox
-    a,b,c,d,e,f = raster.inv_affine
-
-    # draw the vector data
-    for feat in vectordata:
-        if not feat.geometry: continue
-        
-        val = float(valuekey(feat)) if valuekey else 1.0
+    # drawing procedure
+    def burn(val, feat, drawer):
         geotype = feat.geometry["type"]
+
+        # set the coordspace to vectordata bbox
+        a,b,c,d,e,f = raster.inv_affine
+
+        # if fill val is None, then draw binary outline
+        fill = val
+        outline = 1.0 if val is None else None
+        holefill = 0.0 if val is not None else None
+        holeoutline = 1.0 if val is None else None
+        #print ["burnmain",fill,outline,"burnhole",holefill,holeoutline]
 
         # make all multis so can treat all same
         coords = feat.geometry["coordinates"]
@@ -319,14 +320,14 @@ def rasterize(vectordata, valuekey=None, **rasterdef):
                 #print list(path)[:10]
                 path.transform((a,b,c,d,e,f))
                 #print list(path)[:10]
-                drawer.polygon(path, fill=val, outline=None)
+                drawer.polygon(path, fill=fill, outline=outline)
                 # holes
                 if len(poly) > 1:
                     for hole in poly[1:]:
                         hole = [tuple(p) for p in hole]
                         path = PIL.ImagePath.Path(hole)
                         path.transform((a,b,c,d,e,f))
-                        drawer.polygon(path, fill=0, outline=None)
+                        drawer.polygon(path, fill=holefill, outline=holeoutline)
                         
         # line, 1 pixel line thickness
         elif "LineString" in geotype:
@@ -341,16 +342,108 @@ def rasterize(vectordata, valuekey=None, **rasterdef):
             path.transform((a,b,c,d,e,f))
             drawer.point(path, fill=val)
 
-    # if valuekey mode,
-    #    find self intersections,
-    #    aggregate their values,
-    #    and draw over those parts with the new aggval
-    # OR maybe not,
-    #    instead must test multiple overlap per cell?
-    # ...
+    # quickly draw all vector data
+    for feat in vectordata:
+        if not feat.geometry: continue
+        
+        val = float(valuekey(feat)) if valuekey else 1.0
+        burn(val, feat, drawer)
 
     # create raster from the drawn image
-    raster.add_band(img=img)
+    outband = raster.add_band(img=img)
+
+    # special pixels
+    if valuekey or choose:
+        mask = PIL.Image.new("1", (raster.width,raster.height))
+        drawer = PIL.ImageDraw.Draw(mask)
+
+        if not hasattr(vectordata, "spindex"):
+            vectordata.create_spatial_index()
+
+        # prepare geometries
+        from shapely.prepared import prep
+        for f in vectordata:
+            f._shapely = f.get_shapely()
+            f._prepped = prep(f._shapely)
+        
+        # optionally handle overlapping feats (only relevant if using valuekey)
+        if valuekey:
+            # burn all self intersections onto mask
+            for f1 in vectordata:
+                if not f1.geometry:
+                    continue
+                print ["f1",f1.id,len(vectordata)]
+                g1 = f1._shapely
+                sg1 = f1._prepped
+                for f2 in vectordata.quick_overlap(f1.bbox):
+                    if f1 is not f2:
+                        g2 = f2._shapely
+                        if not sg1.disjoint(g2):
+                            intsec = g1.intersection(g2)
+                            if intsec and intsec.is_valid and not intsec.is_empty:
+                                burnfeat = f1.copy()
+                                burnfeat.geometry = intsec.__geo_interface__
+                                #print ["burning",f2['CNTRY_NAME'],burnfeat.geometry.keys()]
+                                if "geometries" in burnfeat.geometry:
+                                    #print ["weird intsec result", [g["type"] for g in burnfeat.geometry["geometries"]]]
+                                    continue
+                                burn(1.0, burnfeat, drawer)
+
+        # optionally handle choice rules
+        if choose:
+            # burn the outlines of polygons (thats the only cells that are only partially filled and need to be choosen)
+            for feat in vectordata:
+                if not feat.geometry:
+                    continue
+                burn(None, feat, drawer)
+
+        mask.show()
+
+        # aggregate feats for each burned cell in mask
+        from ..vector import sql
+        from shapely.geometry import asShape
+        from shapely.prepared import prep
+        from time import time
+        # get which cells to calculate
+        pix = mask.load()
+        oncells = [(x,y) for x in range(mask.size[0]) for y in range(mask.size[1]) if pix[x,y]==1]
+        # calculate
+        for i,(x,y) in enumerate(oncells):
+            cell = outband.get(x, y)
+            cellgeom = asShape(cell.poly)
+            # get features in that cell
+            #print "checking spindex"
+            spindex = list(vectordata.quick_overlap(cellgeom.bounds))
+            #print "spindex checks",len(spindex)
+##            t = time()
+##            intsecs = [feat for feat in spindex
+##                       if feat.geometry and not feat._shapely.disjoint(cellgeom)]
+##            print "not disjoin",time()-t
+##            t = time()
+##            intsecs = [feat for feat in spindex
+##                       if feat.geometry and feat._shapely.intersects(cellgeom)]
+##            print "intersects",time()-t
+##            t = time()
+##            intsecs = [feat for feat in spindex
+##                       if feat.geometry and cellgeom.intersects(feat._shapely)]
+##            print "reverse",time()-t
+            #t = time()
+            intsecs = [feat for feat in spindex
+                       if feat.geometry and not feat._prepped.disjoint(cellgeom)]
+            #print "prepped",time()-t
+            if not intsecs:
+                continue
+            # choose (filter down which to consider)
+            if choose:
+                #print "allocating"
+                intsecs = choose(cellgeom, intsecs)
+            if not intsecs:
+                continue
+            # aggregate and set
+            value = sql.aggreg(intsecs, [("bleh",valuekey,stat)])[0]
+            print ["set","%r of %r"%(i,len(oncells)),(x,y),len(intsecs),value]
+            outband.set(x, y, value)
+
     return raster
 
 def vectorize(raster, mergecells=False, metavars=False, bandnum=0):

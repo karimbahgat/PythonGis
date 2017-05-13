@@ -372,7 +372,7 @@ def connect(frompoints, topoints, key=None, greatcircle=True, segments=100):
 
 # Modify operations
 
-def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, geodetic=False):
+def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, geodetic=False, resolution=None):
     """
     Buffering the data by a positive distance grows the geometry,
     while a negative distance shrinks it. Distance units should be given in
@@ -394,10 +394,13 @@ def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, g
             raise Exception("Geodetic buffer only implemented for points")
 
         from ._helpers import geodetic_buffer
+        kwargs = dict()
+        if resolution:
+            kwargs["resolution"] = resolution
         def bufferfunc(feat):
             geoj = feat.geometry
             distval = distfunc(feat)
-            return geodetic_buffer(geoj, distval, resolution)
+            return geodetic_buffer(geoj, distval, **kwargs)
 
     else:
         # geometry
@@ -417,8 +420,9 @@ def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, g
     new = VectorData()
     new.fields = list(data.fields)
     for feat in data:
-        buffered = bufferfunc(feat)
-        new.add_feature(feat.row, buffered)
+        if feat.geometry:
+            buffered = bufferfunc(feat)
+            new.add_feature(feat.row, buffered)
         
     # change data type to polygon
     new.type = "Polygon"
