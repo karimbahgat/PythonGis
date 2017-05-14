@@ -509,11 +509,11 @@ class VectorData:
 
     def histogram(self, field, width=None, height=None, bins=10):
         import pyagg
-        import classipy
+        import classypie
         values = [f[field] for f in self]
 
         bars = []
-        for (_min,_max),group in classipy.split(values, breaks="equal", classes=bins):
+        for (_min,_max),group in classypie.split(values, breaks="equal", classes=bins):
             label = "%s to %s" % (_min,_max)
             count = len(group)
             bars.append((label,count))

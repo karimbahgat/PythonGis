@@ -278,11 +278,21 @@ def downscale(raster, stat="spread", **rasterdef):
 ##                    ###print aggval
 ##                    cell.value = aggval
 
-def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
-    # TODO: When using valuekey, how to choose between/aggregate
-    # overlapping or nearby features? Now just overwrites and uses value of
-    # the last feature. Maybe provide aggfunc option?
-    # See further below.
+def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
+    # Basic burning and choosing for multiple feats in a cell
+
+    # OLD
+    # TODO: Should there be a separate func for choosing (for all overlaps) and allocate (only for partial/edges)?
+    # TODO: rename allocate to aggregate or overlap
+    # TODO: allow multi (ie overlap and edges) and partial (just edges)
+
+    # NEW TODO!!!
+    # run 'choose' or 'priority' to filter if overlap cell,
+    # then get list of values via 'valuekey'
+    # interact values with 'partial' if edge cell,
+    # then agg via 'stat'
+    
+    # in addition, allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
 
     mode = "float32" if valuekey else "1bit"
     raster = data.RasterData(mode=mode, **rasterdef)
@@ -344,8 +354,8 @@ def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
 
     # quickly draw all vector data
     for feat in vectordata:
-        if not feat.geometry: continue
-        
+        if not feat.geometry:
+            continue
         val = float(valuekey(feat)) if valuekey else 1.0
         burn(val, feat, drawer)
 
@@ -353,7 +363,10 @@ def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
     outband = raster.add_band(img=img)
 
     # special pixels
-    if valuekey or choose:
+    if valuekey:
+        if not overlap:
+            raise Exception("Valuekey and overlap must be set at the same time")
+            
         mask = PIL.Image.new("1", (raster.width,raster.height))
         drawer = PIL.ImageDraw.Draw(mask)
 
@@ -366,36 +379,58 @@ def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
             f._shapely = f.get_shapely()
             f._prepped = prep(f._shapely)
         
-        # optionally handle overlapping feats (only relevant if using valuekey)
-        if valuekey:
-            # burn all self intersections onto mask
-            for f1 in vectordata:
-                if not f1.geometry:
-                    continue
-                print ["f1",f1.id,len(vectordata)]
-                g1 = f1._shapely
-                sg1 = f1._prepped
-                for f2 in vectordata.quick_overlap(f1.bbox):
-                    if f1 is not f2:
-                        g2 = f2._shapely
-                        if not sg1.disjoint(g2):
-                            intsec = g1.intersection(g2)
-                            if intsec and intsec.is_valid and not intsec.is_empty:
-                                burnfeat = f1.copy()
-                                burnfeat.geometry = intsec.__geo_interface__
-                                #print ["burning",f2['CNTRY_NAME'],burnfeat.geometry.keys()]
-                                if "geometries" in burnfeat.geometry:
-                                    #print ["weird intsec result", [g["type"] for g in burnfeat.geometry["geometries"]]]
-                                    continue
-                                burn(1.0, burnfeat, drawer)
+##        # burn all self intersections onto mask (vector approach, slower for larger geoms)
+##        for f1 in vectordata:
+##            if not f1.geometry:
+##                continue
+##            print ["f1",f1.id,len(vectordata)]
+##            g1 = f1._shapely
+##            sg1 = f1._prepped
+##            for f2 in vectordata.quick_overlap(f1.bbox):
+##                if f1 is not f2:
+##                    g2 = f2._shapely
+##                    if not sg1.disjoint(g2):
+##                        intsec = g1.intersection(g2)
+##                        if intsec and intsec.is_valid and not intsec.is_empty:
+##                            burnfeat = f1.copy()
+##                            burnfeat.geometry = intsec.__geo_interface__
+##                            #print ["burning",f2['CNTRY_NAME'],burnfeat.geometry.keys()]
+##                            if "geometries" in burnfeat.geometry:
+##                                #print ["weird intsec result", [g["type"] for g in burnfeat.geometry["geometries"]]]
+##                                continue
+##                            burn(1.0, burnfeat, drawer)
 
-        # optionally handle choice rules
-        if choose:
-            # burn the outlines of polygons (thats the only cells that are only partially filled and need to be choosen)
-            for feat in vectordata:
-                if not feat.geometry:
+        # burn all self intersections onto mask (constant time, slower for easy small geoms)
+        for f1 in vectordata:
+            if not f1.geometry:
+                continue
+            print ["f1",f1.id,len(vectordata)]
+
+            # first burn all maybe feats (ie union)
+            img2 = PIL.Image.new("1", (raster.width,raster.height))
+            d2 = PIL.ImageDraw.Draw(img2)
+            for f2 in vectordata.quick_overlap(f1.bbox):
+                if not f2.geometry:
                     continue
-                burn(None, feat, drawer)
+                if f1 is not f2:
+                    burn(1.0, f2, d2)
+
+            # if any, then get raster common intersection with main feat
+            if img2.getbbox():
+                img1 = PIL.Image.new("1", (raster.width,raster.height))
+                d1 = PIL.ImageDraw.Draw(img1)
+                burn(1.0, f1, d1)
+                intsec = PIL.ImageMath.eval("convert(img1 & img2, '1')", img1=img1, img2=img2)
+                mask.paste(1, mask=intsec)
+
+        # update after all the pasting
+        #drawer = PIL.ImageDraw.Draw(mask) 
+
+        # burn the outlines of polygons (border cells may not be overlapping but can still contain multiple choices)
+        for feat in vectordata:
+            if not feat.geometry:
+                continue
+            burn(None, feat, drawer)
 
         mask.show()
 
@@ -406,7 +441,10 @@ def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
         from time import time
         # get which cells to calculate
         pix = mask.load()
-        oncells = [(x,y) for x in range(mask.size[0]) for y in range(mask.size[1]) if pix[x,y]==1]
+
+        # TODO: change to real loop, check separate edge and overlap masks, do separate func for each
+        
+        oncells = [(x,y) for x in range(mask.size[0]) for y in range(mask.size[1]) if pix[x,y]!=0]
         # calculate
         for i,(x,y) in enumerate(oncells):
             cell = outband.get(x, y)
@@ -433,14 +471,9 @@ def rasterize(vectordata, valuekey=None, stat="sum", choose=None, **rasterdef):
             #print "prepped",time()-t
             if not intsecs:
                 continue
-            # choose (filter down which to consider)
-            if choose:
-                #print "allocating"
-                intsecs = choose(cellgeom, intsecs)
-            if not intsecs:
-                continue
-            # aggregate and set
-            value = sql.aggreg(intsecs, [("bleh",valuekey,stat)])[0]
+            # overlap (special calculation for cells with multiple feats)
+            #print "overlapping"
+            value = overlap(cellgeom, intsecs)
             print ["set","%r of %r"%(i,len(oncells)),(x,y),len(intsecs),value]
             outband.set(x, y, value)
 

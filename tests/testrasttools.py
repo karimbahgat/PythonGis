@@ -21,6 +21,6 @@ print hist
 mapp = pg.renderer.Map()
 mapp.add_layer(distrast)
 mapp.add_layer(vect, fillcolor=None)
-mapp.add_legend()
+#mapp.add_legend()
 mapp.view()
 
