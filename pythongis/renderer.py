@@ -959,6 +959,14 @@ class RasterLayer:
                 options["minval"] = band.summarystats("min")["min"]
             if not "maxval" in options:
                 options["maxval"] = band.summarystats("max")["max"]
+                
+            # cutoff top 2 percent outliers by default
+            if not "cutoff" in options:
+                options["cutoff"] = (0,98) 
+            mincut,maxcut = options["cutoff"]
+            rng = options["maxval"] - options["minval"]
+            options["maxval"] = options["minval"] + rng / 100.0 * maxcut
+            options["minval"] += rng / 100.0 * mincut
 
         elif options["type"] == "colorscale":
             options["bandnum"] = options.get("bandnum", 0)
@@ -970,11 +978,19 @@ class RasterLayer:
             if not "maxval" in options:
                 options["maxval"] = band.summarystats("max")["max"]
 
+            # cutoff top 2 percent outliers by default
+            if not "cutoff" in options:
+                options["cutoff"] = (0,98) 
+            mincut,maxcut = options["cutoff"]
+            rng = options["maxval"] - options["minval"]
+            options["maxval"] = options["minval"] + rng / 100.0 * maxcut
+            options["minval"] += rng / 100.0 * mincut
+
             # process gradient
             if "gradcolors" in options:
                 options["gradcolors"] = [rgb(col) for col in options["gradcolors"]]
             else:
-                options["gradcolors"] = [rgb("random"),rgb("random")]
+                options["gradcolors"] = [rgb("blue"),rgb("turquoise"),rgb("green"),rgb("yellow"),rgb("red")]
 
         elif options["type"] == "rgb":
             options["r"] = options.get("r", 0)

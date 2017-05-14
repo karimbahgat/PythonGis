@@ -287,9 +287,9 @@ def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
     # TODO: allow multi (ie overlap and edges) and partial (just edges)
 
     # NEW TODO!!!
-    # run 'choose' or 'priority' to filter if overlap cell,
+    # run 'choose/priority' to filter if overlap cell,
     # then get list of values via 'valuekey'
-    # interact values with 'partial' if edge cell,
+    # interact values with weight obtained by 'partial' if edge cell,
     # then agg via 'stat'
     
     # in addition, allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
