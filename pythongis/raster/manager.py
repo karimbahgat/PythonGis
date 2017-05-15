@@ -278,21 +278,14 @@ def downscale(raster, stat="spread", **rasterdef):
 ##                    ###print aggval
 ##                    cell.value = aggval
 
-def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
-    # Basic burning and choosing for multiple feats in a cell
+def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None, **rasterdef):
+    """
+    If valuekey, multiple feats in a cell are aggregated using stat.
+    If priority, multiple feats are filtered/chosen. 
+    If partial, feats that only partially overlap cell are given a weight.
+    """
 
-    # OLD
-    # TODO: Should there be a separate func for choosing (for all overlaps) and allocate (only for partial/edges)?
-    # TODO: rename allocate to aggregate or overlap
-    # TODO: allow multi (ie overlap and edges) and partial (just edges)
-
-    # NEW TODO!!!
-    # run 'choose/priority' to filter if overlap cell,
-    # then get list of values via 'valuekey'
-    # interact values with weight obtained by 'partial' if edge cell,
-    # then agg via 'stat'
-    
-    # in addition, allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
+    # TODO: allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
 
     mode = "float32" if valuekey else "1bit"
     raster = data.RasterData(mode=mode, **rasterdef)
@@ -364,11 +357,11 @@ def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
 
     # special pixels
     if valuekey:
-        if not overlap:
-            raise Exception("Valuekey and overlap must be set at the same time")
+        if not stat:
+            raise Exception("Valuekey and stat must be set at the same time")
             
-        mask = PIL.Image.new("1", (raster.width,raster.height))
-        drawer = PIL.ImageDraw.Draw(mask)
+        multimask = PIL.Image.new("1", (raster.width,raster.height))
+        multidrawer = PIL.ImageDraw.Draw(multimask)
 
         if not hasattr(vectordata, "spindex"):
             vectordata.create_spatial_index()
@@ -378,27 +371,6 @@ def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
         for f in vectordata:
             f._shapely = f.get_shapely()
             f._prepped = prep(f._shapely)
-        
-##        # burn all self intersections onto mask (vector approach, slower for larger geoms)
-##        for f1 in vectordata:
-##            if not f1.geometry:
-##                continue
-##            print ["f1",f1.id,len(vectordata)]
-##            g1 = f1._shapely
-##            sg1 = f1._prepped
-##            for f2 in vectordata.quick_overlap(f1.bbox):
-##                if f1 is not f2:
-##                    g2 = f2._shapely
-##                    if not sg1.disjoint(g2):
-##                        intsec = g1.intersection(g2)
-##                        if intsec and intsec.is_valid and not intsec.is_empty:
-##                            burnfeat = f1.copy()
-##                            burnfeat.geometry = intsec.__geo_interface__
-##                            #print ["burning",f2['CNTRY_NAME'],burnfeat.geometry.keys()]
-##                            if "geometries" in burnfeat.geometry:
-##                                #print ["weird intsec result", [g["type"] for g in burnfeat.geometry["geometries"]]]
-##                                continue
-##                            burn(1.0, burnfeat, drawer)
 
         # burn all self intersections onto mask (constant time, slower for easy small geoms)
         for f1 in vectordata:
@@ -406,7 +378,7 @@ def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
                 continue
             print ["f1",f1.id,len(vectordata)]
 
-            # first burn all maybe feats (ie union)
+            # first burn all maybe feats (ie get their combined union)
             img2 = PIL.Image.new("1", (raster.width,raster.height))
             d2 = PIL.ImageDraw.Draw(img2)
             for f2 in vectordata.quick_overlap(f1.bbox):
@@ -415,67 +387,70 @@ def rasterize(vectordata, valuekey=None, overlap=None, **rasterdef):
                 if f1 is not f2:
                     burn(1.0, f2, d2)
 
-            # if any, then get raster common intersection with main feat
+            # if any, then get common raster intersection with main feat
             if img2.getbbox():
                 img1 = PIL.Image.new("1", (raster.width,raster.height))
                 d1 = PIL.ImageDraw.Draw(img1)
                 burn(1.0, f1, d1)
                 intsec = PIL.ImageMath.eval("convert(img1 & img2, '1')", img1=img1, img2=img2)
-                mask.paste(1, mask=intsec)
-
-        # update after all the pasting
-        #drawer = PIL.ImageDraw.Draw(mask) 
+                multimask.paste(1, mask=intsec)
 
         # burn the outlines of polygons (border cells may not be overlapping but can still contain multiple choices)
+        partialmask = PIL.Image.new("1", (raster.width,raster.height))
+        partialdrawer = PIL.ImageDraw.Draw(partialmask)
         for feat in vectordata:
             if not feat.geometry:
                 continue
-            burn(None, feat, drawer)
-
-        mask.show()
+            burn(None, feat, partialdrawer)
 
         # aggregate feats for each burned cell in mask
         from ..vector import sql
         from shapely.geometry import asShape
         from shapely.prepared import prep
         from time import time
-        # get which cells to calculate
-        pix = mask.load()
-
-        # TODO: change to real loop, check separate edge and overlap masks, do separate func for each
         
-        oncells = [(x,y) for x in range(mask.size[0]) for y in range(mask.size[1]) if pix[x,y]!=0]
-        # calculate
-        for i,(x,y) in enumerate(oncells):
-            cell = outband.get(x, y)
-            cellgeom = asShape(cell.poly)
-            # get features in that cell
-            #print "checking spindex"
-            spindex = list(vectordata.quick_overlap(cellgeom.bounds))
-            #print "spindex checks",len(spindex)
-##            t = time()
-##            intsecs = [feat for feat in spindex
-##                       if feat.geometry and not feat._shapely.disjoint(cellgeom)]
-##            print "not disjoin",time()-t
-##            t = time()
-##            intsecs = [feat for feat in spindex
-##                       if feat.geometry and feat._shapely.intersects(cellgeom)]
-##            print "intersects",time()-t
-##            t = time()
-##            intsecs = [feat for feat in spindex
-##                       if feat.geometry and cellgeom.intersects(feat._shapely)]
-##            print "reverse",time()-t
-            #t = time()
-            intsecs = [feat for feat in spindex
-                       if feat.geometry and not feat._prepped.disjoint(cellgeom)]
-            #print "prepped",time()-t
-            if not intsecs:
-                continue
-            # overlap (special calculation for cells with multiple feats)
-            #print "overlapping"
-            value = overlap(cellgeom, intsecs)
-            print ["set","%r of %r"%(i,len(oncells)),(x,y),len(intsecs),value]
-            outband.set(x, y, value)
+        # get which cells to calculate
+        multipix = multimask.load()
+        partialpix = partialmask.load()
+
+        for y in range(raster.height):
+            print "%r of %r"%(y,raster.height)
+            for x in range(raster.width):
+                multicell = multipix[x,y]
+                partialcell = partialpix[x,y]
+
+                # single values have already been written, now only overwrite multis or partials
+                if multicell or partialcell:
+                    cell = outband.get(x, y)
+                    cellgeom = asShape(cell.poly)
+                    
+                    # get features in that cell
+                    spindex = list(vectordata.quick_overlap(cellgeom.bounds))
+                    intsecs = [feat for feat in spindex
+                               if feat.geometry and not feat._prepped.disjoint(cellgeom)]
+                    if not intsecs:
+                        continue
+
+                    # filter or choose multiple feats in a cell
+                    if priority and (multicell or partialcell) and len(intsecs) > 1:
+                        intsecs = priority(cellgeom, intsecs)
+
+                    # get feature values
+                    vals = [valuekey(feat) for feat in intsecs]
+
+                    # calculate and apply weight for cells where features are only partially present
+                    if partial and partialcell:
+                        vals = [v * partial(cellgeom, feat) for v,feat in zip(vals,intsecs)]
+
+                    # aggregate stat if multiple
+                    if len(vals) > 1:
+                        value = sql.aggreg(vals, [("val", lambda v: v, stat)])[0]
+                    else:
+                        value = vals[0]
+
+                    # finally set
+                    #print ["set","%r of %r"%(y,raster.height),(x,y),len(intsecs),value]
+                    outband.set(x, y, value)
 
     return raster
 

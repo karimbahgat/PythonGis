@@ -3,7 +3,7 @@ import pythongis as pg
 from time import time
 
 
-if 1:
+if 0:
     # conflictsite
     confs = pg.VectorData("C:/Users/kimo/Downloads/Conflict Site Dataset 2.0/Conflict Site 4-2006.xls",
                         xfield="Longitude", yfield="Latitude")
@@ -50,21 +50,16 @@ if 1:
     # transform=transform any value...
     # borderpass (filter,transform,partial)
     # overlappass (filter,transform,choose)
-    def sum_area_weighted(cell, feats):
-        def isecs():
-            for feat in feats:
-                isec = feat._shapely.intersection(cell)
-                w = isec.area / cell.area
-                val = feat["bdeadbes"] * w
-                yield val,isec,feat
-
-        vals = (val for val,isec,feat in isecs())
-        return sum(vals)
+    def area_weighted(cell, feat):
+        isec = feat._shapely.intersection(cell)
+        w = isec.area / cell.area
+        return w
 
     t = time()
     rast = pg.raster.manager.rasterize(confs,
                                        valuekey=lambda f: f["bdeadbes"],
-                                       overlap=sum_area_weighted,
+                                       stat="sum",
+                                       partial=area_weighted,
                                        bbox=[-180,90,180,-90], width=720, height=360)
     print time()-t, "secs"
     rast.view()
@@ -90,34 +85,34 @@ if 1:
 vec = pg.VectorData("C:/Users/kimo/Downloads/cshapes_0.6/cshapes.shp")
 vec = vec.select(lambda f: f["GWEYEAR"]==2016) # and f["CNTRY_NAME"]<"D") #f["CNTRY_NAME"]!="Canada") # and f["CNTRY_NAME"]<"C")
 
-# gwno allocation
-t = time()
-def largest(cell,feats):
-    if len(feats) > 1:
-        return sorted(feats, key=lambda f: f._shapely.intersection(cell).area)[-1]["GWCODE"]
-    else:
-        return feats[0]["GWCODE"]
-    
-##def largest_over(cell,feats):
-##    areas = [(f, f._shapely.intersection(cell).area) for f in feats]
-##    carea = cell.area
-##    over = [(f,a) for f,a in areas if a >= carea/2.0] # over 50% cell area
-##    return [f for f,a in sorted(over, key=lambda(f,a): a)][-1]["GWCODE"]
+if 1:
+    # gwno allocation
+    t = time()
+    def largest(cell,feats):
+        incr = sorted(feats, key=lambda f: f._shapely.intersection(cell).area)
+        return [incr[-1]]
+        
+    ##def largest_over(cell,feats):
+    ##    areas = [(f, f._shapely.intersection(cell).area) for f in feats]
+    ##    carea = cell.area
+    ##    over = [(f,a) for f,a in areas if a >= carea/2.0] # over 50% cell area
+    ##    return [f for f,a in sorted(over, key=lambda(f,a): a)][-1]["GWCODE"]
 
-gwno = pg.raster.manager.rasterize(vec,
-                                   valuekey=lambda f: f["GWCODE"],
-                                   overlap=largest,
-                                   bbox=[-180,90,180,-90], width=720, height=360)
-print time()-t,"secs"
+    gwno = pg.raster.manager.rasterize(vec,
+                                       valuekey=lambda f: f["GWCODE"],
+                                       stat="first",
+                                       priority=largest,
+                                       affine=[0.5,0,-180, 0,-0.5,90], width=720, height=360)
+    print time()-t,"secs"
 
-mapp = pg.renderer.Map()
-mapp.add_layer(gwno)
-mapp.add_layer(vec)
-mapp.view()
+    mapp = pg.renderer.Map()
+    mapp.add_layer(gwno)
+    mapp.add_layer(vec)
+    mapp.view()
 
-# overlap count
+# country overlap count
 overlap = pg.raster.manager.rasterize(vec,
                                    valuekey=lambda f: 1,
-                                   overlap=lambda(c,fs):len(fs),
-                                   bbox=[-180,90,180,-90], width=72, height=36)
+                                    stat="sum",
+                                   bbox=[-180,90,180,-90], width=720, height=360)
 overlap.view()
