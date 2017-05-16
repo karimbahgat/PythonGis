@@ -4,25 +4,42 @@ from . import data
 ##from .. import vector
 from ..vector import sql
 
-import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops
+import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMath
 
-##def mosaic(*rasters):
-##    """
-##    Mosaic rasters covering different areas together into one file.
-##    Parts of the rasters may overlap each other, in which case we use the value
-##    from the last listed raster (the "last" overlap rule). 
-##    """
-##    # align all rasters, ie resampling to the same dimensions as the first raster
-##    aligned = align_rasters(*rasters)
-##    # copy the first raster and reset the cached mask for the new raster
-##    firstalign,firstmask = aligned[0]
-##    merged = firstalign.copy()
-##    del merged._cached_mask
-##    # paste onto each other, ie "last" overlap rule
-##    for rast,mask in aligned[1:]:
-##        merged.bands[0].img.paste(rast.bands[0].img, (0,0), mask)
-##        
-##    return merged
+def mosaic(rasters, overlaprule="last", **rasterdef):
+    """
+    Mosaic rasters covering different areas together into one file.
+    Parts of the rasters may overlap each other, in which case we use the
+    overlap rule (default is "last").
+    """
+    # use resampling to the same dimensions as the first raster
+    rasterdef = rasterdef or rasters[0].rasterdef
+    # TODO: Also set total bbox and dims to combined bboxes...
+    outrast = data.RasterData(mode=rasters[0].mode, **rasterdef)
+    maxbands = max((len(rast) for rast in rasters))
+    # align to common grid
+    rasters = [align(rast, **rasterdef) for rast in rasters]
+    # paste
+    for i in range(maxbands):
+        outband = outrast.add_band()
+        if overlaprule == "last":
+            for rast in rasters:
+                if len(rast) >= i:
+                    outband.img.paste(rast.bands[i].img, (0,0), rast.mask)
+        elif overlaprule == "first":
+            for rast in reversed(rasters):
+                if len(rast) >= i:
+                    outband.img.paste(rast.bands[i].img, (0,0), rast.mask)
+        elif overlaprule == "sum":
+            # if image bbox overlap
+            # find overlap via img1 & img2
+            # use img1 + img2 via math
+            # paste using overlap as mask
+            raise Exception("Overlap rule not supported")
+        else:
+            raise Exception("Overlap rule not supported")
+
+    return outrast
 
 def warp(raster, tiepoints):
     # aka georeference
@@ -219,18 +236,6 @@ def upscale(raster, stat="sum", **rasterdef):
                 ###tile.view(500,500)
                 pass
 
-    # visual inspection
-##    from .. import renderer as r
-##    m = r.MapCanvas(1000,1000)
-##    m.zoom_bbox(*targetrast.bbox)
-##    m.zoom_factor(-1.3)
-##    m.layers.add_layer(r.RasterLayer(targetrast))
-##    m.render_all()
-##    for tile in tiled(raster, tilesize=tilesize, worldcoords=True):
-##        tilecenter = (tile.bbox[0]+tile.bbox[2])/2.0, (tile.bbox[1]+tile.bbox[3])/2.0
-##        m.drawer.draw_circle(tilecenter, fillsize="3px", fillcolor=None)
-##    m.view()
-
     return targetrast
     
 
@@ -239,57 +244,7 @@ def downscale(raster, stat="spread", **rasterdef):
     targetrast = data.RasterData(mode=raster.mode, **rasterdef)
 
     raise NotImplementedError()
-    
-# Accurate vector geometric approach (WARNING: extremely slow)
-##def accuresample(raster, algorithm="sum", **rasterdef):
-##    # first, create target raster based on rasterdef
-##    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
-##    
-##    def point_in_poly(x,y,poly):
-##        # taken from http://stackoverflow.com/questions/16625507/python-checking-if-point-is-inside-a-polygon
-##        n = len(poly)
-##        inside = False
-##        p1x,p1y = poly[0]
-##        for i in range(n+1):
-##            p2x,p2y = poly[i % n]
-##            if y > min(p1y,p2y):
-##                if y <= max(p1y,p2y):
-##                    if x <= max(p1x,p2x):
-##                        if p1y != p2y:
-##                            xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
-##                        if p1x == p2x or x <= xints:
-##                            inside = not inside
-##            p1x,p1y = p2x,p2y
-##        return inside
-##
-##    # ensure correct outdatatype
-##    if (raster.mode.startswith("float") and algorithm != "count") or (algorithm in "average stddev".split()):
-##        targetrast.convert("float32")
-##
-##    # add empty bands
-##    for band in raster:
-##        targetrast.add_band()
-##
-##    # aggregate overlapping
-##    def find_overlapping_cells(cell, band):
-##        cellcorners = cell.poly["coordinates"][0]
-##        for othercell in band:
-##            if point_in_poly(othercell.x, othercell.y, cellcorners):
-##                yield othercell
-##
-##    for band in targetrast.bands:
-##        prevrow = None
-##        for cell in band:
-##            if cell.value != band.nodataval:
-##                if cell.row != prevrow:
-##                    print prevrow
-##                    prevrow = cell.row
-##                croppedvals = crop(raster, cell.bbox) # same as a quick spatial index of possibly relevant cells
-##                for valband in croppedvals.bands:
-##                    overlapping = find_overlapping_cells(cell, valband) # TODO: optimize so dont have to repeat for each band
-##                    aggval = sql.aggreg(overlapping, [("aggval",lambda c: c.value, algorithm)])[0]
-##                    ###print aggval
-##                    cell.value = aggval
+
 
 def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None, **rasterdef):
     """
