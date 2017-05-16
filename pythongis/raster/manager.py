@@ -280,9 +280,10 @@ def downscale(raster, stat="spread", **rasterdef):
 
 def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None, **rasterdef):
     """
-    If valuekey, multiple feats in a cell are aggregated using stat.
-    If priority, multiple feats are filtered/chosen. 
-    If partial, feats that only partially overlap cell are given a weight.
+    If valuekey func, multiple feats in a cell are aggregated using stat.
+    If priority func, multiple feats are filtered/chosen before aggregated. 
+    If partialfunc, feats that only partially overlap cell are given a weight.
+    Output raster uses 0 as nodatavalue. 
     """
 
     # TODO: allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
@@ -353,7 +354,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
         burn(val, feat, drawer)
 
     # create raster from the drawn image
-    outband = raster.add_band(img=img)
+    outband = raster.add_band(img=img, nodataval=0)
 
     # special pixels
     if valuekey:
@@ -454,54 +455,172 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
 
     return raster
 
-def vectorize(raster, mergecells=False, metavars=False, bandnum=0):
-    # so far only experimental
-    # ...
+def vectorize(raster, mergecells=True, metavars=True, bandnum=0):
+    """
+    By default merges cells of same value into polygons.
+    Non-binary rasters will create separate polygons for each
+    contiguous group of cells with same value. 
+    
+    Setting mergecells to False will create separate polygon for each cell.
+    Metavars will add extra fields about the position of each cell. 
+    """
 
     from ..vector.data import VectorData
 
     if mergecells:
         
         # merge/union cells of same values
+
+        import shapely
+        from shapely.geometry import Polygon, LineString, Point
         
         if raster.mode == "1bit":
 
-            raise Exception("Not yet implemented")
+##            import PIL.ImageMorph
+##            op = PIL.ImageMorph.MorphOp(op_name="edge")
+##            img = raster.bands[bandnum].img
+##            # extend img with 1 pixel border to allow identifying edges along the edge
+##            # ...
+##            
+##            pixcount,outlineimg = op.apply(img)
+##            outlinepix = outlineimg.load()
+##            outlineimg.show()
+##            
+##            active = op.match(img)
 
-            ##        import PIL.ImageMorph
-            ##        op = PIL.ImageMorph.MorphOp(op_name="edge")
-            ##        img = raster.bands[bandnum]
-            ##        # extend img with 1 pixel border to allow identifying edges along the edge
-            ##        # ...
-            ##        # alt1
-            ##        pixcount,outlineimg = op.apply(img)
-            ##        # alt2
-            ##        coords = op.match(img)
-            ##
-            ##        # difficult part is how to connect the edge pixels
-            ##
-            ##        # MAYBE:
-            ##        # first get pixels as coordinates via geotransform
-            ##        # start on first matching pixel
-            ##        # then examine and follow first match among neighbouring pixels in clockwise direction
-            ##        # each pixel followed is converted to coordinate via geotransform and added to a list
-            ##        # keep following until ring is closed or no more neighbours have match (deadend)
-            ##        # jump to next unprocessed pixel, and repeat until all have been processed
-            ##        # after all is done, we have one or more polygons, lines in the case of deadends, or points in the case of just one match per iteration
-            ##        # if polygons, identify if any of them are holes belonging to other polygons
-            ##
-            ##        # ALSO
-            ##        # how to connect the pixels, via centerpoint coordinate, or tracing the cell corners?
-            ##        # ...
-            ##
-            ##        # OR
-            ##        # http://cardhouse.com/computer/vector.htm
+            # difficult part is how to connect the edge pixels
+
+            # Approach 1: Center-point
+            # first get pixels as coordinates via geotransform
+            # start on first matching pixel
+            # then examine and follow first match among neighbouring pixels in clockwise direction
+            # each pixel followed is converted to coordinate via geotransform and added to a list
+            # keep following until ring is closed or no more neighbours have match (deadend)
+            # jump to next unprocessed pixel, and repeat until all have been processed
+            # after all is done, we have one or more polygons, lines in the case of deadends, or points in the case of just one match per iteration
+            # if polygons, identify if any of them are holes belonging to other polygons
+
+##            outvec = VectorData()
+##
+##            def right(dirr):
+##                xoff,yoff = dirr
+##                # ...
+##
+##            def neighbour(prev,cur):
+##                x,y = cur
+##                if not prev:
+##                    prev = x,y-1 # pretend came from top so will go down
+##                dirr = x-prev[0],y-prev[1]
+##                for _ in range(8):
+##                    xoff,yoff = right(dirr)
+##                    nx,ny = x+xoff,y+yoff
+##                    # neighbouring on-pixel, but cannot go back
+##                    if (nx,ny) not in (prev,cur) and outlinepix[nx,ny]:
+##                        yield nx,ny
+##                    dirr = right((xoff,yoff))
+##
+##            parts = []
+##            while active:
+##                print len(active)
+##                path = []
+##                
+##                # can only start new feat on an active non-visited cell, but can follow any on-pixel
+##                prev = None
+##                cur = active[0]
+##                while cur:
+##                    #print cur
+##                    path.append(cur)
+##                    if cur in active:
+##                        active.remove(cur)
+##                    
+##                    connections = list(neighbour(prev, cur))
+##                    if not connections:
+##                        # reached deadend, ie nowhere else to go
+##                        break
+##                    nxt = connections[0]
+##                    if nxt == path[0]:
+##                        # circled back to start
+##                        path.append(nxt)
+##                        break
+##                    elif nxt in path:
+##                        # hit back on itself, ie infinite loop, ie selfintersection
+##                        path.append(nxt)
+##                        break
+##                    elif len(connections) > 2:
+##                        # reached a junction, ie more than two possible next direction
+##                        path.append(nxt)
+##                        break
+##                    prev = cur
+##                    cur = nxt
+##
+##                # finished, add part
+##                # polygon, ie path has been closed
+##                #print len(path)
+##                if len(path) > 1:# and path[0]==path[-1]:
+##                    parts.append(LineString(path))
+##                else:
+##                    pass #parts.append(Point(path[0]))
+##
+##            # connect line segments into polygons
+##            print len(parts)
+##            for poly in shapely.ops.polygonize(parts):
+##                print str(poly)[:100]
+##                outvec.add_feature([], poly.__geo_interface__)
+##
+##            return outvec
+
+            # Approach 2: cell outline
+            # http://cardhouse.com/computer/vector.htm
+
+            # Approach 3: shapely cell merge
+            band = raster.bands[bandnum]
+            shps = []
+            for i,cell in enumerate(band):
+                if cell.value:
+                    #print i
+                    shp = Polygon(cell.poly["coordinates"][0])
+                    shps.append(shp)
+            union = shapely.ops.cascaded_union(shps)
+            print str(union)[:200]
+
+            outvec = VectorData()
+            outvec.fields = ["id"]
+            for i,poly in enumerate(union.geoms):
+                outvec.add_feature([i], poly.__geo_interface__)
+
+            return outvec
 
         else:
             # for each region of contiguous cells with same value
             # assign a feature and give it that value
-            # ...
-            raise Exception("Not yet implemented")
+            outvec = VectorData()
+            outvec.fields = ["value"]
+            
+            band = raster.bands[bandnum]
+            zonevalues = (val for count,val in band.img.getcolors(raster.width*raster.height))
+            for zoneval in zonevalues:
+                print zoneval
+                
+                # exclude nullzone
+                if zoneval == band.nodataval: continue
+
+                shps = []
+                for cell in band:
+                    if cell.value == zoneval:
+                        shp = Polygon(cell.poly["coordinates"][0])
+                        shps.append(shp)
+
+                union = shapely.ops.cascaded_union(shps)
+                print str(union)[:200]
+
+                if hasattr(union, "geoms"):
+                    for poly in union.geoms:
+                        outvec.add_feature([zoneval], poly.__geo_interface__)
+                else:
+                    outvec.add_feature([zoneval], union.__geo_interface__)
+
+            return outvec
+
 
     else:
         
