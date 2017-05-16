@@ -34,41 +34,52 @@ def warp(raster, tiepoints):
     raise Exception("Not yet implemented")
 
 def reproject(raster, crs, algorithm="nearest", **rasterdef):
+    """If given, **rasterdef will override the input raster structure"""
 
-    raise Exception("Not yet implemented")
+    # TODO: How to handle coords that get transformed to infinity...
+
+    import pyproj
     
-    ##    algocode = {"nearest":PIL.Image.NEAREST,
-    ##                "bilinear":PIL.Image.BILINEAR,
-    ##                "bicubic":PIL.Image.BICUBIC,
-    ##                }[algorithm.lower()]
-    ##
-    ##    if crs == raster.crs:   # need pycrs to compare crs in a smarter way
-    ##        raise Exception("The from and to crs are the same, so no need to reproject.")
+    algocode = {"nearest":PIL.Image.NEAREST,
+                "bilinear":PIL.Image.BILINEAR,
+                "bicubic":PIL.Image.BICUBIC,
+                }[algorithm.lower()]
 
-    ##    # first, create target raster based on rasterdef
-    ##    targetrast = data.RasterData(**rasterdef)
-    ##    for band in raster:
-    ##        targetrast.add_band(img=band.img)
-    ##
-    ##    # get target coordinates
-    ##    lons = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
-    ##    lats = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
-    ##
-    ##    # reproject coords using pyproj
-    ##    for row,lat in enumerate(lats):
-    ##        # convert crs coords
-    ##        reproj = PIL.ImagePath.Path([pyproj.convert(lon,lat) for lon in lons])
-    ##
-    ##        # go from reprojected target coordinates and over to source pixels
-    ##        sourcepixels = reproj.transform(raster.inv_affine)
-    ##
-    ##        # manually get and set the pixels using some algorithm
-    ##        if algorithm == "nearest":
-    ##            for sourceband,targetband in zip(raster,targetrast):
-    ##                for col,pixel in enumerate(sourcepixels):
-    ##                    pixel = int(round(pixel[0])),int(round(pixel[1]))
-    ##                    val = sourceband.get(*pixel)
-    ##                    targetband.set(col,row,val)
+    if crs == raster.crs:   # need pycrs to compare crs in a smarter way
+        raise Exception("The from and to crs are the same, so no need to reproject.")
+
+    fromcrs = pyproj.Proj(raster.crs)
+    tocrs = pyproj.Proj(crs)
+
+    # first, create target raster based on rasterdef
+    rasterdef = rasterdef or raster.rasterdef
+    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    for band in raster:
+        targetrast.add_band(img=band.img)
+
+    # get target coordinates
+    lons = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
+    lats = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
+
+    # reproject coords using pyproj
+    for row,lat in enumerate(lats):
+        # convert crs coords
+        reproj = PIL.ImagePath.Path([pyproj.transform(fromcrs,tocrs,lon,lat) for lon in lons])
+
+        # go from reprojected target coordinates and over to source pixels
+        sourcepixels = reproj.transform(raster.inv_affine)
+
+        # manually get and set the pixels using some algorithm
+        if algorithm == "nearest":
+            for sourceband,targetband in zip(raster,targetrast):
+                for col,pixel in enumerate(sourcepixels):
+                    pixel = int(round(pixel[0])),int(round(pixel[1]))
+                    val = sourceband.get(*pixel)
+                    targetband.set(col,row,val)
+        else:
+            raise NotImplementedError("Not a valid algorithm")
+
+    return targetrast
 
     # TODO: Potential speedup algorithm
     # table-based reprojection, so only have to reproject 100*100 values
@@ -226,6 +237,8 @@ def upscale(raster, stat="sum", **rasterdef):
 def downscale(raster, stat="spread", **rasterdef):
     # first, create target raster based on rasterdef
     targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+
+    raise NotImplementedError()
     
 # Accurate vector geometric approach (WARNING: extremely slow)
 ##def accuresample(raster, algorithm="sum", **rasterdef):
