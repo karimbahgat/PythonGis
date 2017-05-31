@@ -258,7 +258,7 @@ NAMEGEN = Name_generator()
 
 
 class VectorData:
-    def __init__(self, filepath=None, type=None, name=None, **kwargs):
+    def __init__(self, filepath=None, type=None, name=None, fields=None, rows=None, geometries=None, features=None, crs=None, **kwargs):
         self.filepath = filepath
         self.name = name or filepath
         if not self.name:
@@ -271,7 +271,13 @@ class VectorData:
         if filepath:
             fields,rows,geometries,crs = loader.from_file(filepath, **kwargs)
         else:
-            fields,rows,geometries,crs = [],[],[],"+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+            if features:
+                rows,geometries = itertools.izip(*((feat.row,feat.geometry) for feat in features))
+            else:
+                rows = rows or []
+                geometries = geometries or []
+            fields = fields or []
+            crs = crs or "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
 
         self.fields = fields
 

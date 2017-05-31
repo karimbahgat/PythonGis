@@ -3,7 +3,10 @@ import itertools, operator, math
 from .data import *
 
 import shapely, shapely.ops, shapely.geometry
+from shapely.geometry import asShape as geojson2shapely
 from shapely.prepared import prep as supershapely
+
+from ._helpers import geodetic_buffer
 
 
 
@@ -146,6 +149,369 @@ def where(data, other, condition, **kwargs):
     else:
         raise Exception("Unknown select condition")
 
+def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **kwargs):
+    """
+    Pairwise joining with all unique pairs that match the spatial "condition" and the key function.
+    If set, clip can be intersection, difference, or union and will be performed on the joined geometries. 
+    """
+
+##    from . import sql
+##
+##    out = VectorData()
+##    out.fields = list(data.fields)
+##
+##    # set up spatial testing
+##    if condition == "intersects":
+##        if data.type == other.type == "Polygon":
+##            # when comparing polys to polys, dont count neighbouring polygons that just touch on the edge
+##            def condfunc(othergeom):
+##                if supergeom.intersects(othergeom) and not geom.touches(othergeom):
+##                    return True
+##        else:
+##            # for lines and points, ok that just touches on the edge
+##            def condfunc(othergeom):
+##                return supergeom.intersects(othergeom)
+##
+##    elif condition == "disjoint":
+##        def condfunc(othergeom):
+##            return supergeom.disjoint(othergeom)
+##
+##    elif condition == "nearest":
+##        if n:
+##            fdsf
+##        elif radius:
+##            def condfunc(othergeom):
+##                return buffgeom.intersects(othergeom)
+##    
+##    # loop
+##    if not hasattr(data, "spindex"): data.create_spatial_index()
+##    if not hasattr(other, "spindex"): other.create_spatial_index()
+##    
+##    feats = data if keepall else data.quick_overlap(other.bbox) # take advantage of spindex if not keeping all
+##    for feat in feats: 
+##
+##        if not feat.geometry:
+##            if keepall:
+##                newrow = list(feat.row)
+##                newrow.extend( (None for _ in other.fields) )
+##                out.add_feature(newrow, None)
+##
+##            continue
+##        
+##        geom = feat.get_shapely()
+##        supergeom = supershapely(geom)
+##        print feat
+##        otherfeats = ((otherfeat,otherfeat.get_shapely()) for otherfeat in other.quick_overlap(feat.bbox))
+##
+##        # find matches
+##        if key:
+##            matches = (otherfeat for otherfeat,othergeom in otherfeats
+##                       if key(feat,otherfeat) and condfunc(othergeom))
+##        else:
+##            matches = (otherfeat for otherfeat,othergeom in otherfeats
+##                       if condfunc(othergeom))
+##
+##        # add
+##        if matches:
+##            for match in matches:
+##                newrow = list(feat.row)
+##                newrow.extend( match.row )
+##                out.add_feature(newrow, geom.__geo_interface__)
+##
+##        elif keepall:
+##            newrow = list(feat.row)
+##            newrow.extend( (None for _ in other.fields) )
+##            out.add_feature(newrow, geom.__geo_interface__)
+##
+##    # dist
+##    # ...
+
+    # TODO: switch if point is other
+
+    # NEW
+    condition = condition.lower()
+    
+    # create spatial index
+    if not hasattr(data, "spindex"): data.create_spatial_index()
+    if not hasattr(other, "spindex"): other.create_spatial_index()
+
+    out = VectorData()
+    out.fields = list(data.fields)
+    out.fields.extend(other.fields)
+
+    if condition in ("distance",):
+        radius = kwargs.get("radius")
+        n = kwargs.get("n")
+        geodetic = kwargs.get("geodetic", True)
+        if not (radius or n):
+            raise Exception("The 'distance' join condition requires a 'radius' or 'n' arg")
+
+        # prep geoms in other
+        for otherfeat in other:
+            if not otherfeat.geometry:
+                continue
+            otherfeat._shapely = otherfeat.get_shapely()
+
+        # match funcs
+        def within(feat, other):
+            if geodetic:
+                buff = geojson2shapely(geodetic_buffer(feat.geometry, radius))
+            else:
+                buff = geom.buffer(radius)
+            superbuff = supershapely(buff)
+            otherfeats = other.quick_overlap(buff.bounds) if hasattr(other, "spindex") else other
+            for otherfeat in otherfeats:
+                if superbuff.intersects(otherfeat._shapely):
+                    yield otherfeat
+
+        def nearest(feat, otherfeats):
+            # TODO: implement optional geodetic distance
+            for otherfeat in sorted(otherfeats, key=lambda otherfeat: geom.distance(otherfeat._shapely)):
+                yield otherfeat
+
+        # begin
+        for feat in data:
+
+            print feat
+            
+            if not feat.geometry:
+                if keepall:
+                    newrow = list(feat.row)
+                    newrow.extend( (None for _ in other.fields) )
+                    out.add_feature(newrow, None)
+                continue
+
+            geom = feat.get_shapely()
+            supergeom = supershapely(geom)
+
+##            # test conditions
+##            if maxdist:
+##                matches = within(feat, other) # only those within dist
+##            else:
+##                matches = (otherfeat for otherfeat in other) # all
+##
+##            if key:
+##                matches = (otherfeat for otherfeat in matches if key(feat, otherfeat))
+##
+##            if n:
+##                # TODO: only calc dist bw quick disjoint, setting all intersects to 0 dist
+##                matches = nearest(feat, matches)
+##
+##            # add
+##            matches = list(matches)
+##            if matches:
+##                for match in matches:
+##                    newrow = list(feat.row)
+##                    newrow.extend( match.row )
+##                    out.add_feature(newrow, feat.geometry)
+##                
+##            elif keepall:
+##                # no matches
+##                newrow = list(feat.row)
+##                newrow.extend( (None for _ in other.fields) )
+##                out.add_feature(newrow, feat.geometry)
+
+##            # test conditions
+##            # first find overlaps
+##            overlaps = []
+##            nonoverlaps = []
+##            for otherfeat in other.quick_overlap(feat.bbox):
+##                if supergeom.intersects(otherfeat._shapely):
+##                    overlaps.append(otherfeat)
+##                else:
+##                    nonoverlaps.append(otherfeat)
+##            # then for nonoverlaps
+##            for otherfeat in other.quick_disjoint(feat.bbox):
+##                nonoverlaps.append(otherfeat)
+##            # specialcase speedup
+##            if not n:
+##                _nonoverlaps = VectorData()
+##                for otherfeat in nonoverlaps:
+##                    newfeat = _nonoverlaps.add_feature(otherfeat.row, otherfeat.geometry)
+##                    newfeat._shapely = otherfeat._shapely
+##                _nonoverlaps.create_spatial_index()
+##                nonoverlaps = _nonoverlaps
+##            # get within
+##            if maxdist:
+##                nonoverlaps = within(feat, nonoverlaps)
+##            #print "within"
+##            # filter by key
+##            if key:
+##                nonoverlaps = (otherfeat for otherfeat in nonoverlaps if key(feat, otherfeat))
+##            # then calc dist for nonoverlaps
+##            if n:
+##                matches = []
+##                for otherfeat in overlaps:
+##                    matches.append(otherfeat)
+##                    if len(matches) >= n:
+##                        #print "ol",len(matches)
+##                        break
+##                if len(matches) < n:
+##                    for otherfeat in nearest(feat, nonoverlaps):
+##                        matches.append(otherfeat)
+##                        if len(matches) >= n:
+##                            #print "ne",len(matches)
+##                            break
+##            else:
+##                matches = overlaps + list(nonoverlaps)
+##                #print "wt",len(overlaps),len(matches)
+##
+##            # add
+##            if matches:
+##                for match in matches:
+##                    newrow = list(feat.row)
+##                    newrow.extend( match.row )
+##                    out.add_feature(newrow, feat.geometry)
+##                
+##            elif keepall:
+##                # no matches
+##                newrow = list(feat.row)
+##                newrow.extend( (None for _ in other.fields) )
+##                out.add_feature(newrow, feat.geometry)
+
+            # test conditions
+            # first find overlaps
+            overlaps = []
+            nonoverlaps = []
+            for otherfeat in other.quick_overlap(feat.bbox):
+                if supergeom.intersects(otherfeat._shapely):
+                    overlaps.append(otherfeat)
+                else:
+                    nonoverlaps.append(otherfeat)
+            # check if sufficient
+            matches = []
+            for otherfeat in overlaps:
+                if key and not key(feat,otherfeat):
+                    continue
+                matches.append(otherfeat)
+                if n and len(matches) >= n:
+                    #print "ol",len(matches)
+                    break
+            # otherwise proceed to nonoverlaps
+            proceed = len(matches) < n if n else True
+            if proceed:
+                # limit to those within radius
+                if radius:
+                    # make spindex for speedup
+##                    _nonoverlaps = VectorData()
+##                    for otherfeat in nonoverlaps:
+##                        newfeat = _nonoverlaps.add_feature(otherfeat.row, otherfeat.geometry)
+##                        newfeat._shapely = otherfeat._shapely
+##                    _nonoverlaps.create_spatial_index()
+##                    nonoverlaps = _nonoverlaps
+                    # test within
+                    # NOTE: seems faster to just use existing spindex and exclude those already added
+                    nonoverlaps = (otherfeat for otherfeat in within(feat, other)
+                                   if otherfeat not in matches)
+                    #print "within"
+                # add remainder of nonoverlaps
+                else:
+                    for otherfeat in other.quick_disjoint(feat.bbox):
+                        nonoverlaps.append(otherfeat)
+                # filter by key
+                if key:
+                    nonoverlaps = (otherfeat for otherfeat in nonoverlaps if key(feat, otherfeat))
+                # then calc dist for nonoverlaps
+                if n:
+                    nonoverlaps = list(nonoverlaps)
+                    #print "nearsort",len(nonoverlaps)
+                    for otherfeat in nearest(feat, nonoverlaps):
+                        # if it gets this far it will be slow regardless of n,
+                        # since all dists have to be calculated in order to sort them
+                        matches.append(otherfeat)
+                        if n and len(matches) >= n:
+                            #print "ne",len(matches)
+                            break
+                else:
+                    # means radius is only criteria,
+                    # so join with all (within radius)
+                    matches.extend(list(nonoverlaps))
+                    #print "wt2",len(matches)
+
+            # add
+            if matches:
+                for match in matches:
+                    newrow = list(feat.row)
+                    newrow.extend( match.row )
+                    out.add_feature(newrow, feat.geometry)
+                
+            elif keepall:
+                # no matches
+                newrow = list(feat.row)
+                newrow.extend( (None for _ in other.fields) )
+                out.add_feature(newrow, feat.geometry)
+                
+        return out
+
+    elif condition in ("intersects", "within", "contains", "crosses", "touches", "equals", "covers"):
+        # prep geoms in other
+        for otherfeat in other:
+            if not otherfeat.geometry:
+                continue
+            otherfeat._shapely = otherfeat.get_shapely()
+
+        # begin
+        for feat in data.quick_overlap(other.bbox):
+
+            print feat
+
+            if not feat.geometry:
+                if keepall:
+                    newrow = list(feat.row)
+                    newrow.extend( (None for _ in other.fields) )
+                    out.add_feature(newrow, None)
+                continue
+
+            # match funcs
+            geom = feat.get_shapely()
+            if condition in ("intersects", "contains", "covers"):
+                supergeom = supershapely(geom)
+                matchtest = getattr(supergeom, condition)
+            else:
+                matchtest = getattr(geom, condition)
+
+            # test conditions
+            matches = [otherfeat for otherfeat in other.quick_overlap(feat.bbox) if matchtest(otherfeat._shapely)]
+            if matches:
+                for match in matches:
+                    newrow = list(feat.row)
+                    newrow.extend( match.row )
+                    out.add_feature(newrow, feat.geometry)
+
+            elif keepall:
+                # no matches
+                newrow = list(feat.row)
+                newrow.extend( (None for _ in other.fields) )
+                out.add_feature(newrow, feat.geometry)
+                
+        return out
+
+    elif condition in ("disjoint",):
+        # NOT FIXED....
+        raise NotImplementedError
+        # TODO: check empty geom
+        # first add those whose bboxes clearly dont overlap
+        for feat in data.quick_disjoint(other.bbox):
+            out.add_feature(feat.row, feat.geometry)
+
+        # then check those that might overlap
+        for feat in data.quick_overlap(other.bbox):
+            geom = feat.get_shapely()
+
+            # has to be disjoint with all those that maybe overlap,
+            # ie a feature that intersects at least one feature in the
+            # other layer is not disjoint
+            disjoint = all((otherfeat.get_shapely().disjoint(geom) for otherfeat in other.quick_overlap(feat.bbox)))
+
+            if disjoint:
+                out.add_feature(feat.row, feat.geometry)
+
+        return out
+    
+    else:
+        raise Exception("Unknown join condition")
+
+
 
 
 
@@ -220,6 +586,7 @@ def merge(*datalist):
             outfile.add_feature(row, geometry)
     #return merged file
     return outfile
+
 
 
 
@@ -308,6 +675,9 @@ def snap(data, otherdata, tolerance=0.0000001):
 
 
 
+
+
+
 # Create operations
 
 def connect(frompoints, topoints, key=None, greatcircle=True, segments=100):
@@ -364,6 +734,10 @@ def connect(frompoints, topoints, key=None, greatcircle=True, segments=100):
                 outfile.add_feature(row=row, geometry=geoj)
 
     return outfile
+
+
+
+
 
 
 
