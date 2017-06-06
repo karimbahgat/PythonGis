@@ -11,6 +11,7 @@ import pythongis as pg
 class MapView(tk.Canvas):
     def __init__(self, master, renderer, **kwargs):        
         # Make this class a subclass of tk.Canvas and add to it
+        kwargs["bg"] = kwargs.get("bg", "#%02x%02x%02x" % (111,111,111))
         tk.Canvas.__init__(self, master, **kwargs)
         self.renderer = renderer
         self.controls = []
@@ -224,13 +225,18 @@ class MapView(tk.Canvas):
         if self.onstart:
             self.onstart()
         print "rendering thread..."
+        import time
+        t=time.time()
         pending = self.master.new_thread(self.renderer.render_all)
 
         def finish(result):
             if isinstance(result, Exception):
                 tk2.messagebox.showerror(self, "Rendering error: " + str(result) )
             else:
+                import time
+                print "-threadrend",time.time()-t
                 # update renderings
+                
                 self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
                 self.update_image()
                 # display zoom scale
@@ -240,11 +246,17 @@ class MapView(tk.Canvas):
             if self.onfinish:
                 self.onfinish()
             
-        self.master.process_thread(pending, finish)
+        self.master.process_thread(pending, finish, mslag=1, msinterval=21) # faster checking/update of tk img
 
     def update_image(self):
+        #import PIL, PIL.ImageTk
+        #img = PIL.Image.open("C:/Users/kimo/Desktop/best/2017-02-26 044.jpg").resize(self.renderer.img.size).convert("RGBA")
+        tt=time.time()
+        #self.renderer.img = self.renderer.img.convert("RGB")
         self.tkimg = self.renderer.get_tkimage()
+        print "-tkfresh",time.time()-tt
         self.itemconfig(self.image_on_canvas, image=self.tkimg )
+        
 
     def zoom_in(self):
         self.zoomfactor += 1

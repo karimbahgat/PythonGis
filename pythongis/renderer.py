@@ -247,7 +247,7 @@ class Map:
         self.width = width or None
         self.height = height or None
         self.drawer = None
-        self.zooms = []
+        #self.zooms = []
 
         # foreground layergroup for non-map decorations
         self.foregroundgroup = ForegroundLayerGroup()
@@ -261,6 +261,9 @@ class Map:
             
         self.img = None
         self.changed = True
+
+        #self.drawer = pyagg.Canvas(self.width, self.height, (111,111,111))
+        #self.drawer.geographic_space()
 
     def _create_drawer(self):
         # get coordspace bbox aspect ratio of all layers
@@ -289,19 +292,19 @@ class Map:
         # factor in zooms (zoombbx should somehow be crop, so alters overall img dims...)
         self.drawer = pyagg.Canvas(self.width, self.height, None)
         self.drawer.geographic_space()
-        for zoom in self.zooms:
-            zoom()
+        #for zoom in self.zooms:
+        #    zoom()
         # determine drawer pixel size based on zoom area
         # WARNING: when i changed this, it led to some funky misalignments...
-        if autosize:
-            bbox = self.drawer.coordspace_bbox
-            w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
-            aspect = w/float(h)
-            if aspect < 1:
-                self.width = int(self.height * aspect)
-            else:
-                self.height = int(self.width / float(aspect))
-            self.drawer.resize(self.width, self.height, lock_ratio=False)
+##        if autosize:
+##            bbox = self.drawer.coordspace_bbox
+##            w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
+##            aspect = w/float(h)
+##            if aspect < 1:
+##                self.width = int(self.height * aspect)
+##            else:
+##                self.height = int(self.width / float(aspect))
+##            self.drawer.resize(self.width, self.height, lock_ratio=False)
 
     def copy(self):
         dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy())
@@ -317,8 +320,9 @@ class Map:
     # Map canvas alterations
 
     def offset(self, xmove, ymove):
-        func = lambda: self.drawer.move(xmove, ymove)
-        self.zooms.append(func)
+        if not self.drawer: self._create_drawer()
+        self.drawer.move(xmove, ymove)
+        #self.zooms.append(func)
         self.changed = True
 
     def resize(self, width, height):
@@ -332,34 +336,41 @@ class Map:
     # Zooming
 
     def zoom_auto(self):
+        if not self.drawer: self._create_drawer()
         bbox = self.layers.bbox
-        func = lambda: self.zoom_bbox(*bbox)
-        self.zooms.append(func)
+        self.zoom_bbox(*bbox)
+        #self.zooms.append(func)
         self.changed = True
 
     def zoom_bbox(self, xmin, ymin, xmax, ymax):
+        if not self.drawer: self._create_drawer()
         if self.width and self.height:
-            # predetermined map size will conor the aspect ratio
-            func = lambda: self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=True)
+            # predetermined map size will honor the aspect ratio
+            self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=True)
         else:
             # otherwise snap zoom to edges so can determine map size from coordspace
-            func = lambda: self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=False)
-        self.zooms.append(func)
+            self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=False)
+        #self.zooms.append(func)
         self.changed = True
 
     def zoom_in(self, factor, center=None):
-        func = lambda: self.drawer.zoom_in(factor, center=center)
-        self.zooms.append(func)
+        if not self.drawer: self._create_drawer()
+        self.drawer.zoom_in(factor, center=center)
+        #func = lambda: self.drawer.zoom_in(factor, center=center)
+        #self.zooms.append(func)
         self.changed = True
 
     def zoom_out(self, factor, center=None):
-        func = lambda: self.drawer.zoom_out(factor, center=center)
-        self.zooms.append(func)
+        if not self.drawer: self._create_drawer()
+        self.drawer.zoom_out(factor, center=center)
+        #func = lambda: self.drawer.zoom_out(factor, center=center)
+        #self.zooms.append(func)
         self.changed = True
 
     def zoom_units(self, units, center=None):
-        func = lambda: self.drawer.zoom_units(units, center=center)
-        self.zooms.append(func)
+        if not self.drawer: self._create_drawer()
+        self.drawer.zoom_units(units, center=center)
+        #self.zooms.append(func)
         self.changed = True
 
     # Layers
@@ -466,17 +477,24 @@ class Map:
 
     # Drawing
 
-    def render_one(self, layer):
-        self._create_drawer()
+    def render_one(self, layer, antialias=False):
+        if not self.drawer: self._create_drawer()
         
         if layer.visible:
             layer.render(width=self.drawer.width,
                          height=self.drawer.height,
-                         bbox=self.drawer.coordspace_bbox)
+                         bbox=self.drawer.coordspace_bbox,
+                         antialias=antialias)
             self.update_draworder()
 
-    def render_all(self):
-        self._create_drawer()
+    def render_all(self, antialias=False):
+        #import time
+        #t=time.time()
+        if not self.drawer: self._create_drawer()
+        #print "# createdraw",time.time()-t
+
+        #import time
+        #t=time.time()
         
         for layer in self.backgroundgroup:
             layer.render()
@@ -485,7 +503,8 @@ class Map:
             if layer.visible:
                 layer.render(width=self.drawer.width,
                              height=self.drawer.height,
-                             bbox=self.drawer.coordspace_bbox)
+                             bbox=self.drawer.coordspace_bbox,
+                             antialias=antialias)
                 
                 layer.render_text(width=self.drawer.width,
                                  height=self.drawer.height,
@@ -493,9 +512,13 @@ class Map:
 
         for layer in self.foregroundgroup:
             layer.render()
+        #print "# rendall",time.time()-t
             
         self.changed = False
+        import time
+        t=time.time()
         self.update_draworder()
+        print "# draword",time.time()-t
 
     def update_draworder(self):
         if self.drawer: self.drawer.clear()
@@ -533,25 +556,38 @@ class Map:
 
     def get_tkimage(self):
         # Special image format needed by Tkinter to display it in the GUI
-        if not self.drawer: self._create_drawer() 
-        return self.drawer.get_tkimage()
+        #return self.drawer.get_tkimage()
+        import PIL, PIL.ImageTk
+        #img = PIL.Image.open("C:/Users/kimo/Desktop/best/2017-02-26 044.jpg")
+        return PIL.ImageTk.PhotoImage(image=self.img)
+        
+##        if not hasattr(self, "_tkim"):
+##            print "new"
+##            import PIL.ImageTk
+##            self._tkim = PIL.ImageTk.PhotoImage(self.drawer.img)
+##        self._tkim.paste(self.drawer.img)
+##        return self._tkim
+        
+##        if not hasattr(self, "_tkim"):
+##            print "new"
+##            import Tkinter
+##            self._tkim = Tkinter.PhotoImage(self.drawer.img)
+##        dat = list(self.drawer.img.getdata())
+##        rows = (dat[self.drawer.width*i:self.drawer.width*(i+1)] for i in range(self.drawer.height))
+##        data = ('{' + ' '.join(("#%02x%02x%02x" % rgb[:3] for rgb in row)) + '}' for row in rows)
+##        self._tkim.put(' '.join(data))
+##        return self._tkim
 
     def view(self):
-        if self.changed:
-            self.render_all()
-        elif self.layers.changed:
-            self.update_draworder()
+        mapp = self.copy()
+        mapp.render_all()
         # make gui
         from . import app
-        mapp = self
         win = app.builder.MultiLayerGUI(mapp)
         win.mainloop()
 
     def save(self, savepath):
-        if self.changed:
-            self.render_all()
-        elif self.layers.changed:
-            self.update_draworder()
+        self.render_all(antialias=True) # antialias
         self.drawer.save(savepath)
 
         
@@ -820,8 +856,11 @@ class VectorLayer:
             for feat in features:
                 yield feat
 
-    def render(self, width, height, bbox=None, lock_ratio=True, flipy=False):
+    def render(self, width, height, bbox=None, lock_ratio=True, flipy=False, antialias=False):
         if self.has_geometry():
+            import time
+            t=time.time()
+
             if not bbox:
                 bbox = self.bbox
 
@@ -838,7 +877,16 @@ class VectorLayer:
                 features = sorted(features, key=self.styleoptions["sortkey"],
                                   reverse=self.styleoptions["sortorder"].lower() == "decr")
 
-            # draw each as geojson
+            # prep PIL if non-antialias polygon
+            if not antialias and "Polygon" in self.data.type:
+                #print "preint",time.time()-t
+                import time
+                t=time.time()
+                import PIL.ImageDraw, PIL.ImagePath
+                img = PIL.Image.new("RGBA", (width,height), None)
+                PIL_drawer = PIL.ImageDraw.Draw(img)   #self.PIL_drawer
+
+            # for each
             for feat in features:
                 
                 # get symbols
@@ -860,9 +908,51 @@ class VectorLayer:
                             rendict[key] = val
 
                 # draw
-                drawer.draw_geojson(feat.geometry, **rendict)
-                
-            self.img = drawer.get_image()
+
+                # fast PIL Approach for non-antialias polygons
+                if not antialias and "Polygon" in feat.geometry["type"]:
+
+                    if "Multi" in feat.geometry["type"]:
+                        geoms = feat.geometry["coordinates"]
+                    else:
+                        geoms = [feat.geometry["coordinates"]]
+                    
+                    for poly in geoms:
+                        coords = poly[0]
+                        if len(poly) > 1:
+                            holes = poly[1:0]
+                        else:
+                            holes = []
+
+                        # first exterior
+                        path = PIL.ImagePath.Path(coords)
+                        path.transform(drawer.coordspace_transform)
+                        #print "draw",str(path.tolist())[:300]
+                        path.compact(1)
+                        #print "draw",str(path.tolist())[:100]
+                        if len(path) > 1:
+                            PIL_drawer.polygon(path, rendict["fillcolor"], None)
+                            PIL_drawer.line(path, "white", 1)
+
+                        # then holes
+                        for hole in holes:
+                            path = PIL.ImagePath.Path(hole)
+                            path.transform(drawer.coordspace_transform)
+                            path.compact(1)
+                            if len(path) > 1:
+                                PIL_drawer.polygon(path, (0,0,0,0), None)
+                                PIL_drawer.line(path, "white", 1)
+
+                else:
+                    # high qual geojson
+                    drawer.draw_geojson(feat.geometry, **rendict)
+
+            # flush
+            print "internal",time.time()-t
+            if not antialias and "Polygon" in self.data.type:
+                self.img = img
+            else:
+                self.img = drawer.get_image()
 
         else:
             self.img = None
@@ -1007,7 +1097,7 @@ class RasterLayer:
     def is_empty(self):
         return False # for now
 
-    def render(self, resampling="nearest", lock_ratio=True, **georef):
+    def render(self, resampling="nearest", lock_ratio=True, antialias=None, **georef):
         # position in space
         # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
         # LIKELY DUE TO HALF CELL CENTER VS CORNER
