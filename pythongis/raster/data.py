@@ -477,6 +477,8 @@ class Band(object):
         from .. import renderer
         
         rast = self._rast
+        if not rast:
+            raise Exception("Cannot render a freestanding band without a parent raster which is needed for georeferencing")
         styleoptions.update(bandnum=rast.bands.index(self))
         
         mapp = renderer.Map(width, height, title=title, background=background)
@@ -623,9 +625,12 @@ class RasterData(object):
         xright_coord,ybottom_coord = self.cell_to_geo(self.width-1+0.5, self.height-1+0.5)
         return [xleft_coord,ytop_coord,xright_coord,ybottom_coord]
 
-    def copy(self):
+    def copy(self, shallow=False):
         new = RasterData(**self.meta)
-        new.bands = [band.copy() for band in self.bands]
+        if shallow:
+            new.bands = []
+        else:
+            new.bands = [band.copy() for band in self.bands]
         new._cached_mask = self._cached_mask
         return new
 

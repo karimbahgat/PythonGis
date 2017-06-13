@@ -619,6 +619,7 @@ class VectorData:
                 yield feat
 
     def group(self, key):
+        """Iterates over keyvalue-group pairs based on key"""
         for uid,feats in itertools.groupby(sorted(self, key=key), key=key):
             yield uid, list(feats)
 
@@ -636,8 +637,9 @@ class VectorData:
         return new
 
     def aggregate(self, key, geomfunc, fieldmapping=[]):
-        # Aggregate values and geometries within key groupings
-        # Allows a lot of customization
+        """Aggregate values and geometries within key groupings.
+        Geomfunc specifies how to aggregate geometries, either intersection, union, difference,
+        or a function that takes all geometries to aggregate."""
         # TODO: How is it different than manager.collapse()...?
         # TODO: Move to manager...?
         out = VectorData()
@@ -652,7 +654,7 @@ class VectorData:
         return out
 
     def duplicates(self, subkey=None, fieldmapping=[]):
-        # groups duplicate geometries
+        """Groups duplicate geometries"""
         # TODO: Move to manager...?
         if subkey:
             # additional subgrouping based on eg attributes
@@ -666,14 +668,13 @@ class VectorData:
         
         return out
 
-    def join(self, other, key, fieldmapping=[], keepall=True):
-        # NOTE: key can be a single fieldname or function that returns the link for both tables, or a left-right key pair. 
+    def join(self, other, key, fieldmapping=[], collapse=False, keepall=True):
+        """Key can be a single fieldname or function that returns the link for both tables, or a left-right key pair."""
         # TODO: enable multiple join conditions in descending priority, ie key can be a list of keys, so looks for a match using the first key, then the second, etc, until a match is found.
         # TODO: Move to manager...?
         out = VectorData()
         out.fields = list(self.fields)
-        out.fields += (field for field in other.fields if field not in self.fields)
-        out.fields += (fieldtup[0] for fieldtup in fieldmapping if fieldtup[0] not in out.fields)
+        out.fields += other.fields #(field for field in other.fields if field not in self.fields)
 
         from . import sql
 
@@ -683,36 +684,58 @@ class VectorData:
             k1 = k2 = key # same key for both
         key1 = k1 if hasattr(k1,"__call__") else lambda f:f[k1]
         key2 = k2 if hasattr(k2,"__call__") else lambda f:f[k2]
-        
-        fieldmapping_default = [(field,lambda f,field=field:f[field],"first") for field in other.fields if field not in self.fields]
-        fs,vfs,afs = zip(*fieldmapping) or [[],[],[]]
-        
-        def getfm(item):
-            if item[0] in fs:
-                return fieldmapping[fs.index(item[0])]
-            else:
-                return item
-        fieldmapping_old = fieldmapping
-        fieldmapping = [getfm(item) for item in fieldmapping_default]
-        fieldmapping += (item for item in fieldmapping_old if item[0] not in self.fields and item[0] not in other.fields)
-        print fieldmapping
 
-        def grouppairs(data1, key1, data2, key2):
-            # create hash table
-            # inspired by http://rosettacode.org/wiki/Hash_join#Python
-            hsh = dict()
-            for keyval,f2s in itertools.groupby(sorted(data2,key=key2), key=key2):
-                aggval = sql.aggreg(f2s, aggregfuncs=fieldmapping)
-                hsh[keyval] = aggval
-            # iterate join
-            for f1 in data1:
-                keyval = key1(f1)
-                if keyval in hsh:
-                    f2row = hsh[keyval]
-                    yield f1,f2row
-                elif keepall:
-                    f2row = ("" for f in fieldmapping)
-                    yield f1,f2row
+        if collapse:
+            out.fields += (fieldtup[0] for fieldtup in fieldmapping if fieldtup[0] not in out.fields)
+            fieldmapping_default = [(field,lambda f,field=field:f[field],"first") for field in other.fields if field not in self.fields]
+            fs,vfs,afs = zip(*fieldmapping) or [[],[],[]]
+            
+            def getfm(item):
+                if item[0] in fs:
+                    return fieldmapping[fs.index(item[0])]
+                else:
+                    return item
+            fieldmapping_old = fieldmapping
+            fieldmapping = [getfm(item) for item in fieldmapping_default]
+            fieldmapping += (item for item in fieldmapping_old if item[0] not in self.fields and item[0] not in other.fields)
+            print fieldmapping
+
+            def grouppairs(data1, key1, data2, key2):
+                "aggregates"
+                # create hash table
+                # inspired by http://rosettacode.org/wiki/Hash_join#Python
+                hsh = dict()
+                for keyval,f2s in itertools.groupby(sorted(data2,key=key2), key=key2):
+                    aggval = sql.aggreg(f2s, aggregfuncs=fieldmapping)
+                    hsh[keyval] = aggval
+                # iterate join
+                for f1 in data1:
+                    keyval = key1(f1)
+                    if keyval in hsh:
+                        f2row = hsh[keyval]
+                        yield f1,f2row
+                    elif keepall:
+                        f2row = (None for f in fieldmapping)
+                        yield f1,f2row
+
+        else:
+            def grouppairs(data1, key1, data2, key2):
+                "pairwise"
+                # create hash table
+                # inspired by http://rosettacode.org/wiki/Hash_join#Python
+                hsh = dict()
+                for keyval,f2s in itertools.groupby(sorted(data2,key=key2), key=key2):
+                    hsh[keyval] = list(f2s)
+                # iterate join
+                for f1 in data1:
+                    keyval = key1(f1)
+                    if keyval in hsh:
+                        f2s = hsh[keyval]
+                        for f2row in f2s:
+                            yield f1,f2row
+                    elif keepall:
+                        f2row = (None for f in other.fields)
+                        yield f1,f2row
 
         for pair in grouppairs(self, key1, other, key2):
             f1,f2row = pair
@@ -909,11 +932,20 @@ class VectorData:
         mapp.render_all()
         return mapp
 
-    def browse(self):
+    def browse(self, limit=None):
         from .. import app
         win = app.builder.TableGUI()
-        rows = (f.row for f in self)
-        win.browser.table.populate(self.fields, rows)
+        if limit:
+            def rows():
+                for i,f in enumerate(self):
+                    yield f.row
+                    if i >= limit:
+                        break
+        else:
+            def rows():
+                for f in self:
+                    yield f.row
+        win.browser.table.populate(self.fields, rows())
         win.mainloop()
 
     def view(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):

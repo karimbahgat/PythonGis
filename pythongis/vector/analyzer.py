@@ -117,6 +117,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegr
         from .. import raster
 
         for f in groupfeats:
+            print f
             try:
                 cropped = raster.manager.crop(valuedata, f.bbox)
             except:

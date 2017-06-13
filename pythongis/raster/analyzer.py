@@ -9,7 +9,7 @@ import math
 
 # Zonal aggregation
 
-def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="mean"):
+def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="mean", nodataval=-999):
     """
     For each unique zone in "zonaldata", summarizes "valuedata" cells that overlap "zonaldata".
     Which band to use must be specified for each.
@@ -35,28 +35,40 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
     georef = dict(width=valuedata.width, height=valuedata.height,
                   affine=valuedata.affine)
     outrast = RasterData(mode="float32", **georef)
-    outrast.add_band(nodataval=valueband.nodataval)
+    outrast.add_band(nodataval=nodataval)
 
     # get stats for each unique value in zonal data
     zonevalues = (val for count,val in zonalband.img.getcolors(zonaldata.width*zonaldata.height))
     zonesdict = {}
+    zonalband.view()
+    valueband.view()
     for zoneval in zonevalues:
         # exclude nullzone
         if zoneval == zonalband.nodataval: continue
 
-        # mask to only the current zone
-        curzone = zonalband.copy()
-        curzone.mask = curzone.conditional("val != %s" % zoneval).img
+        # mask valueband to only the current zone
+        curzone = valueband.copy()
+        print "copy"
+        curzone.img.show()
+        curzone.mask = zonalband.conditional("val != %s" % zoneval).img  # returns true everywhere, which is not correct..., maybe due to nodataval??? 
+        print "cond",zoneval
+        zonalband.conditional("val != %s" % zoneval).img.show()
+        print "mask"
+        curzone.img.show()        
         
         # also exclude null values from calculations
         curzone.mask = valueband.mask   # pastes additional nullvalues
         curzone._cached_mask = None    # force having to recreate the mask using the combined old and pasted nullvals
+        print "mask2", curzone
+        curzone.img.show()
 
         # retrieve stats
         stats = curzone.summarystats(outstat)
         zonesdict[zoneval] = stats
 
         # write chosen stat to outimg
+        if stats[outstat] is None:
+            stats[outstat] = nodataval
         outrast.bands[0].img.paste(stats[outstat], mask=curzone.mask)
         
     return zonesdict, outrast
