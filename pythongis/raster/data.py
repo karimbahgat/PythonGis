@@ -119,7 +119,56 @@ class Band(object):
         metadict = dict(img=self.img,
                         nodataval=self.nodataval)
         return "Band object:\n" + pprint.pformat(metadict, indent=4)
-            
+
+    def _operator(self, other, op): 
+        # calculate math
+        # basic math + - * / ** %
+        # note: logical ops ~ & | ^ makes binary mask and return the pixel value where mask is valid
+        # note: relational ops < > == != return only binary mask
+        # note: other useful is min() and max(), equiv to (r1 < r2) | r2
+        if isinstance(other, (float,int)):
+            if isinstance(other, int):
+                md = "I"
+            elif isinstance(other, float):
+                md = "F"
+            _oimg = PIL.Image.new(md, (self.width,self.height), other)
+            other = Band(img=_oimg)
+        
+        bands = {"b1": self.img, "b2": other.img}
+        img = PIL.ImageMath.eval("b1 %s b2" % op, **bands)
+
+        # should maybe create a combined mask of nullvalues for all rasters
+        # and filter away those nullcells from math result
+        # ...
+        masks = {"m1": self.mask, "m2": other.mask}
+        mask = PIL.ImageMath.eval("convert(m1 | m2, '1')", **masks) # union of all masks
+
+        # return result
+        outband = Band(img=img)
+        outband.mask = mask
+        return outband
+
+    def __add__(self, other):
+        return self._operator(other, "+")
+
+    def __sub__(self, other):
+        return self._operator(other, "-")
+
+    def __mul__(self, other):
+        return self._operator(other, "*")
+
+    def __truediv__(self, other):
+        return self._operator(other, "/")
+
+    def __and__(self, other):
+        return self._operator(other, "&")
+
+    def __or__(self, other):
+        return self._operator(other, "|")
+
+    def __xor__(self, other):
+        return self._operator(other, "^")
+
     @property
     def width(self):
         return self.img.size[0]
@@ -196,25 +245,35 @@ class Band(object):
         if self._rast:
             self._rast._cached_mask = None
 
-    def compute(self, expr):
+    def compute(self, expr, condition=None):
         """Apply the given expression to recompute all values"""
         # get the mask before changing values
+        mask = None
         if self.nodataval != None:
             mask = self.mask
 
+        if condition:
+            if isinstance(condition, basestring):
+                condition = self.conditional(condition)
+            condition = condition.img
+
         # change values
-        self._compute(expr)
+        self._compute(expr, condition)
 
         # use the original nodatamask to set null values again
-        if self.nodataval != None:
+        if mask:
             self.img.paste(self.nodataval, (0,0), mask)
 
-    def _compute(self, expr):
+    def _compute(self, expr, condition=None):
         """Internal only"""
         try:
-            _expr = "convert(%s, '%s')" % (expr, self.img.mode)
-            result = PIL.ImageMath.eval(_expr, val=self.img)
-            self.img = result
+            if "val" in expr:
+                expr = "convert(%s, '%s')" % (expr, self.img.mode)
+            result = PIL.ImageMath.eval(expr, val=self.img)
+            if condition:
+                self.img.paste(result, (0,0), condition)
+            else:
+                self.img = result
         
         except MemoryError:
             
@@ -234,17 +293,29 @@ class Band(object):
                 forcerange = lambda v: min(max(v,0),255)
             else:
                 forcerange = lambda v: v
-            
-            for y in range(self.width):
-                for x in range(self.height):
-                    val = self._pixelaccess[x,y]
-                    newval = eval(expr, {}, {"val":val})
-                    self._pixelaccess[x,y] = forcetype(forcerange(newval))
+
+            if condition:
+                condpx = condition.load()
+                for y in range(self.width):
+                    for x in range(self.height):
+                        if condpx[x,y]:
+                            val = self._pixelaccess[x,y]
+                            newval = eval(expr, {}, {"val":val})
+                            self._pixelaccess[x,y] = forcetype(forcerange(newval))
+            else:
+                for y in range(self.width):
+                    for x in range(self.height):
+                        val = self._pixelaccess[x,y]
+                        newval = eval(expr, {}, {"val":val})
+                        self._pixelaccess[x,y] = forcetype(forcerange(newval))
 
     def recode(self, condition, newval):
         """Change to a new value for those pixels that meet a condition"""
-        wheretrue = self._conditional(condition)
-        self.img.paste(newval, (0,0), wheretrue)
+        if isinstance(condition, basestring):
+            condition = self._conditional(condition)
+        if isinstance(newval, Band):
+            newval = newval.img
+        self.img.paste(newval, (0,0), condition)
 
     def conditional(self, condition):
         """Return a binary band showing where a condition is true"""
