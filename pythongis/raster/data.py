@@ -136,7 +136,7 @@ class Band(object):
         
         bands = {"b1": self.img, "b2": other.img}
         if any((sym in op for sym in "&|^=><!")):
-            img = PIL.ImageMath.eval("convert(b1 %s b2, '1')" % op, **bands)
+            img = PIL.ImageMath.eval("convert((b1 %s b2)*255, '1')" % op, **bands)
         else:
             img = PIL.ImageMath.eval("b1 %s b2" % op, **bands)
 

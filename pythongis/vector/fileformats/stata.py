@@ -31,9 +31,9 @@ class StataFile(object):
             
         for row in self._data:
             # only interpret str,int,float, otherwise None
-            row = [v if isinstance(v, (str,int,float)) else None
+            row = [v if isinstance(v, (basestring,int,float)) else None
                    for v in row]
-            row = [v.decode(self.encoding,"ignore") if isinstance(v, str) else v
+            row = [v.decode(self.encoding,"ignore") if isinstance(v, bytes) else v
                    for v in row]
             if self.use_valuelabels:
                 row = [self.valuelabels.get(f,{}).get(v,v) for f,v in zip(self.fieldnames,row)]
