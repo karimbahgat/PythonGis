@@ -135,7 +135,10 @@ class Band(object):
             other = Band(img=_oimg)
         
         bands = {"b1": self.img, "b2": other.img}
-        img = PIL.ImageMath.eval("b1 %s b2" % op, **bands)
+        if any((sym in op for sym in "&|^=><!")):
+            img = PIL.ImageMath.eval("convert(b1 %s b2, '1')" % op, **bands)
+        else:
+            img = PIL.ImageMath.eval("b1 %s b2" % op, **bands)
 
         # should maybe create a combined mask of nullvalues for all rasters
         # and filter away those nullcells from math result
@@ -148,6 +151,8 @@ class Band(object):
         outband.mask = mask
         return outband
 
+    
+
     def __add__(self, other):
         return self._operator(other, "+")
 
@@ -157,8 +162,37 @@ class Band(object):
     def __mul__(self, other):
         return self._operator(other, "*")
 
+    def __div__(self, other):
+        return self._operator(other, "/")
+
     def __truediv__(self, other):
         return self._operator(other, "/")
+
+    def __pow__(self, other):
+        return self._operator(other, "**")
+
+
+
+    def __radd__(self, other):
+        return other._operator(self, "+")
+
+    def __rsub__(self, other):
+        return other._operator(other, "-")
+
+    def __rmul__(self, other):
+        return other._operator(other, "*")
+
+    def __rdiv__(self, other):
+        return other._operator(self, "/")
+
+    def __rtruediv__(self, other):
+        return other._operator(self, "/")
+
+    def __rpow__(self, other):
+        return other._operator(self, "**")
+
+    
+
 
     def __and__(self, other):
         return self._operator(other, "&")
@@ -168,6 +202,28 @@ class Band(object):
 
     def __xor__(self, other):
         return self._operator(other, "^")
+
+
+
+    def __lt__(self, other):
+        return self._operator(other, "<")
+
+    def __le__(self, other):
+        return self._operator(other, "<=")
+
+    def __eq__(self, other):
+        return self._operator(other, "==")
+
+    def __ne__(self, other):
+        return self._operator(other, "!=")
+
+    def __gt__(self, other):
+        return self._operator(other, ">")
+
+    def __ge__(self, other):
+        return self._operator(other, ">=")
+    
+
 
     @property
     def width(self):
@@ -269,7 +325,10 @@ class Band(object):
         try:
             if "val" in expr:
                 expr = "convert(%s, '%s')" % (expr, self.img.mode)
-            result = PIL.ImageMath.eval(expr, val=self.img)
+                result = PIL.ImageMath.eval(expr, val=self.img)
+            else:
+                val = eval(expr)
+                result = PIL.Image.new(self.img.mode, self.img.size, val)
             if condition:
                 self.img.paste(result, (0,0), condition)
             else:
