@@ -201,7 +201,7 @@ def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **
         # begin
         for feat in data:
 
-            print feat
+            #print feat
             
             if not feat.geometry:
                 if keepall:

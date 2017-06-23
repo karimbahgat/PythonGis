@@ -83,7 +83,9 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
             delimiter = kwargs.get("delimiter")
             fileobj = open(filepath, "rU")
             if delimiter is None:
-                dialect = csv.Sniffer().sniff(fileobj.read())
+                # auto detect delimiter
+                # NOTE: only based on first 10 mb, otherwise gets really slow for large files
+                dialect = csv.Sniffer().sniff(fileobj.read(1056*10)) 
                 fileobj.seek(0)
                 rows = csv.reader(fileobj, dialect)
             else:
