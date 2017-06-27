@@ -99,7 +99,9 @@ class Band(object):
                 img = PIL.Image.new(pilmode, (width, height))
             else:
                 raise Exception("Mode, width, and height must be specified when creating a new empty band from scratch")
-        
+
+        if isinstance(img, basestring):
+            img = PIL.Image.open(img)
         self.img = img
 
         self._pixelaccess = None
@@ -607,9 +609,14 @@ class Band(object):
         from .. import renderer
         
         rast = self._rast
-        if not rast:
-            raise Exception("Cannot render a freestanding band without a parent raster which is needed for georeferencing")
-        styleoptions.update(bandnum=rast.bands.index(self))
+        if rast:
+            styleoptions.update(bandnum=rast.bands.index(self))
+        else:
+            #raise Exception("Cannot render a freestanding band without a parent raster which is needed for georeferencing")
+            rast = RasterData(mode=pilmode_to_rastmode(self.img.mode),
+                              bbox=[0,0,self.width,self.height], width=self.width, height=self.height)
+            rast.add_band(self)
+            styleoptions.update(bandnum=0)
         
         mapp = renderer.Map(width, height, title=title, background=background)
         mapp.add_layer(rast, **styleoptions)
@@ -626,6 +633,9 @@ class Band(object):
         # make gui
         win = app.builder.MultiLayerGUI(mapp)
         win.mainloop()
+
+    def save(self, filepath):
+        self.img.save(filepath)
 
 
 
