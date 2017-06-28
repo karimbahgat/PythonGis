@@ -1122,9 +1122,12 @@ class RasterLayer:
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            valrange = 1/float(maxval-minval) * 255 if maxval-minval != 0 else 0
-            expr = "(val - {minval}) * {valrange}".format(minval=minval,valrange=valrange)
-            band.compute(expr)
+            valrange = maxval-minval
+            if valrange:
+                expr = "(convert(val,'F') - {minval}) / {valrange} * 255".format(minval=minval,valrange=valrange)
+                band.compute(expr)
+            else:
+                band.compute("0")
             # colorize
             img = band.img.convert("LA")
 
@@ -1134,9 +1137,12 @@ class RasterLayer:
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            valrange = 1/float(maxval-minval) * 255 if maxval-minval != 0 else 0
-            expr = "(val - {minval}) * {valrange}".format(minval=minval,valrange=valrange)
-            band.compute(expr)
+            valrange = maxval-minval
+            if valrange:
+                expr = "(convert(val,'F') - {minval}) / {valrange} * 255".format(minval=minval,valrange=valrange)
+                band.compute(expr)
+            else:
+                band.compute("0")
             # colorize
             canv = pyagg.canvas.from_image(band.img.convert("RGBA"))
             canv = canv.color_remap(self.styleoptions["gradcolors"])
