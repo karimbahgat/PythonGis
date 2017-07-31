@@ -157,6 +157,7 @@ def resample(raster, algorithm="nearest", **rasterdef):
     return targetrast
 
 def roll(raster, x, y, worldcoords=True):
+    # TODO: rename to wrap? 
     out = raster.copy()
     xscale, xskew, xoffset, yskew, yscale, yoffset = out.affine
 
@@ -169,16 +170,6 @@ def roll(raster, x, y, worldcoords=True):
         band.img = PIL.ImageChops.offset(band.img, x, y)
         band.mask = PIL.ImageChops.offset(band.mask, x, y)
     out.mask = PIL.ImageChops.offset(premask, x, y)
-
-    # roll the georef
-    # TODO: unsure if should roll the geotransform, possibly also wrap around if extending outside the edge of coordsys, depending on coordsys and extent not obvious where to wrap around, also not all wraps can be represented with a bbox/affine
-    if worldcoords:
-        xoffset += x * xscale
-        yoffset += y * yscale
-    else:
-        xoffset += x
-        yoffset += y
-    out.set_geotransform(affine=[xscale, xskew, xoffset, yskew, yscale, yoffset])
     
     return out
 

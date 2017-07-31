@@ -770,7 +770,8 @@ class RasterData(object):
         if shallow:
             new.bands = []
         else:
-            new.bands = [band.copy() for band in self.bands]
+            for band in self.bands:
+                new.add_band(band.copy())
         new._cached_mask = self._cached_mask
         return new
 
