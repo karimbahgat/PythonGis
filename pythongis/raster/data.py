@@ -17,6 +17,28 @@ import PIL.Image, PIL.ImageMath, PIL.ImageStat
 # ...
 
 
+class _ModuleFuncsAsClassMethods(object):
+    "Helps access this module's functions as rasterdata class methods by automatically inserting self as the first arg"
+    def __init__(self, data, module):
+        from functools import wraps
+        self.data = data
+
+        for k,v in module.__dict__.items():
+            if hasattr(v, "__call__") and not v.__name__.startswith("_"):
+                func = v
+                def as_method(func):
+                    @wraps(func)
+                    def firstarg_inserted(*args, **kwargs):
+                        # wrap method to insert self data as the first arg
+                        args = [self.data] + list(args)
+                        return func(*args, **kwargs)
+                    return firstarg_inserted
+                self.__dict__[k] = as_method(func)
+
+##########
+
+
+
 class Cell(object):
     def __init__(self, band, col, row):
         self.band = band
@@ -894,13 +916,28 @@ class RasterData(object):
     def save(self, filepath):
         saver.to_file(self.bands, self.meta, filepath)
 
-    ##############################
-    # Methods from other modules
+
+    ### ACCESS TO ADVANCED METHODS FROM INTERNAL MODULES ###
 
     def resample(self, **kwargs):
+        # TODO: drop, switch this everywhere to .manage.resample()
         from . import manager
         kwargs["raster"] = self
         return manager.resample(**kwargs)
+
+    @property
+    def manage(self):
+        from . import manager
+        return _ModuleFuncsAsClassMethods(self, manager)
+
+    @property
+    def analyze(self):
+        from . import analyzer
+        return _ModuleFuncsAsClassMethods(self, analyzer)
+    
+
+    ##############################
+    # Rendering
 
     def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
         from .. import renderer

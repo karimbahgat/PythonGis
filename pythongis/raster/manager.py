@@ -96,6 +96,42 @@ def reproject(raster, crs, algorithm="nearest", **rasterdef):
         else:
             raise NotImplementedError("Not a valid algorithm")
 
+##    # first, create target raster based on rasterdef
+##    rasterdef = rasterdef or raster.rasterdef
+##    # TODO: need to calc xscale yscale based on reprojected bbox?
+##    # ... 
+##    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+##    for band in raster:
+##        targetrast.add_band(img=band.img)
+##
+##    # get target coordinates
+##    coords = [targetrast.cell_to_geo(px,py) for px in range(targetrast.width) for py in range(targetrast.height)]
+##    lons,lats = zip(*coords)
+##
+##    # reproject coords using pyproj
+##    nlons,nlats = pyproj.transform(fromcrs,tocrs,lons,lats)
+##    xmin,xmax = min(nlons),max(nlons)
+##    ymin,ymax = min(nlats),max(nlats)
+##
+##    # manually get and set the pixels using some algorithm
+##    if algorithm == "nearest":
+##        for row in range(targetrast.height):
+##            for col in range(targetrast.width):
+##                i = row * targetrast.height + col
+##                nlon = nlons[i]
+##                nlat = nlats[i]
+##
+##                # hmm...
+##                
+##                pixel = raster.geo_to_cell(nlon,nlat)
+##                print pixel
+##                for sourceband,targetband in zip(raster,targetrast):
+##                    val = sourceband.get(*pixel).value
+##                    print val
+##                    targetband.set(col,row,val)
+##    else:
+##        raise NotImplementedError("Not a valid algorithm")
+
     return targetrast
 
     # TODO: Potential speedup algorithm
