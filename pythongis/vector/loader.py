@@ -1,3 +1,7 @@
+"""
+TODO: Switch to a fileformat class that iterates the source data, instead of loading
+all into memory... 
+"""
 
 # import builtins
 import os

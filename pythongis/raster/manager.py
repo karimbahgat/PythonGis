@@ -1,7 +1,8 @@
+"""
+Module containing methods for the management and modification of raster datasets. 
+"""
 
 from . import data
-##from .. import raster
-##from .. import vector
 from ..vector import sql
 
 import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMath
@@ -9,8 +10,12 @@ import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMa
 def mosaic(rasters, overlaprule="last", **rasterdef):
     """
     Mosaic rasters covering different areas together into one file.
+    All rasters are aligned to the extent and resolution of the first
+    raster, though this can be overridden by the optional rasterdef.
     Parts of the rasters may overlap each other, in which case we use the
-    overlap rule (default is "last").
+    overlap rule. Valid overlap rules: last (default), first.
+
+    TODO: Add more overlap rules. 
     """
     # use resampling to the same dimensions as the first raster
     rasterdef = rasterdef or rasters[0].rasterdef
@@ -35,23 +40,34 @@ def mosaic(rasters, overlaprule="last", **rasterdef):
             # find overlap via img1 & img2
             # use img1 + img2 via math
             # paste using overlap as mask
-            raise Exception("Overlap rule not supported")
+            raise NotImplemented("Overlap rule not supported")
         else:
-            raise Exception("Overlap rule not supported")
+            raise NotImplemented("Overlap rule not supported")
 
     return outrast
 
 def warp(raster, tiepoints):
-    # aka georeference
-    # morph or smudge a raster in arbitrary directions based on a set of controlpoints
-    # default algorithm is splines, maybe also polynomyal
-    # prob first prep the tiepoints then call on analyzer.interpolate with splines method
-    # ...
+    """
+    NOT YET IMPLEMENTED
+
+    Morph or smudge a raster in arbitrary directions based on a set of controlpoints.
+    Default algorithm is splines, maybe also polynomyal.
+
+    Aka: georeference.
+    """
+    # Prob first prep the tiepoints then call on analyzer.interpolate with splines method
     
-    raise Exception("Not yet implemented")
+    raise NotImplementedError
 
 def reproject(raster, crs, algorithm="nearest", **rasterdef):
-    """If given, **rasterdef will override the input raster structure"""
+    """
+    NOT YET IMPLEMENTED
+
+    Reprojects the raster from the input crs to a target crs.
+    If given, **rasterdef will override the input raster structure.
+    """
+    
+    raise NotImplementedError
 
     # TODO: How to handle coords that get transformed to infinity...
 
@@ -140,6 +156,8 @@ def reproject(raster, crs, algorithm="nearest", **rasterdef):
     # https://caniban.files.wordpress.com/2011/04/tile-based-geospatial-information-systems.pdf
 
 def resample(raster, algorithm="nearest", **rasterdef):
+    """Resamples raster extent, resolution, or affine transform.
+    Algorithm for resampling can be nearest (default), bilinear, bicubic."""
 
     algocodes = {"nearest":PIL.Image.NEAREST,
                 "bilinear":PIL.Image.BILINEAR,
@@ -193,7 +211,16 @@ def resample(raster, algorithm="nearest", **rasterdef):
     return targetrast
 
 def roll(raster, x, y, worldcoords=True):
-    # TODO: rename to wrap? 
+    """Offsets the cell values along the x and/or y axis, wrapping any
+    overflowing cells around to the opposite edge.
+    Useful for recentering the midpoint of a raster dataset.
+    By default the offset values are given as units in the raster's
+    coordinate system, but can also be given as pixel cells by setting
+    worldcoords to False. 
+    Does not affect the raster's affine geotransform. 
+
+    Aka: wrap.
+    """
     out = raster.copy()
     xscale, xskew, xoffset, yskew, yscale, yoffset = out.affine
 
@@ -210,6 +237,10 @@ def roll(raster, x, y, worldcoords=True):
     return out
 
 def align(raster, **rasterdef):
+    """Aligns a raster to the given rasterdef (via resampling), so that
+    the x/yoffset starts on the same x/yoffset as the rasterdef.
+    """
+    # TODO: Not sure if should use same x/yoffset or just as a multiple...
     rasterdef = rasterdef.copy()
     ref = data.RasterData(mode="1bit", **rasterdef)
     
@@ -223,6 +254,12 @@ def align(raster, **rasterdef):
     return aligned
 
 def upscale(raster, stat="sum", **rasterdef):
+    """Upscales a raster so that many cells are aggregated to fewer cells.
+    Works by running a moving window coinciding with each new cell in the
+    new rasterdef resolution, setting the new cell to the summary statistics of
+    the moving window.
+    Stat decides which summary statistic to use when aggregating (defaults to sum). 
+    """
     # either use focal stats followed by nearest resampling to match target raster
     # or use zonal stats where zone values are determined by col/row to form squares
     # for various approaches, see: https://gis.stackexchange.com/questions/27838/resample-binary-raster-to-give-proportion-within-new-cell-window/27849#27849
@@ -267,6 +304,11 @@ def upscale(raster, stat="sum", **rasterdef):
     
 
 def downscale(raster, stat="spread", **rasterdef):
+    """
+    NOT YET IMPLEMENTED
+
+    Downscales a raster so that few cells are spread across many new cells. 
+    """
     # first, create target raster based on rasterdef
     targetrast = data.RasterData(mode=raster.mode, **rasterdef)
 
@@ -275,7 +317,10 @@ def downscale(raster, stat="spread", **rasterdef):
 
 def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None, **rasterdef):
     """
-    If valuekey func, multiple feats in a cell are aggregated using stat.
+    Rasterizes vectordata to a raster with the given rasterdef. 
+    By default returns a binary raster of the vector features. 
+    If valuekey func, the cells take on the value of each feature and multiple
+    feats in a cell are aggregated using stat.
     If priority func, multiple feats are filtered/chosen before aggregated. 
     If partialfunc, feats that only partially overlap cell are given a weight.
     Output raster uses 0 as nodatavalue. 
@@ -452,12 +497,13 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
 
 def vectorize(raster, mergecells=True, metavars=True, bandnum=0):
     """
+    Vectorizes a raster band (defaults to 0) to vector data. 
     By default merges cells of same value into polygons.
     Non-binary rasters will create separate polygons for each
     contiguous group of cells with same value. 
     
     Setting mergecells to False will create separate polygon for each cell.
-    Metavars will add extra fields about the position of each cell. 
+    Metavars will add extra fields about the position of each cell.
     """
 
     from ..vector.data import VectorData
@@ -645,6 +691,7 @@ def vectorize(raster, mergecells=True, metavars=True, bandnum=0):
 def crop(raster, bbox, worldcoords=True):
     """Finds the pixels that are closest to the coordinate bbox
     and just does a normal image crop, meaning no resampling/changing of data.
+    The cropping bbox can also be set in pixel units if setting worldcoords to False. 
     """
     x1,y1,x2,y2 = bbox
     xscale,xskew,xoffset, yskew,yscale,yoffset = raster.meta["affine"]
@@ -702,10 +749,14 @@ def crop(raster, bbox, worldcoords=True):
 
 def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
     """
-    Yields raster as a series of subtile rasters. 
+    Iterates through raster as a series of subtile rasters.
+    Tiles are determined either by tilesize or tiles args.
     Bbox is optional and will check so only yields tiles relevant to
     the given bbox. However, tiles will not be cropped, so may extend
-    outside area of interest. 
+    outside area of interest.
+
+    By default tilesize and bbox are given as pixel cell units, but can be
+    specified using coordinate system units by setting worldcoords to False. 
     """
     # TODO: not sure if tiles should be cropped to the bbox or just
     # used as selection criteria...
@@ -766,8 +817,10 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
 
 def clip(raster, clipdata, bbox=None, bandnum=0):
     """Clips a raster by the areas containing data in a vector or raster data instance.
-    If clipdata is a raster instance, the valid area is determined from the specified
-    bandnum arg (default is 0). 
+    If clipdata is a vector instance, the vector is first rasterized. 
+    If clipdata is a raster instance, the valid area is determined from the non-nodata cells
+    of the specified bandnum arg (default is 0).
+    The clipping can be further limited to the bbox arg. 
     """
 
     from ..vector.data import VectorData

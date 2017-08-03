@@ -1,3 +1,6 @@
+"""
+Module containing the data structures and interfaces for operating with raster datasets.
+"""
 
 # import builtins
 import sys, os, itertools, operator
@@ -15,7 +18,6 @@ import PIL.Image, PIL.ImageMath, PIL.ImageStat
 # ie a strategy of convenience behind-the-scene handling or give direct raw handling of values and masks... 
 # compute should only affect valid values, not nullvalues. 
 # ...
-
 
 class _ModuleFuncsAsClassMethods(object):
     "Helps access this module's functions as rasterdata class methods by automatically inserting self as the first arg"
@@ -37,10 +39,34 @@ class _ModuleFuncsAsClassMethods(object):
 
 ##########
 
-
-
 class Cell(object):
+    """
+    Cell class representing a particular pixel/cell in a raster band instance. 
+    """
     def __init__(self, band, col, row):
+        """
+        Cell is instantiated by referencing the paremt raster band to which it belongs, and the cell's
+        column and row location within that grid.
+        Usually created by the parent raster band class, the user should not have to create this. 
+        
+        Args:
+            band: Parent band instance.
+            col: Column number location of the cell (zero-indexed).
+            row: Row number location of the cell (zero-indexed).
+
+        Attributes:
+            band: Parent band instance.
+            col: Column number location of the cell (zero-indexed).
+            row: Row number location of the cell (zero-indexed).
+            x: X coordinate of the cell's midpoint.
+            y: Y coordinate of the cell's midpoint.
+            bbox: Bounding box of the cell in the form [leftx,uppery,rightx,lowery]
+            point: GeoJSON representation of the cell's midpoint.
+            polygon: GeoJSON representation of the cell as a rectangular polygon.
+            value: The cell's value. Setting this value saves the change to the parent raster band.
+            neighbours: Returns all 8 neighbours as a list of cell instances. 
+        """
+        
         self.band = band
         self.col, self.row = col, row
         self._x = None
@@ -113,7 +139,15 @@ class Cell(object):
 
 class Band(object):
     def __init__(self, img=None, mode=None, width=None, height=None, nodataval=-9999):
-        """Only used internally, use instead RasterData's .add_band()"""
+        """...
+        Methods:
+            get
+            set
+            compute
+            recode
+            conditional
+            summarystats
+        """
 
         if not img:
             if all((mode,width,height)):
