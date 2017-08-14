@@ -743,7 +743,10 @@ class VectorLayer:
                     if isinstance(val.get("key"), basestring):
                         fieldname = val["key"]
                         val["key"] = lambda f,fn=fieldname: f[fn] # turn field name into callable
-                    val["classvalues"] = val.pop("symbolvalues")
+                    if "color" in key:
+                        val["classvalues"] = val.pop("colors")
+                    else:
+                        val["classvalues"] = val.pop("sizes")
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
                     if "color" in key and notclassified != None:
                         notclassified = rgb(notclassified)
@@ -794,7 +797,10 @@ class VectorLayer:
                     if isinstance(val.get("key"), basestring):
                         fieldname = val["key"]
                         val["key"] = lambda f,fn=fieldname: f[fn] # turn field name into callable
-                    val["classvalues"] = val.pop("symbolvalues")
+                    if "color" in key:
+                        val["classvalues"] = val.pop("colors")
+                    else:
+                        val["classvalues"] = val.pop("sizes")
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
 
                     # cache precalculated values in id dict
