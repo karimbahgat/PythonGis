@@ -1,8 +1,8 @@
 raster
 	manager
+	analyzer
 -----------
 	data
-	analyzer
 	loader
 	saver
 	init

@@ -138,15 +138,65 @@ class Cell(object):
         
 
 class Band(object):
+    """
+    Band class representing a raster band or grid containing values,
+    either standalone or as part of a raster instance.
+    """
     def __init__(self, img=None, mode=None, width=None, height=None, nodataval=-9999):
-        """...
-        Methods:
-            get
-            set
-            compute
-            recode
-            conditional
-            summarystats
+        """Initiate empty band (filled with "nodataval", defaults to -9999) by setting
+        data type "mode", "width", and "height".
+        
+        Alternatively, load existing data structure from a PIL image given in "img".
+
+        Band instances supports all of Python's math operators, so that "band1 + band2" returns
+        a new band instance where the corresponding cell values have been added together.
+        This requires that all band instances are of the same dimensions.
+        Using constant numbers in the expression is interpreted as a band where
+        all cells have that value. For example, "band1 + 3" adds 3 to all cells in band1. 
+        Comparison operations like == or > are also supported and will return 1bit bands.
+        Logical operators are also supported. Especially useful is the & operator which returns
+        a binary band where cells from both bands are valid (intersection), the | operator which returns a binary
+        band where cell's from any of the two bands are valid (union), and the ^ operator which
+        returns a binary band where each band is different from the other band (symmetrical difference).
+
+        TODO: Add tests to make sure the math and logical operators work correctly.
+
+        Iterating over the band loops over each individual cell instance of the band, in order to
+        manipulate the band data on a cell-by-cell level. 
+
+        Args:
+            img: Existing PIL image instance to load data from. 
+            mode: Sets the data type. Only required when creating empty band.
+                - float32
+                - float16
+                - int32
+                - int16
+                - int8
+                - 1bit
+            width/height: The width/height of the band data. Only required when creating empty band.
+            nodataval: The value to be interpreted as nodata, defaults to -9999. 
+
+        Attributes:
+            nodataval: The data value that represents nodata/missing data. This attribute can be changed
+                manually, which will update the mask. 
+            width/height: References the width/height of the band. 
+            mode: References the data type of the band. 
+            mask: Returns the nodata mask of the band, in the form of a binary PIL image with 255
+                for the pixels that are considered nodata.
+
+                The user can also set the mask attribute by supplying another band's mask (or any binary PIL image),
+                which overwrites pixel values in the masked areas with nodataval. 
+                
+                NOTE: This mask is dynamically calculated from the location of nodata values.
+                Repeated references use a cached version of the mask ("_cached_mask"). 
+                The class is designed so that any changes to the band's values or nodataval
+                also clears the cached mask so the correct mask can be calculated on next call.
+
+                TODO: Add tests to make sure this is implemented systematically. 
+            img: Reference to the underlaying data storage, which is stored in a PIL image.
+                Should not be used by the user, mostly used internally.
+            _rast: On rare occasions, this hidden attribute might be useful to get a reference to
+                the raster instance that owns this band. Returns None if standalone band. 
         """
 
         if not img:
@@ -319,9 +369,11 @@ class Band(object):
             self._rast._cached_mask = None
 
     def get(self, col, row):
+        """Returns the cell instance located in the specified column and row numbers."""
         return Cell(self, col, row)
 
     def set(self, col, row, value):
+        """Sets the value of the cell located in the specified column and row numbers."""
         if not self._pixelaccess:
             self._pixelaccess = self.img.load()
         self._pixelaccess[col,row] = value
@@ -360,7 +412,18 @@ class Band(object):
             self._rast._cached_mask = None
 
     def compute(self, expr, condition=None):
-        """Apply the given expression to recompute all values"""
+        """Apply the given expression to recompute all cell values, or limited to a subset
+        of cells that meet a particular condition. This method changes the band data in place.
+        Nodata values will remain unchanged. 
+
+        Args:
+            expr: A string expression using Python math syntax, using the keyword "val" to
+                reference the value of each cell. For instance, "val * 3" changes the band
+                so that all cell values are timed by 3.
+            condition (optional): If given, the expression will only be computed for those cells
+                that meet the given criteria. This can be either a preexisting binary band, or
+                a conditional string expression for calculating such a binary band. 
+        """
         # get the mask before changing values
         mask = None
         if self.nodataval != None:
@@ -377,6 +440,8 @@ class Band(object):
         # use the original nodatamask to set null values again
         if mask:
             self.img.paste(self.nodataval, (0,0), mask)
+
+        return self
 
     def _compute(self, expr, condition=None):
         """Internal only"""
@@ -427,15 +492,38 @@ class Band(object):
                         self._pixelaccess[x,y] = forcetype(forcerange(newval))
 
     def recode(self, condition, newval):
-        """Change to a new value for those pixels that meet a condition"""
+        """Change to a new value for those pixels that meet a condition.
+
+        Similar to compute, but specifically for recoding only a subset of cell values or
+        when you wish to "burn" or "stamp" some of the cell values from another band.
+        This method changes the band data in place.
+
+        TODO: Does this change nodata values? 
+
+        Args:
+            condition: A string expression for specifying which cell values will be recoded.
+            newval: The new value that will be set where the condition is true.
+                Either a single numeric value (int or float, no expression),
+                or a band instance of the same dimensions and mode whose values will be copied
+                into the current band where the condition is true. 
+        """
         if isinstance(condition, basestring):
             condition = self._conditional(condition)
         if isinstance(newval, Band):
             newval = newval.img
         self.img.paste(newval, (0,0), condition)
 
+        return self
+
     def conditional(self, condition):
-        """Return a binary band showing where a condition is true"""
+        """Return a binary band showing where a condition is true.
+
+        TODO: Does this, and should it, evaluate to True for nodata values? 
+
+        Args:
+            condition: A string expression whose evaluation will determine which cell
+                values in the returned binary band will be set to true. 
+        """
         
         result = self._conditional(condition)
 
@@ -478,6 +566,21 @@ class Band(object):
         return result
 
     def summarystats(self, *stattypes):
+        """Calculates and returns a dictionary of statistics of all values in the
+        band. 
+
+        Args:
+            *stattypes (optional): If given, only calculates the requested statistics,
+                otherwise calculates all statistics.
+                    - count
+                    - sum
+                    - mean
+                    - min
+                    - max
+                    - median
+                    - majority
+                    - minority
+        """
         # get all stattypes unless specified
 
         statsdict = dict()
@@ -600,17 +703,38 @@ class Band(object):
         return statsdict
 
     def clear(self):
-        # not fully tested yet...
+        """Resets all the cell values of the band, setting them to the specified nodataval,
+        otherwise setting them to a value of 0.
+
+        TODO: Not fully tested yet. Is 0 a correct value for bands without nodataval? 
+        """
         na = self.nodataval
         if na is None: na = 0
         self.img.paste(na)
 
+        return self
+
     def convert(self, mode):
+        """Converts the band and its values to a new data type.
+        Changes the band in place. 
+
+        Args:
+            mode: The data type mode to be converted to.
+                - float32
+                - float16
+                - int32
+                - int16
+                - int8
+                - 1bit
+        """
         pilmode = rastmode_to_pilmode(mode)
         self.img = self.img.convert(pilmode)
         self._pixelaccess = None
 
+        return self
+
     def copy(self):
+        """Copies the band and its data to a new identical band."""
         img = self.img.copy()
         band = Band(img=img, nodataval=self.nodataval)
         if self._cached_mask:
@@ -640,6 +764,15 @@ class Band(object):
 ##        app.mainloop()
 
     def histogram(self, width=None, height=None, bins=10):
+        """Calculates the histogram of the band's data values and draws it on
+        a PyAgg canvas which the user can use to view, modify, or save.
+
+        TODO: Is returning it as a PyAgg canvas the best option?
+
+        Args:
+            width/height: Desired width/height of the histogram canvas drawing. 
+            bins: Number of bins in the histogram. 
+        """
         import pyagg
         stats = self.summarystats("min","max")
         binsize = (stats["max"] - stats["min"]) / float(bins)
@@ -660,6 +793,22 @@ class Band(object):
         return c.draw() # draw returns the canvas
 
     def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        """Shortcut for easily rendering and returning the band data on a Map instance.
+
+        Note: If the band belongs to a raster instance, the band data will be rendered in the coordinate
+        system defined in the raster. Otherwise, the coordinate system will be set to match the pixel
+        coordinates.
+
+        TODO: Check that works correctly. Have experienced that adding additional layers on top
+        of this results in mismatch and layers jumping around. 
+
+        Args:
+            width/height: Desired width/height of the rendered map.
+            bbox (optional): If given, only renders the given bbox, specified as (xmin,ymin,xmax,ymax).
+            title (optional): Title text to print on the map.
+            background (optional): Background color, defaults to transparent.
+            **styleoptions (optional): How to style the band values, as documented in "renderer.RasterLayer".
+        """
         # WARNING: CANNOT USE TO GET A MAP AND THEN ADDING OTHER LAYERS,
         # GETS ALL MISMATCHED AND JUMPS AROUND
         from .. import renderer
@@ -684,6 +833,10 @@ class Band(object):
         return mapp
 
     def view(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        """Renders and opens a Tkinter window for viewing and interacting with the map.
+
+        Args are same as for "render()".
+        """
         from .. import app
         mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
         # make gui
@@ -691,11 +844,18 @@ class Band(object):
         win.mainloop()
 
     def save(self, filepath):
+        """Saves the raw band data to an image file, devoid of any geographic metadata.
+        Image format extension can be any of those supported by PIL. 
+        """
         self.img.save(filepath)
 
 
 
 def Name_generator():
+    """Used internally for ensuring default data names are unique for each Python session.
+
+    TODO: Maybe make private. 
+    """
     i = 1
     while True:
         yield "Untitled%s" % i
@@ -707,10 +867,16 @@ NAMEGEN = Name_generator()
 
 
 class RasterData(object):
+    """The main raster data class."""
     def __init__(self, filepath=None, data=None, name=None,
                  image=None,
                  mode=None, tilesize=None, tiles=None,
                  **kwargs):
+        """To initiate, ...
+
+        Args:
+            fdsfsdf
+        """
         self.filepath = filepath
         self.name = name or filepath
         if not self.name:

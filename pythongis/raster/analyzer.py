@@ -1,3 +1,6 @@
+"""
+Module containing analysis functions for raster datasets. 
+"""
 
 import itertools, operator
 from .data import *
@@ -11,12 +14,15 @@ import math
 
 def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="mean", nodataval=-999):
     """
-    For each unique zone in "zonaldata", summarizes "valuedata" cells that overlap "zonaldata".
-    Which band to use must be specified for each.
+    Summarizes values of a raster dataset in groups or regions defined by a zonal dataset, which
+    can be either vector data or a categorical raster. 
+    For each unique zone in "zonaldata" (each feature in the case of vector data), summarizes "valuedata"
+    cells that overlaps that zone.
+    Which band to use must be specified for each with "zonalband" and "valueband".
 
-    The "outstat" statistics option can be one of: mean, median, max, min, stdev, var, count, or sum
+    The "outstat" statistics option can be one of: mean (default), median, max, min, stdev, var, count, or sum
 
-    For now, both must have same crs, no auto conversion done under the hood.
+    NOTE: For now, both must have same crs, no auto conversion done under the hood.
     """
 
     # handle zonaldata being vector type
@@ -77,7 +83,17 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
 
 # Raster math
 
-def algebra(mathexpr, rasters):
+def math(mathexpr, rasters):
+    """Performs math operations on one or more raster datasets.
+    The math is given in "mathexpr" as a string expression, where each input raster is
+    referred to as "rast1", "rast2", etc, according to their order in the input raster list.
+    Supports all of Python's math expressions. Logical operations like == or > are also supported
+    and will return binary rasters.
+
+    TODO: For now just uses band 0 for each raster, should add support for specifying bands. 
+    
+    Alias: Raster algebra.
+    """
     print rasters
     
     # align all to same affine
@@ -122,7 +138,24 @@ def algebra(mathexpr, rasters):
 # Interpolation
 
 def interpolate(pointdata, rasterdef, valuefield=None, algorithm="idw", **kwargs):
-    """Exact interpolation between point data values. Original values are kept intact"""
+    """Exact interpolation between point data values. Original values are kept intact.
+    The raster extent and cell size on which to interpolate must be defined in "rasterdef".
+
+    First all points are burnt onto the output raster. By default, each point counts as a value of 1,
+    but "valuefield" can also be set to a field name that determies the relative weight of each
+    point feature. 
+
+    When multiple points land in the same output cell, the point values are aggregated according
+    to "aggval" (defaults to mean) to determine the cell's final value.
+
+    When the points are converted to cell values, the remaining cells without any point features are
+    interpolated.
+
+    NOTE: The algorithm for interpolating is set with "algorithm", but currently only allows "idw" or
+    inverse distance weighting. 
+
+    TODO: Add spline, kdtree, and kriging methods. 
+    """
 
     # some links
     #http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.interpolate.RegularGridInterpolator.html
@@ -227,7 +260,27 @@ def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
     """
     Bins and aggregates point data values, followed by simple value smearing to produce a smooth surface raster.
     Different from interpolation in that the new values do not exactly pass through the original values.
-    Aka heatmap in the proper sense. 
+
+    The raster extent and cell size on which to smooth must be defined in "rasterdef".
+
+    Smoothing works by considering a region around each pixel, specified by "algorithm".
+    Supported binning regions include:
+        - "radial" (default): a circle of size "radius";
+        - "gauss": a Gaussian statistical function applied to the distance-weighted average of pixels
+            within "radius" distance of the output pixel.
+
+    The points considered to be part of that region
+    are then summarized with a statistic as determined by "aggfunc" (defaults to sum) and used as the pixel
+    value. For the Gaussian method, this is the function used to aggregate points to pixels before
+    blurring. 
+    
+    By default, each point counts as a value of 1,
+    but "valuefield" can also be set to a field name that determies the relative weight of each
+    point feature.
+
+    TODO: Add more methods such as box convolving. 
+
+    Alias: convolve, blur, heatmap (but incorrect usage). 
     """
 
     if not pointdata.type == "Point":
@@ -369,7 +422,14 @@ def density(pointdata, rasterdef, algorithm="radial", **kwargs):
 # Distance Analysis
 
 def distance(data, **rasterdef):
-    """Calculates raster of distances to nearest feature in data"""
+    """Calculates raster of distances to nearest feature in vector data.
+    Output raster extent and cell size must be set with keyword arguments.
+
+    Uses fast approach that rasterizes the edge of the vector data and only compares
+    distances to each edge pixel, significantly reducing time for complex geometries. 
+
+    TODO: Distances are measured using eucledian distance, should also allow option for geodetic. 
+    """
     # TODO: allow max dist limit
     if isinstance(data, RasterData):
         raise NotImplementedError("Distance tool requires vector data")
@@ -492,11 +552,14 @@ def distance(data, **rasterdef):
 # Morphology
 
 def morphology(raster, selection, pattern, bandnum=0):
-    """
-    General purpose morphology pattern operations, returning binary raster.
-    Selection is the conditional expression to be interpreted as on-values. 
-    Valid patterns include "edge", "dilation", "erosion", and
-    manual input as expected by PIL.ImageMorph.
+    """General purpose morphology pattern operations, returning binary raster.
+
+    First, "selection" is a conditional expression converting the raster to binary,
+    defining which vales to interpret as on-values.
+    
+    Then, an algorithm analyzes the on-values and looks for the pattern set in "pattern",
+    which includes "edge", "dilation", "erosion", or a manual input input string as
+    expected by PIL.ImageMorph.
     """
     premask = raster.mask
     cond = raster.bands[bandnum].conditional(selection)
