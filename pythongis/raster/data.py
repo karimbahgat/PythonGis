@@ -868,14 +868,96 @@ NAMEGEN = Name_generator()
 
 class RasterData(object):
     """The main raster data class."""
-    def __init__(self, filepath=None, data=None, name=None,
+    def __init__(self, filepath=None, name=None,
+                 data=None,
                  image=None,
                  mode=None, tilesize=None, tiles=None,
                  **kwargs):
-        """To initiate, ...
+        """To load from a file simply supply the filepath, and all metadata such as crs and
+        affine transform is loaded directly from the file.
+
+        To load from data (list of lists representing a grid), or from an in-memory PIL image,
+        you must additionally define the geotransform. 
+
+        To create a new empty raster, supply the data type mode, and define the geotransform.
+
+        Defining the geotransform can be done in several ways:
+            1. Set the width/height arguments, and supply an "affine" transform that converts pixel
+                coordinates to geographic coordinates, a list of [xscale,xskew,xoffset, yskew,yscale,yoffset].
+            2. Set the width/height arguments, and supply each item of the affine transform directly as
+                keywords. Only the xscale, yscale, xoffset, and yoffset are required.
+                
+                The keywords xscale and yscale can also be written as "cellwidth" and "cellheight".
+
+                The keywords xoffset and yoffset can be omitted by instead specifying xy_cell (any cell
+                coordinate) along with xy_geo (its equivalent geographic coordinate). This will calculate
+                the offsets for you. 
+            3. Set the width/height arguments, and define the bbox of the raster. This will calculate the
+                remaining affine coefficients for you.
+            4. Set the cellwidth/xscale and cellheight/yscale, and define the bbox of the raster. This will
+                calculate the necessary width/height to fit inside the bbox.
+
+        TODO: Thoroughly test that all of these combinations will create the geotransform without error.
+
+        TODO: Also figure out if the affine points to the middle of each cell or the upperleft. 
+
+        The raster has a length equal to the number of bands it contains, and iterating over the raster
+        loops through each of the bands.
 
         Args:
-            fdsfsdf
+            filepath: Filepath of a raster file to load data from.
+            name: Specifies the name of the data, otherwise set to "Untitled". 
+            data: List of lists representing the rows of the grid from top to bottom.
+            image: Existing PIL image instance to load data from.
+            mode: Sets the data type. Only required when creating empty band.
+                - float32
+                - float16
+                - int32
+                - int16
+                - int8
+                - 1bit
+            **kwargs: Define the geotransform:
+                - width/height: The width/height of the raster data. Only required when creating empty raster.
+                    Not required if both bbox and affine transform are given, which will calculate the
+                    necessary width/height to contain such a coordinate system. 
+                - affine
+                - xscale
+                - xskew
+                - xoffset
+                - yscale
+                - yskew
+                - yoffset
+                - cellwidth
+                - cellheight
+                - xy_geo
+                - xy_cell
+
+        Attributes:
+            filepath: Filepath from which the raster was loaded, otherwise None. 
+            name: Name of the raster. 
+            width/height: Width/height of this raster. 
+            mode: Data type mode of this raster. 
+            bands: List of band instances belonging to this raster. 
+            crs: Coordinate reference system. Not currently used.
+            meta: A dictionary of the raster's metadata.
+            rasterdef: A dictionary that defines the raster, its width/height and affine transform.
+                TODO: Consider changing the name of rasterdef to geotransform, and returning more than just affine. 
+            bbox: Bounding box extents of the raster in the form [xleft,ytop, xright,ybottom].
+                TODO: Also figure out how bbox should be specified and stored internally (as the centerpoint of the cells,
+                or offsetting by half a pixel to get the corners).
+            mask: Returns a nodata mask that represents the shared area of all the band masks, the cells with nodata
+                value in all the bands. The mask is a binary PIL image with 255 for the pixels that are considered nodata. 
+
+                The user can also set the mask attribute by supplying another band's mask (or any binary PIL image).
+                Setting the raster mask will only serve as a temporary mask but will not change any of the band values. 
+                
+                NOTE: This mask is dynamically calculated from the location of nodata values.
+                Repeated references use a cached version of the mask ("_cached_mask"). 
+                The class is designed so that any changes to the band's values or nodataval
+                also clears the cached mask so the correct mask can be calculated on next call.
+            manager: Accesses the manager subclass and all of its functions, supplying itself as the first argument.
+            analyzer: Accesses the analyzer subclass and all of its functions, supplying itself as the first argument. 
+            
         """
         self.filepath = filepath
         self.name = name or filepath
@@ -959,16 +1041,11 @@ class RasterData(object):
                                                                                          bbox=self.bbox)
 
     @property
-    def nodatavals(self):
-        return [band.nodataval for band in self.bands]
-
-    @property
     def meta(self):
         metadict = dict(bands=len(self),
                         mode=self.mode,
                         width=self.width,
                         height=self.height,
-                        nodatavals=self.nodatavals,
                         affine=self.affine,
                         bbox=self.bbox)
         return metadict
@@ -988,6 +1065,8 @@ class RasterData(object):
         return [xleft_coord,ytop_coord,xright_coord,ybottom_coord]
 
     def copy(self, shallow=False):
+        """Returns a copy of the raster data along with copies of all of its band data,
+        unless shallow is set to True."""
         new = RasterData(**self.meta)
         if shallow:
             new.bands = []
@@ -998,6 +1077,7 @@ class RasterData(object):
         return new
 
     def get(self, x, y, band):
+        """Given a geographic xy coordinate, return the cell belonging to the given band index."""
         if not isinstance(band, Band):
             band = self.bands[band]
 
@@ -1005,6 +1085,7 @@ class RasterData(object):
         return band.get(col,row)
 
     def set(self, x, y, value, band):
+        """Given a geographic xy coordinate, set the cell value belonging to the given band index."""
         if not isinstance(band, Band):
             band = self.bands[band]
 
@@ -1012,8 +1093,9 @@ class RasterData(object):
         band.set(col,row,value)
 
     def add_band(self, band=None, **kwargs):
-        """
-        band is an existing Band() class, or use kwargs as init args for Band() class
+        """Adds a band to the raster, and associates it with the raster.
+        Either supply an existing Band class, or use kwargs as init args to be used to
+        construct a new Band class. 
         """
         if band:
             pass
@@ -1039,6 +1121,12 @@ class RasterData(object):
         return band
 
     def set_geotransform(self, **georef):
+        """Updates the geotransform of the raster.
+
+        Set it by supplying any of the affine coefficients as expected when creating a new Raster class.
+        Any changes to the geotransform must be set with this method, since it will calculate the affine
+        and the inverse affine coefficients behind the scenes. 
+        """
         
         # get coefficients needed to convert from raster to geographic space
         if "affine" in georef:
@@ -1072,6 +1160,7 @@ class RasterData(object):
                             a raster should not collapse upon itself")
 
     def cell_to_geo(self, column, row):
+        """Returns the geographic coordinate for the given column-row."""
         [xscale, xskew, xoffset, yskew, yscale, yoffset] = self.affine
         x, y = column, row
         x_coord = x*xscale + y*xskew + xoffset
@@ -1079,6 +1168,7 @@ class RasterData(object):
         return x_coord, y_coord
 
     def geo_to_cell(self, x, y, fraction=False):
+        """Returns the column-row for the given geographic coordinate."""
         [xscale, xskew, xoffset, yskew, yscale, yoffset] = self.inv_affine
         column = x*xscale + y*xskew + xoffset
         row = x*yskew + y*yscale + yoffset
@@ -1109,18 +1199,20 @@ class RasterData(object):
         self._cached_mask = value
 
     def convert(self, mode):
+        """Converts all the bands to a new data type mode."""
         for band in self:
             band.convert(mode)
         self.mode = mode
 
     def save(self, filepath):
+        """Saves the raster data as a geographic file."""
         saver.to_file(self.bands, self.meta, filepath)
 
 
     ### ACCESS TO ADVANCED METHODS FROM INTERNAL MODULES ###
 
     def resample(self, **kwargs):
-        # TODO: drop, switch this everywhere to .manage.resample()
+        """TODO: drop, switch this everywhere to .manage.resample()."""
         from . import manager
         kwargs["raster"] = self
         return manager.resample(**kwargs)
@@ -1140,6 +1232,18 @@ class RasterData(object):
     # Rendering
 
     def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        """Shortcut for easily rendering and returning the raster data on a Map instance.
+
+        TODO: Check that works correctly. Have experienced that adding additional layers on top
+        of this results in mismatch and layers jumping around. 
+
+        Args:
+            width/height: Desired width/height of the rendered map.
+            bbox (optional): If given, only renders the given bbox, specified as (xmin,ymin,xmax,ymax).
+            title (optional): Title text to print on the map.
+            background (optional): Background color, defaults to transparent.
+            **styleoptions (optional): How to style the raster values, as documented in "renderer.RasterLayer".
+        """
         from .. import renderer
         mapp = renderer.Map(width, height, title=title, background=background)
         mapp.add_layer(self, **styleoptions)
@@ -1151,6 +1255,10 @@ class RasterData(object):
         return mapp
 
     def view(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        """Renders and opens a Tkinter window for viewing and interacting with the map.
+
+        Args are same as for "render()".
+        """
         from .. import app
         mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
         # make gui
