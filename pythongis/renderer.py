@@ -732,11 +732,11 @@ class VectorLayer:
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
                 if isinstance(val, dict):
                     # random colors if not specified
-                    if "symbolvalues" not in val:
+                    if "color" in key and "colors" not in val:
                         if val["breaks"] == "unique":
-                            val["symbolvalues"] = [rgb("random") for _ in range(20)]
+                            val["colors"] = [rgb("random") for _ in range(20)]
                         else:
-                            val["symbolvalues"] = [rgb("random"),rgb("random")]
+                            val["colors"] = [rgb("random"),rgb("random")]
 
                     # remove args that are not part of classypie
                     val = dict(val)
@@ -788,9 +788,11 @@ class VectorLayer:
             for key,val in self.styleoptions["textoptions"].copy().items():
                 if isinstance(val, dict):
                     # random colors if not specified in unique algo
-                    if val["breaks"] == "unique" and "symbolvalues" not in val:
-                        val["symbolvalues"] = [rgb("random")
-                                                 for _ in range(20)]
+                    if "color" in key and "colors" not in val:
+                        if val["breaks"] == "unique":
+                            val["colors"] = [rgb("random") for _ in range(20)]
+                        else:
+                            val["colors"] = [rgb("random"),rgb("random")]
 
                     # remove args that are not part of classypie
                     val = dict(val)
@@ -922,6 +924,9 @@ class VectorLayer:
                         geoms = feat.geometry["coordinates"]
                     else:
                         geoms = [feat.geometry["coordinates"]]
+
+                    fill = tuple((int(c) for c in rendict["fillcolor"])) if rendict["fillcolor"] else None
+                    outline = tuple((int(c) for c in rendict["outlinecolor"])) if rendict["outlinecolor"] else None
                     
                     for poly in geoms:
                         coords = poly[0]
@@ -937,8 +942,8 @@ class VectorLayer:
                         path.compact(1)
                         #print "draw",str(path.tolist())[:100]
                         if len(path) > 1:
-                            PIL_drawer.polygon(path, rendict["fillcolor"], None)
-                            PIL_drawer.line(path, "white", 1)
+                            PIL_drawer.polygon(path, fill, None)
+                            PIL_drawer.line(path, outline, 1)
 
                         # then holes
                         for hole in holes:
@@ -947,7 +952,7 @@ class VectorLayer:
                             path.compact(1)
                             if len(path) > 1:
                                 PIL_drawer.polygon(path, (0,0,0,0), None)
-                                PIL_drawer.line(path, "white", 1)
+                                PIL_drawer.line(path, outline, 1)
 
                 else:
                     # high qual geojson
