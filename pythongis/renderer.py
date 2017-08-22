@@ -1015,7 +1015,11 @@ class VectorLayer:
                     # draw
                     # either bbox or xy can be set for positioning
                     if "bbox" not in rendict:
-                        # default to xy being centroid, but also allow other options or custom key
+                        # also allow custom key for any of the options
+                        for k,v in rendict.items():
+                            if hasattr(v, "__call__"):
+                                rendict[k] = v(feat)
+                        # default to xy being centroid
                         rendict["xy"] = rendict.get("xy", "centroid")
                         if rendict["xy"] == "centroid":
                             rendict["xy"] = feat.get_shapely().centroid.coords[0]
