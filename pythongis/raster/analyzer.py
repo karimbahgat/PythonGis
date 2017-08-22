@@ -5,6 +5,7 @@ Module containing analysis functions for raster datasets.
 import itertools, operator
 from .data import *
 from . import manager
+from .. import vector
 
 import PIL.Image, PIL.ImageMath, PIL.ImageStat, PIL.ImageMorph
 import math
@@ -90,7 +91,9 @@ def math(mathexpr, rasters):
     Supports all of Python's math expressions. Logical operations like == or > are also supported
     and will return binary rasters.
 
-    TODO: For now just uses band 0 for each raster, should add support for specifying bands. 
+    TODO: For now just uses band 0 for each raster, should add support for specifying bands.
+
+    TODO: Check that all math works correctly, such as divide and floats vs ints. 
     
     Alias: Raster algebra.
     """
@@ -414,6 +417,48 @@ def density(pointdata, rasterdef, algorithm="radial", **kwargs):
     
     return smooth(pointdata, rasterdef, valuefield=None, algorithm=algorithm, **kwargs)
 
+def disperse(vectordata, valuekey, weight=None, **rasterdef):
+    """Disperses values in a vector dataset based on a raster dataset containing weights.
+    If the raster weight is not given, then a raster geotransform must be given and the
+    value is divided into equal portions for all the cells.
+
+    After each feature disperses its values into cells, the sum of those cells should always equal
+    the original feature value. However, in the case of features that overlap each other, cells will
+    added on top of each other, and there will be no way of reconstructing how much of a cell's value
+    belonged to one feature or the other. 
+
+    Returns a raster dataset of the dispersed values.    
+    """
+    if weight:
+        outrast = RasterData(mode="float32", **weight.rasterdef)
+    else:
+        outrast = RasterData(mode="float32", **rasterdef)
+    outband = outrast.add_band()
+    outband.nodataval = None
+        
+    for feat in vectordata:
+        if not feat.geometry:
+            continue
+        featdata = vector.data.VectorData(features=[feat])
+        if weight:
+            featweight = manager.clip(weight, featdata)
+        else:
+            featweight = manager.rasterize(featdata, **outrast.rasterdef)
+        # TODO: Does clip and rasterize write nodataval to nonvalid areas? Is this correct?
+        #       Unless nodataval is reset, those then prevent correct math operations somehow... 
+        featweight.bands[0].nodataval = None
+        weightsum = featweight.bands[0].summarystats("sum")["sum"]
+        if weightsum is None:
+            continue
+        weightprop = featweight.bands[0] / float(weightsum) / 255.0 # / 255 is a hack, have to decide if binary rasters should be 1 or 255.
+        total = valuekey(feat)
+        weightvalue = weightprop * total
+        weightvalue.nodataval = None 
+        outband = outband + weightvalue
+
+    outrast.bands[0] = outband
+    return outrast
+        
 
 
 

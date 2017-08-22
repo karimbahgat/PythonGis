@@ -161,6 +161,8 @@ class Band(object):
 
         TODO: Add tests to make sure the math and logical operators work correctly.
 
+        TODO: Fix so that right math operators work with numbers, now it just tries to call ._operator in reverse.
+
         Iterating over the band loops over each individual cell instance of the band, in order to
         manipulate the band data on a cell-by-cell level. 
 

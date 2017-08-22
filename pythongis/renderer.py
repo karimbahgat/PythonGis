@@ -925,8 +925,8 @@ class VectorLayer:
                     else:
                         geoms = [feat.geometry["coordinates"]]
 
-                    fill = tuple((int(c) for c in rendict["fillcolor"])) if rendict["fillcolor"] else None
-                    outline = tuple((int(c) for c in rendict["outlinecolor"])) if rendict["outlinecolor"] else None
+                    fill = tuple((int(c) for c in rendict["fillcolor"])) if rendict.get("fillcolor") else None
+                    outline = tuple((int(c) for c in rendict["outlinecolor"])) if rendict.get("outlinecolor") else None
                     
                     for poly in geoms:
                         coords = poly[0]
