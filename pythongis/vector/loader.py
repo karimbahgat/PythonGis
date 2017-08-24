@@ -85,15 +85,17 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
         # txt or csv
         if filetype in ("Text-Delimited","CSV"):
             delimiter = kwargs.get("delimiter")
-            fileobj = open(filepath, "rU")
-            if delimiter is None:
-                # auto detect delimiter
-                # NOTE: only based on first 10 mb, otherwise gets really slow for large files
-                dialect = csv.Sniffer().sniff(fileobj.read(1056*10)) 
-                fileobj.seek(0)
-                rows = csv.reader(fileobj, dialect)
-            else:
-                rows = csv.reader(fileobj, delimiter=delimiter)
+            fileobj = open(filepath, "rb")
+            # auto detect delimiter
+            # NOTE: only based on first 10 mb, otherwise gets really slow for large files
+            # TODO: run sniffer regardless, and allow sending all kwargs to overwrite
+            dialect = csv.Sniffer().sniff(fileobj.read(1056*10)) 
+            fileobj.seek(0)
+            # overwrite with user input
+            for k,v in kwargs.items():
+                setattr(dialect, k, v)
+            # load and parse
+            rows = csv.reader(fileobj, dialect)
             def parsestring(string):
                 try:
                     val = float(string.replace(",","."))

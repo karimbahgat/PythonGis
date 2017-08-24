@@ -15,7 +15,8 @@ from .raster.loader import detect_filetype as raster_filetype
 
 
 # TODO:
-# all copys need to be systematically checked, not fully correct right now
+# - all copys need to be systematically checked, not fully correct right now
+# - unspecified outlinewidth in layer styleoptions becomes weird in legend, but ok if specified. 
 
 DEFAULTSTYLE = "pastelle"
 
