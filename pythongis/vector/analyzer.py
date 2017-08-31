@@ -33,7 +33,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegr
 
     # add fields
     out.fields = list(groupbydata.fields)
-    out.fields.extend([name for name,valfunc,aggfunc in fieldmapping])
+    out.fields.extend([name for name,valfunc,aggfunc in fieldmapping if name not in out.fields])
 
     # loop
     if not hasattr(groupbydata, "spindex"): groupbydata.create_spatial_index()

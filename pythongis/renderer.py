@@ -170,13 +170,13 @@ class Layout:
 ##        #print self.foreground,self.foreground._layers
 ##        self.foreground.add_layer(decor)
 
-    def render_all(self, columns=None, rows=None, **kwargs):
+    def render_all(self, columns=None, rows=None, antialias=False, **kwargs):
         # render and draworder in one
         self.drawer.clear()
 
         if len(self.maps) == 1:
             mapobj = self.maps[0]
-            mapobj.render_all()
+            mapobj.render_all(antialias=antialias)
             pasteoptions = mapobj.pasteoptions or dict(bbox=[5,5,95,95]) #dict(xy=("0%w","0%h")) #,"100%w","100%h"))
             self.drawer.paste(mapobj.img, **pasteoptions)
 
@@ -185,14 +185,14 @@ class Layout:
             def mapimgs():
                 for mapobj in self.maps:
                     if not mapobj.pasteoptions:
-                        mapobj.render_all()
+                        mapobj.render_all(antialias=antialias)
                         yield mapobj.img
             self.drawer.grid_paste(mapimgs(), columns=columns, rows=rows, **kwargs)
             
             # any remaining maps are pasted based on pasteoptions
             for mapobj in self.maps:
                 if mapobj.pasteoptions:
-                    mapobj.render_all()
+                    mapobj.render_all(antialias=antialias)
                     self.drawer.paste(mapobj.img, **mapobj.pasteoptions)
 
         # foreground
@@ -222,7 +222,7 @@ class Layout:
 
     def save(self, savepath):
         if self.changed:
-            self.render_all()
+            self.render_all(antialias=True)
             self.changed = False
         self.drawer.save(savepath)
 
@@ -752,13 +752,13 @@ class VectorLayer:
                     if "color" in key and notclassified != None:
                         notclassified = rgb(notclassified)
 
-                    # convert any text symbolvalues to pure numeric so can be handled by classypie
+                    # convert any color names to pure numeric so can be handled by classypie
                     if "color" in key:
                         if isinstance(val["classvalues"], dict):
                             # value color dict mapping for unique breaks
                             val["classvalues"] = dict([(k,rgb(v)) for k,v in val["classvalues"].items()])
                         else:
-                            # color gradienr
+                            # color gradient
                             val["classvalues"] = [rgb(col) for col in val["classvalues"]]
                     else:
                         pass #val["classvalues"] = [Unit(col) for col in val["classvalues"]]
@@ -777,7 +777,7 @@ class VectorLayer:
                     pass
                 
                 else:
-                    # convert any text symbolvalues to pure numeric so can be handled by classypie
+                    # convert any color names to pure numeric so can be handled by classypie
                     if "color" in key:
                         val = rgb(val)
                     else:
@@ -815,7 +815,17 @@ class VectorLayer:
                                                                symbols=dict((id(f),classval) for f,classval in classifier),
                                                                notclassified=notclassified
                                                                )
+
+                    
+                elif hasattr(val, "__call__"):
+                    pass
+                
                 else:
+                    # convert any color names to pure numeric so can be handled by classypie
+                    if "color" in key:
+                        val = rgb(val)
+                    else:
+                        pass #val = Unit(val)
                     self.styleoptions["textoptions"][key] = val
 
     def is_empty(self):
@@ -1235,14 +1245,17 @@ class Legend:
             if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
                 cls = layer.styleoptions["fillcolor"]["classifier"]
 
-                # force to categorical if classifier algorithm is unique
+                # force legend type depending on classifier algorithm
                 if cls.algo == "unique": options["valuetype"] = "categorical"
+                elif cls.algo == "proportional": options["valuetype"] = "proportional"
 
                 # detect valuetype
                 if options.get("valuetype") == "categorical":
                     # WARNING: not very stable yet...
                     categories = set((cls.key(item),tuple(classval)) for item,classval in cls) # only the unique keys
                     breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
+                elif options.get("valuetype") == "proportional":
+                    raise NotImplementedError()
                 else:
                     breaks = cls.breaks
                     classvalues = cls.classvalues_interp
@@ -1288,6 +1301,19 @@ class Legend:
                 shape = self._get_layer_shape(layer)
             
             if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
+                cls = layer.styleoptions["fillsize"]["classifier"]
+
+                # force legend type depending on classifier algorithm
+                if cls.algo == "unique": options["valuetype"] = "categorical"
+                elif cls.algo == "proportional": options["valuetype"] = "proportional"
+
+                if options.get("valuetype") == "proportional":
+                    # switch, uses classvalues as breaks
+                    breaks = cls.breaks
+                    classvalues = cls.classvalues_interp
+                else:
+                    breaks = cls.breaks
+                    classvalues = cls.classvalues_interp
                 
                 # add any other nonvarying layer options
                 #print 9999
@@ -1301,9 +1327,7 @@ class Legend:
                             options[k] = v
                             
                 #print options
-
-                cls = layer.styleoptions["fillsize"]["classifier"]
-                self._legend.add_fillsizes(shape, cls.breaks, cls.classvalues_interp, **options)
+                self._legend.add_fillsizes(shape, breaks, classvalues, **options)
 
             else:
                 # add as static symbol if none of the dynamic ones

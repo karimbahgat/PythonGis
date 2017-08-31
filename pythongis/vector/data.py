@@ -674,7 +674,7 @@ class VectorData:
         # TODO: Move to manager...?
         out = VectorData()
         out.fields = list(self.fields)
-        out.fields += other.fields #(field for field in other.fields if field not in self.fields)
+        out.fields += (field for field in other.fields if field not in self.fields)
 
         from . import sql
 
