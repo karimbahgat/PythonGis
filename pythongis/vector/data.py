@@ -320,6 +320,9 @@ class Feature:
 
 
 def ID_generator():
+    """Used internally for ensuring default feature IDs are unique for each VectorData instance.
+    TODO: Maybe make private. 
+    """
     i = 0
     while True:
         yield i
@@ -327,6 +330,9 @@ def ID_generator():
 
 
 def Name_generator():
+    """Used internally for ensuring default data names are unique for each Python session.
+    TODO: Maybe make private. 
+    """
     i = 1
     while True:
         yield "Untitled%s" % i
@@ -338,7 +344,76 @@ NAMEGEN = Name_generator()
 
 
 class VectorData:
+    """
+    Class representing a vector dataset. 
+    
+    Calling len() returns the number of features in the dataset, and iterating over the dataset
+    loops through the dataset features one by one. 
+    
+    Supports getting and setting feature instances via indexing, e.g. feat[13] gets or sets the feature 
+    located at the given index position. 
+    
+    Supports the __geo_interface__ protocol, returning a GeoJSON feature collection object dictionary. 
+    
+    TODO:
+    - Currently, loads all features into memory. Maybe outsource to format-specific classes that iterate over each feature
+        without loading into memory (or allow via streaming option or a separate Streaming class). 
+    
+    Attributes:
+        filepath: 
+        name: 
+        type: 
+        fields: 
+        features: 
+        crs: 
+        bbox: 
+    """
     def __init__(self, filepath=None, type=None, name=None, fields=None, rows=None, geometries=None, features=None, crs=None, **kwargs):
+        """A vector dataset can be created in several ways. 
+        
+        To create an empty dataset, simply initiate the class with no args. A list of field names can be set with the fields arg, 
+        or set after creation. 
+        
+        To load from a file, specify the filepath argument. The "select" option can be used to only populate the data with a subsample of 
+        features instead of the entire dataset. When loading non-spatial file formats, the "x/yfield" and "geokey" args can be set to calculate
+        the geometry based on the attributes of each row. Optional **kwargs can be used to pass on format-specific loading options. 
+        Supported reading fileformats include: 
+        - fdsfds...
+        
+        TODO: 
+        - Ensure that select applies to all file formats, not just the non-spatial ones. 
+        
+        To initiate from a list of existing Feature instances, pass in to the features arg. 
+        Alternatively, to load a dataset from separate lists of row values and geometry GeoJSON dictionaries, pass in the rows and geometries args 
+        as lists of equal length. 
+
+        Optional metadata can also be specified with args such as name, type, and crs. 
+        
+        Args:
+            fields: List of field names. 
+            
+            rows: List of row lists to load from, of equal length and sequence as geometries. 
+            geometries: List of GeoJSON dictionaries to load from, of equal length and sequence as rows. 
+            
+            features: List of Feature instances to load from. 
+        
+            filepath: Filepath of the dataset to load. 
+            
+            name (optional): Gives the dataset a name, which is used mostly for esthetic reasons and identification in visual lists. 
+                TODO: Make this more meaningful, so that various functions can make use of the names to reference specific datasets. 
+            type (optional): Geometry type of the dataset. If set, will make the features ensure that all geometries are of the
+                specified type. Otherwise, type enforcement will be based on first geometry found. 
+            crs (optional): The coordinate system specified as a Proj4 string, defaults to unprojected WGS84. 
+                TODO: Currently holds no meaning, makes no difference for any methods or functions. Maybe add on-the-fly reprojection? 
+            
+            select (optional): Function that takes a fieldname-value dictionary mapping and returns True for features that should be loaded. 
+            x/yfield (optional): Specifies the field name containing the x/y coordinates of each feature, used for creating the feature 
+                geometries of non-spatial fileformat point data. 
+            geokey (optional): Function for creating more advanced types of geometries of non-spatial fileformats. The function takes
+                a fieldname-value dictionary mapping and returns a GeoJSON dictionary, or None for null-geometries. 
+            
+            **kwargs: File-format specific loading options. See `vector.loader` for details.
+        """
         self.filepath = filepath
         self.name = name or filepath
         if not self.name:
