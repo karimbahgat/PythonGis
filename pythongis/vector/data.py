@@ -1,3 +1,6 @@
+"""
+Module containing the data structures and interfaces for operating with vector datasets.
+"""
 
 # import builtins
 import sys, os, itertools, operator, math
@@ -52,8 +55,58 @@ def is_missing(val):
 
 
 class Feature:
+    """
+    Class representing a vector data feature. 
+    A feature object contains attributes/properties describing the feature, 
+    equivalent to a row in a table, and a geometry describing its spatial representation. 
+    
+    Supports getting and setting feature properties/attributes via indexing, e.g. feat["name"] 
+    gets or sets the feature's value for the name field. Raises an error if no such field name exists. 
+    
+    Supports the __geo_interface__ protocol, returning a GeoJSON feature object dictionary. 
+    
+    TODO: 
+    - Change the geometry property, represented as a Geometry class instead of a pure GeoJSON dictinoary. 
+    - Move all geometry calculations such as length, area, etc., to the geometry class. 
+    
+    Attributes:
+        row: A list of values describing the feature properties as listed in the parent dataset's fields. 
+        geometry: A GeoJSON dictionary describing the feature geometry, or None for features without geometry. 
+        bbox: The bounding box of the feature, as a list of [xmin,ymin,xmax,ymax]. 
+        _cached_bbox: A cached version of the feature's bounding box, to avoid having to repeat the calculation each time. 
+            All methods that change the feature's geometry should reset this cache to None in order to recalculate the bbox. 
+            In case of errors, the user may reset this themselves by setting it to None. 
+            
+            TODO:
+            - Make sure all methods that alter the geometry indeed does reset the cache. 
+        
+        length: Returns the cartesian length of the feature geometry, expressed in units of the coordinate system. 
+            See Shapely docs for more. 
+        geodetic_length: Returns the geodetic length of the feature geometry, expressed as km distance as calculated by the 
+            vincenty algorithm. 
+        area: Returns the cartesian area of the feature geometry, expressed in units of the coordinate system. 
+            See Shapely docs for more. 
+        
+        id: The feature's ID in the parent vector dataset. 
+        _data: The parent vector dataset to which the feature belongs. 
+    
+    """
     def __init__(self, data, row, geometry, id=None):
-        "geometry must be a geojson dictionary"
+        """
+        Mostly used internally by the VectorData class. 
+        The user should instead use the VectorData's add_feature() method. 
+        
+        Args:
+            data: The parent vector dataset to which the feature belongs. Necessary in order to access the feature row's field names. 
+            row: A list of values describing the feature properties as listed in the parent dataset's fields. 
+                Must be of the same sequence and length as the dataset fields. 
+                
+                TODO: 
+                - Accept partially filled dictionaries too, setting all to None except those specified. 
+                
+            geometry: A GeoJSON dictionary describing the feature geometry, or None. 
+            id (optional): If given, manually sets the feature's ID in the parent vector dataset. Otherwise, automatically assigned. 
+        """
         self._data = data
         self.row  = list(row)
 
@@ -127,11 +180,18 @@ class Feature:
         return self._cached_bbox
 
     def get_shapely(self):
+        """Creates and returns the shapely object of the feature geometry. 
+        
+        NOTE: 
+        - Repeated calling of this method can cause considerable overhead.
+        - Will be depreceated once all geometry operations are outsourced to a Geometry class. 
+        """
         if not self.geometry:
             raise Exception("Cannot get shapely object of null geometry")
         return geojson2shapely(self.geometry)                
 
     def copy(self):
+        """Copies the feature and returns a new instance."""
         geoj = self.geometry
         if self.geometry and self._cached_bbox: geoj["bbox"] = self._cached_bbox
         return Feature(self._data, self.row, geoj)
@@ -139,7 +199,8 @@ class Feature:
     def iter_points(self):
         """Yields every point in the geometry as a flat generator,
         useful for quick inspecting of dimensions so don't have to
-        worry about nested coordinates and geometry types"""
+        worry about nested coordinates and geometry types. For polygons
+        this includes the coordinates of both exterior and holes."""
         geoj = self.geometry
         if not geoj:
             yield None
@@ -168,9 +229,11 @@ class Feature:
 
     def transform(self, func):
         """
-        Transforms the feature geometry in place.
-        
-        - func: a function that takes a flat list of points, does something, and returns them
+        Transforms the feature geometry in place. 
+        Func is a function that takes a flat list of coordinates, does something, and returns them.
+        For points, the function is applied to a list containing a single coordinate, separately for each multipart. 
+        For linestrings, the function is applied to each multipart. 
+        For polygons, the function is applied to the exterior, and to each hole if any. 
         """
         geoj = self.geometry
         if not geoj:
@@ -216,6 +279,19 @@ class Feature:
     # convenient visualizing
 
     def render(self, width, height, bbox=None, flipy=True, **styleoptions):
+        """Shortcut for easily rendering and returning the feature geometry on a Map instance.
+
+        TODO: Check that works correctly. Have experienced that adding additional layers on top
+        of this results in mismatch and layers jumping around. 
+        
+        Args:
+            width/height: Desired width/height of the rendered map.
+            bbox (optional): If given, only renders the given bbox, specified as (xmin,ymin,xmax,ymax).
+            flipy (optional): If True, flips the direction of the y-coordinate axis so that it increases towards the top of the screen
+                instead of the bottom of the screen. This is useful for rendering unprojected long/lat coordinates and is the default. 
+                Should only be changed when rendering projected x/y coordinates, whose y-axis typically increases towards the bottom. 
+            **styleoptions (optional): How to style the feature geometry, as documented in "renderer.VectorLayer".
+        """
         from .. import renderer
         singledata = renderer.VectorData()
         singledata.add_feature(self.row, self.geometry)
@@ -224,6 +300,10 @@ class Feature:
         return lyr
 
     def view(self, width, height, bbox=None, flipy=True, **styleoptions):
+        """Renders and opens a Tkinter window for viewing and interacting with the map.
+        
+        Args are same as for "render()".
+        """
         lyr = self.render(width, height, bbox, flipy, **styleoptions)
         
         import Tkinter as tk
