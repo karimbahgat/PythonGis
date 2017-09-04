@@ -1,3 +1,10 @@
+"""
+Module for converting the geometry type of vector datasets, 
+e.g. converting a polygon or linestring dataset to a point dataset. 
+
+TODO:
+- Add "to_linestring", and "to_polygon" functions. 
+"""
 
 import itertools, operator, math
 from .data import *
@@ -106,6 +113,10 @@ def _to_vertexes(data):
 # Converting between geometry types
 
 def to_points(data, pointtype="centroid"):
+    """
+    Converts every feature in a non-point vector dataset to one or more point features, returning a new instance. 
+    Pointtype can be centroid (default), multicentroid (one for each multipart), or vertex (a point at every vertex). 
+    """
     if pointtype == "vertex":
         return _to_vertexes(data)
     
