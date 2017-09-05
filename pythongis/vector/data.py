@@ -91,24 +91,34 @@ class Feature:
         _data: The parent vector dataset to which the feature belongs. 
     
     """
-    def __init__(self, data, row, geometry, id=None):
+    def __init__(self, data, row=None, geometry=None, id=None):
         """
+        Creates new feature class.
         Mostly used internally by the VectorData class. 
         The user should instead use the VectorData's add_feature() method. 
         
         Args:
             data: The parent vector dataset to which the feature belongs. Necessary in order to access the feature row's field names. 
-            row: A list of values describing the feature properties as listed in the parent dataset's fields. 
-                Must be of the same sequence and length as the dataset fields. 
-                
-                TODO: 
-                - Accept partially filled dictionaries too, setting all to None except those specified. 
-                
-            geometry: A GeoJSON dictionary describing the feature geometry, or None. 
+            row (optional): A list or dictionary of values describing the feature properties as listed in the parent dataset's fields. 
+                Lists must be of the same sequence and length as the dataset fields. 
+                Dictionaries sets only the specified fields, the rest defaulting to None. 
+            geometry (optional): A GeoJSON dictionary describing the feature geometry, or None. 
             id (optional): If given, manually sets the feature's ID in the parent vector dataset. Otherwise, automatically assigned. 
         """
         self._data = data
-        self.row  = list(row)
+        if row:
+            if isinstance(row, list):
+                if len(row) != len(self._data.fields):
+                    raise Exception("Row list must be of same length as parent dataset's field list")
+                row = list(row)
+            elif isinstance(row, dict):
+                for fn in row.keys():
+                    if fn not in self._data.fields:
+                        raise Exception("Field name '%s' does not exist" % fn)
+                row = [row.get(fn, None) for fn in self._data.fields]
+        else:
+            row = [None for _ in self._data.fields]
+        self.row  = row
 
         if geometry:
             geometry = geometry.copy()
@@ -367,6 +377,10 @@ class VectorData:
         features: 
         crs: 
         bbox: 
+        
+        manage: Access all methods from the manager module, passing self as first arg.
+        analyze: Access all methods from the analyzer module, passing self as first arg.
+        convert: Access all methods from the converter module, passing self as first arg.
     """
     def __init__(self, filepath=None, type=None, name=None, fields=None, rows=None, geometries=None, features=None, crs=None, **kwargs):
         """A vector dataset can be created in several ways. 
@@ -492,6 +506,7 @@ class VectorData:
         raise NotImplementedError()
 
     def has_geometry(self):
+        """Returns True if at least one feature has non-null geometry."""
         return any((feat.geometry for feat in self))
 
     @property
@@ -506,14 +521,22 @@ class VectorData:
     ### DATA ###
 
     def sort(self, key, reverse=False):
+        """Sorts the feature order in-place using a key function and optional reverse flag."""
         self.features = OrderedDict([ (feat.id,feat) for feat in sorted(self.features.values(), key=key, reverse=reverse) ])
+        return self
 
-    def add_feature(self, row, geometry=None):
+    def add_feature(self, row=None, geometry=None):
+        """Adds and returns a new feature, given a row list or dict, and a geometry GeoJSON dictionary.
+        If neither are set, populates row with None values, and empty geometry.
+        """
         feature = Feature(self, row, geometry)
         self[feature.id] = feature
         return feature
 
     def add_field(self, field, index=None):
+        """Adds a new field by the name of 'field', optionally at the specified index position.
+        All existing feature rows are updated accordingly.
+        """
         if index is None:
             self.fields.append(field)
             for feat in self:
@@ -524,6 +547,22 @@ class VectorData:
                 feat.row.insert(index, None)
 
     def compute(self, field, value, by=None, stat=None):
+        """Loops through all features and sets the row field to the given value.
+        If the value is a function, it will take each Feature object as input and uses it to calculate and return a new value.
+        If the field name does not already exist, one will be created.
+        If by and stat is given, 'by' will be used to group features, and for each group, 'stat' will be used to calculate a 
+        statistic and write the results to the members of the group. 
+        
+        Arguments:
+            field: Name of the field to compute. Existing name will overwrite all values, new name will create new field. 
+            value: Any value or object to be written to the field, or a callable that expects a Feature as its input and outputs 
+                the value to write. 
+            by: A field name by which to group, or a callable that expects a Feature as its input and outputs the group-by value.
+            stat: The name of a summary statistic to calculate and write for each by-group, or a callable that expects a list of
+                Feature instances as input and returns the aggregated value to write. 
+                Valid stat values include: 
+                - fdsf...
+        """
         if field not in self.fields:
             self.add_field(field)
 
@@ -547,15 +586,33 @@ class VectorData:
                 feat[field] = valfunc(feat)
 
     def interpolate(self, step):
+        """Interpolates missing values between known values.
+        
+        NOT YET IMPLEMENTED.
+        """
         # maybe one for inserting new rows in between gaps
         # another for just filling missing values in between gaps
         # maybe it does both
         # and finally a separate for interpolating one value based on values in another...
         # ...
-        pass
+        raise NotImplementedError
 
     def moving_window(self, n, fieldmapping, groupby=None):
-        # general flexible method that cursors over a window of rows and runs arbitrary function on them
+        """Loops through the features in the dataset, and calculates one or more new values based
+        on aggregate statistics of a moving window of previously visited rows.
+        
+        Arguments:
+            n: Size of the moving window specified as number of rows.
+            fieldmapping: Specifies a set of aggregation rules used to calculate the new values based on the moving
+                window. Specified as a list of (outfield,valuefield,stat) tuples, where outfield is the field name 
+                of a new or existing field to write, valuefield is the field name or function that retrieves the value
+                to calculate statistics on, and stat is the name of the statistic to calculate or a function that takes
+                the list of values from the moving window as defined by valuefield. 
+                Valid stat values include: 
+                - fdsf...
+            groupby (optional): If specified, the moving window will run separately for each group of features as defined
+                by the groupby field name or grouping function. 
+        """
         for name,valfunc,statfunc in fieldmapping:
             if not name in self.fields:
                 self.add_field(name)
@@ -585,16 +642,19 @@ class VectorData:
         return self
 
     def drop_field(self, field):
+        """Drops the specified field, changing the dataset in-place."""
         fieldindex = self.fields.index(field)
         del self.fields[fieldindex]
         for feat in self:
             del feat.row[fieldindex]
 
     def drop_fields(self, fields):
+        """Drops all of the specified fields, changing the dataset in-place."""
         for f in fields:
             self.drop_field(f)
 
     def keep_fields(self, fields):
+        """Keeps only the fields specified, changing the dataset in-place."""
         for kf in fields:
             if kf not in self.fields:
                 raise Exception("%s is not a field" % kf)
@@ -603,21 +663,25 @@ class VectorData:
                 self.drop_field(f)
 
     def rename_field(self, oldname, newname):
+        """Changes the name of a field from oldname to newname."""
         self.fields[self.fields.index(oldname)] = newname
 
     def convert_field(self, field, valfunc):
+        """Applies the given valfunc function to force convert all values in a field."""
         fieldindex = self.fields.index(field)
         for feat in self:
             val = feat.row[fieldindex]
             feat.row[fieldindex] = valfunc(val)
 
     def inspect_field(self, field):
-        """Returns more detailed stats unique values freq for a single field."""
+        """Returns detailed stats unique values freq for a single field.
 
-        # TODO: split into multiple methods, eg field_stats vs field_values/frequencies
-        # TODO: standardize table string formatting, eg as a vectordata.stringformat() method, and simply populate a stats vectordata table and call its method
-        # TODO: sort freq table by percentages
-        # TODO: fix unicode print error
+        TODO: change so purpose of function is to print the text in IDLE rather than just return it.
+        TODO: split into multiple methods, eg field_stats vs field_values/frequencies
+        TODO: standardize table string formatting, eg as a vectordata.stringformat() method, and simply populate a stats vectordata table and call its method
+        TODO: sort freq table by percentages
+        TODO: fix unicode print error
+        """
         
         typ = self.field_type(field)
         getval = lambda v: v
@@ -669,6 +733,13 @@ class VectorData:
         return outstring
 
     def histogram(self, field, width=None, height=None, bins=10):
+        """Renders the value distribution of a given field in a histogram plot, 
+        returned as a PyAgg Canvas of size width/height. This canvas can be used
+        to call "save()" or "view()". Default histogram bins is 10.
+        
+        TODO:
+        - Should it return Canvas, or just straight view() it? 
+        """
         import pyagg
         import classypie
         values = [f[field] for f in self]
@@ -684,9 +755,12 @@ class VectorData:
         return c.draw() # draw returns the canvas
 
     def describe(self, *fields):
-        """Returns table of fieldname, type, min/minority, max/majority, stdev, missing"""
+        """Returns table of fieldname, type, min/minority, max/majority, stdev, missing.
+        If specified, only calculates for the fields listed in *fields.
 
-        # TODO: maybe not use all those stats...
+        TODO: change so purpose of function is to print the text in IDLE rather than just return it.
+        TODO: maybe not use all those stats...
+        """
 
         printfields = ["", "type", "min/minority", "max/majority", "mean", "stdev", "missing"]
         printrows = []
@@ -743,14 +817,17 @@ class VectorData:
         return outstring
 
     def field_type(self, field):
-        """Returns field type of field based on its values (ignoring missing values)"""
+        """Determines and returns field type of field based on its values (ignoring missing values).
+        For now, only detects int, float, and text.
+        
+        TODO: also detect other types eg datetime, etc.
+        """
         values = (f[field] for f in self)
         values = (v for v in values if not is_missing(v))
         # approach: at first assume int, if fails then assume float,
         # ...if fails then assume text and stop checking (lowest possible dtype)
         typ = "int"
         for v in values:
-            # TODO: also detect other types eg datetime, etc
             try:
                 v = float(v)
                 if v.is_integer():
@@ -765,7 +842,9 @@ class VectorData:
     ### FILTERING ###
 
     def get(self, func):
-        """Iterates over features that meet filter conditions"""
+        """Iterates over features that meet filter conditions.
+        Func takes a Feature instance as input and yield only those where it returns True.
+        """
         new = VectorData()
         new.fields = [field for field in self.fields]
         
@@ -781,7 +860,9 @@ class VectorData:
     ### OTHER ###
 
     def select(self, func):
-        """Returns new filtered VectorData instance"""
+        """Returns new filtered VectorData instance. 
+        Func takes a Feature instance as input and keeps only those where it returns True.
+        """
         new = VectorData()
         new.fields = [field for field in self.fields]
         
@@ -793,8 +874,19 @@ class VectorData:
 
     def aggregate(self, key, geomfunc, fieldmapping=[]):
         """Aggregate values and geometries within key groupings.
-        Geomfunc specifies how to aggregate geometries, either intersection, union, difference,
-        or a function that takes all geometries to aggregate."""
+        
+        Arguments:
+            key: Name of field or function to group by. 
+            geomfunc: Specifies how to aggregate geometries, either intersection, union, difference,
+                or a function that takes all geometries to aggregate.
+            fieldmapping: Specifies a set of aggregation rules used to calculate the new value for each group. 
+                Specified as a list of (outfield,valuefield,stat) tuples, where outfield is the field name 
+                of a new or existing field to write, valuefield is the field name or function that retrieves the value
+                to calculate statistics on, and stat is the name of the statistic to calculate or a function that takes
+                the list of values from the group as defined by valuefield. 
+                Valid stat values include: 
+                - fdsf...
+        """
         # TODO: How is it different than manager.collapse()...?
         # TODO: Move to manager...?
         out = VectorData()
@@ -809,7 +901,14 @@ class VectorData:
         return out
 
     def duplicates(self, subkey=None, fieldmapping=[]):
-        """Groups duplicate geometries"""
+        """Removes duplicate geometries by grouping and aggregating their values.
+        
+        Arguments: 
+            subkey (optional): If specified, for each set of duplicate geometries will perform separate aggregations 
+                for each subgroup defined by subkey. Geometry duplicates will continue to exist if they have more than 
+                one subkey grouping. 
+            fieldmapping: Defines the value aggregations. See aggregate(). 
+        """
         # TODO: Move to manager...?
         if subkey:
             # additional subgrouping based on eg attributes
@@ -824,7 +923,22 @@ class VectorData:
         return out
 
     def join(self, other, key, fieldmapping=[], collapse=False, keepall=True):
-        """Key can be a single fieldname or function that returns the link for both tables, or a left-right key pair."""
+        """Matches and joins the features in this dataset with the features in another dataset.
+        Returns a new joined dataset. 
+        
+        Arguments:
+            other: The other VectorData dataset to join to this one.
+            key: Can be a single fieldname or function that returns the link for both tables, or a left-right key pair.
+                
+                TODO: 
+                - Change this to be more intuitive, e.g. for specifying multiple fields as the key...
+                
+            collapse (optional): If True, collapses and aggregates all matching features in the other dataset (default), otherwise
+                adds a new row for each matching pair. 
+            fieldmapping (optional): If collapse is True, this determines the aggregation rules. See aggregate(). 
+            keepall (optional): If True, keeps all features in the main dataset regardless (default), otherwise only keeps the 
+                ones that match.
+        """
         # TODO: enable multiple join conditions in descending priority, ie key can be a list of keys, so looks for a match using the first key, then the second, etc, until a match is found.
         # TODO: Move to manager...?
         out = VectorData()
