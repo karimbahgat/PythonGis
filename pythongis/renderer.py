@@ -947,7 +947,7 @@ class VectorLayer:
                             holes = []
 
                         # first exterior
-                        path = PIL.ImagePath.Path(coords)
+                        path = PIL.ImagePath.Path([tuple(p) for p in coords])
                         path.transform(drawer.coordspace_transform)
                         #print "draw",str(path.tolist())[:300]
                         path.compact(1)
@@ -958,7 +958,7 @@ class VectorLayer:
 
                         # then holes
                         for hole in holes:
-                            path = PIL.ImagePath.Path(hole)
+                            path = PIL.ImagePath.Path([tuple(p) for p in hole])
                             path.transform(drawer.coordspace_transform)
                             path.compact(1)
                             if len(path) > 1:
@@ -1078,11 +1078,13 @@ class RasterLayer:
                 
             # cutoff top 2 percent outliers by default
             if not "cutoff" in options:
-                options["cutoff"] = (0,98) 
+                options["cutoff"] = (0,98)
             mincut,maxcut = options["cutoff"]
-            rng = options["maxval"] - options["minval"]
-            options["maxval"] = options["minval"] + rng / 100.0 * maxcut
-            options["minval"] += rng / 100.0 * mincut
+            
+            if options["maxval"] != None and options["minval"] != None:
+                rng = options["maxval"] - options["minval"]
+                options["maxval"] = options["minval"] + rng / 100.0 * maxcut
+                options["minval"] += rng / 100.0 * mincut
 
         elif options["type"] == "colorscale":
             options["bandnum"] = options.get("bandnum", 0)
@@ -1098,9 +1100,11 @@ class RasterLayer:
             if not "cutoff" in options:
                 options["cutoff"] = (0,98) 
             mincut,maxcut = options["cutoff"]
-            rng = options["maxval"] - options["minval"]
-            options["maxval"] = options["minval"] + rng / 100.0 * maxcut
-            options["minval"] += rng / 100.0 * mincut
+
+            if options["maxval"] != None and options["minval"] != None:
+                rng = options["maxval"] - options["minval"]
+                options["maxval"] = options["minval"] + rng / 100.0 * maxcut
+                options["minval"] += rng / 100.0 * mincut
 
             # process gradient
             if "gradcolors" in options:
@@ -1148,10 +1152,13 @@ class RasterLayer:
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            valrange = maxval-minval
-            if valrange:
-                expr = "(convert(val,'F') - {minval}) / {valrange} * 255".format(minval=minval,valrange=valrange)
-                band.compute(expr)
+            if None not in (minval,maxval):
+                valrange = maxval-minval
+                if valrange:
+                    expr = "(convert(val,'F') - {minval}) / {valrange} * 255".format(minval=minval,valrange=valrange)
+                    band.compute(expr)
+                else:
+                    band.compute("0")
             else:
                 band.compute("0")
             # colorize
@@ -1163,10 +1170,13 @@ class RasterLayer:
             
             # equalize
             minval,maxval = self.styleoptions["minval"], self.styleoptions["maxval"]
-            valrange = maxval-minval
-            if valrange:
-                expr = "(convert(val,'F') - {minval}) / {valrange} * 255".format(minval=minval,valrange=valrange)
-                band.compute(expr)
+            if None not in (minval,maxval):
+                valrange = maxval-minval
+                if valrange:
+                    expr = "(convert(val,'F') - {minval}) / {valrange} * 255".format(minval=minval,valrange=valrange)
+                    band.compute(expr)
+                else:
+                    band.compute("0")
             else:
                 band.compute("0")
             # colorize

@@ -323,16 +323,15 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
     feats in a cell are aggregated using stat.
     If priority func, multiple feats are filtered/chosen before aggregated. 
     If partialfunc, feats that only partially overlap cell are given a weight.
-    Output raster uses 0 as nodatavalue. 
     """
 
     # TODO: allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
 
-    mode = "float32" if valuekey else "1bit"
+    mode = "float32" if valuekey else "int8"
     raster = data.RasterData(mode=mode, **rasterdef)
 
     # create 1bit image with specified size
-    mode = "F" if valuekey else "1"
+    mode = "F" if valuekey else "L"  # L aka 8bit instead of 1, temp fix because in mode 1, actually writes 255
     img = PIL.Image.new(mode, (raster.width, raster.height), 0)
     drawer = PIL.ImageDraw.Draw(img)
 
@@ -394,7 +393,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
         burn(val, feat, drawer)
 
     # create raster from the drawn image
-    outband = raster.add_band(img=img, nodataval=0)
+    outband = raster.add_band(img=img, nodataval=None)
 
     # special pixels
     if valuekey:

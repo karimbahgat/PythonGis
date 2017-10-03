@@ -47,27 +47,33 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
     # get stats for each unique value in zonal data
     zonevalues = (val for count,val in zonalband.img.getcolors(zonaldata.width*zonaldata.height))
     zonesdict = {}
-    zonalband.view()
-    valueband.view()
+    #print zonalband, zonalband.summarystats()
+    #zonalband.view()
+    #valueband.view()
     for zoneval in zonevalues:
         # exclude nullzone
         if zoneval == zonalband.nodataval: continue
+        print "zone",zoneval
 
         # mask valueband to only the current zone
         curzone = valueband.copy()
-        print "copy"
-        curzone.img.show()
+        #print "copy"
+        #print curzone.summarystats()
+        #curzone.view() #.img.show()
         curzone.mask = zonalband.conditional("val != %s" % zoneval).img  # returns true everywhere, which is not correct..., maybe due to nodataval??? 
-        print "cond",zoneval
-        zonalband.conditional("val != %s" % zoneval).img.show()
-        print "mask"
-        curzone.img.show()        
+        #print "cond",zoneval
+        #print zonalband.conditional("val != %s" % zoneval).summarystats()
+        #zonalband.conditional("val != %s" % zoneval).view() #img.show()
+        #print "mask"
+        #print curzone.summarystats()
+        #curzone.view() #img.show()
         
         # also exclude null values from calculations
         curzone.mask = valueband.mask   # pastes additional nullvalues
         curzone._cached_mask = None    # force having to recreate the mask using the combined old and pasted nullvals
-        print "mask2", curzone
-        curzone.img.show()
+        #print "mask2", curzone
+        #print curzone.summarystats()
+        #curzone.view() #img.show()
 
         # retrieve stats
         stats = curzone.summarystats(outstat)

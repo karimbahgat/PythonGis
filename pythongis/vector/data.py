@@ -304,7 +304,12 @@ class Feature:
         """
         from .. import renderer
         singledata = renderer.VectorData()
-        singledata.add_feature(self.row, self.geometry)
+        if self._data:
+            singledata.fields = self._data.fields
+            singledata.add_feature(self.row, self.geometry)
+        else:
+            singledata.add_feature([], self.geometry)
+        
         lyr = renderer.VectorLayer(singledata, **styleoptions)
         lyr.render(width=width, height=height, bbox=bbox, flipy=flipy)
         return lyr
