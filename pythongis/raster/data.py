@@ -413,6 +413,13 @@ class Band(object):
         if self._rast:
             self._rast._cached_mask = None
 
+    def is_empty(self):
+        """Returns True if the grid is empty, ie only contains nodata values."""
+        if self.nodataval and self.summarystats("count")["count"] == 0:
+            return True
+        else:
+            return False
+
     def compute(self, expr, condition=None):
         """Apply the given expression to recompute all cell values, or limited to a subset
         of cells that meet a particular condition. This method changes the band data in place.

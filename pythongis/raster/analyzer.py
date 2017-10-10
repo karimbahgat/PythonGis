@@ -53,7 +53,7 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
     for zoneval in zonevalues:
         # exclude nullzone
         if zoneval == zonalband.nodataval: continue
-        print "zone",zoneval
+        #print "zone",zoneval
 
         # mask valueband to only the current zone
         curzone = valueband.copy()

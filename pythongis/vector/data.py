@@ -933,10 +933,10 @@ class VectorData:
         
         Arguments:
             other: The other VectorData dataset to join to this one.
-            key: Can be a single fieldname or function that returns the link for both tables, or a left-right key pair.
+            key: Can be a single fieldname, multiple fieldnames, or function that returns the link for both tables.
                 
                 TODO: 
-                - Change this to be more intuitive, e.g. for specifying multiple fields as the key...
+                - Maybe introduce separate lkey and rkey args... 
                 
             collapse (optional): If True, collapses and aggregates all matching features in the other dataset (default), otherwise
                 adds a new row for each matching pair. 
@@ -952,12 +952,14 @@ class VectorData:
 
         from . import sql
 
-        if isinstance(key, (list,tuple)) and len(key) == 2:
-            k1,k2 = key
+        if isinstance(key, (list,tuple)):
+            keyfunc = lambda f: tuple([f[k] for k in key])
+        elif hasattr(key,"__call__"):
+            keyfunc = key
         else:
-            k1 = k2 = key # same key for both
-        key1 = k1 if hasattr(k1,"__call__") else lambda f:f[k1]
-        key2 = k2 if hasattr(k2,"__call__") else lambda f:f[k2]
+            keyfunc = lambda f: f[key]
+            
+        key1 = key2 = keyfunc
 
         if collapse:
             out.fields += (fieldtup[0] for fieldtup in fieldmapping if fieldtup[0] not in out.fields)
@@ -1001,14 +1003,15 @@ class VectorData:
                 for keyval,f2s in itertools.groupby(sorted(data2,key=key2), key=key2):
                     hsh[keyval] = list(f2s)
                 # iterate join
+                otheridx = [i for i,field in enumerate(other.fields) if field not in self.fields]
                 for f1 in data1:
                     keyval = key1(f1)
                     if keyval in hsh:
                         f2s = hsh[keyval]
                         for f2row in f2s:
-                            yield f1,f2row
+                            yield f1,[f2row[i] for i in otheridx]
                     elif keepall:
-                        f2row = (None for f in other.fields)
+                        f2row = [None for field in other.fields if field not in self.fields]
                         yield f1,f2row
 
         for pair in grouppairs(self, key1, other, key2):

@@ -149,9 +149,9 @@ def where(data, other, condition, **kwargs):
     else:
         raise Exception("Unknown select condition")
 
-def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **kwargs):
+def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False, **kwargs):
     """
-    Pairwise joining with all unique pairs that match the spatial "condition" and the key function.
+    Pairwise joining with all unique pairs that match the spatial "condition" and the subkey function.
     If set, clip can be intersection, difference, or union and will be performed on the joined geometries. 
     """
 
@@ -167,6 +167,10 @@ def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **
     out = VectorData()
     out.fields = list(data.fields)
     out.fields.extend(other.fields)
+
+    if isinstance(clip, basestring):
+        clipname = clip
+        clip = lambda f1,f2: getattr(f1.get_shapely(), clipname)(f2._shapely).__geo_interface__
 
     if condition in ("distance",):
         radius = kwargs.get("radius")
@@ -225,7 +229,7 @@ def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **
             # check if sufficient
             matches = []
             for otherfeat in overlaps:
-                if key and not key(feat,otherfeat):
+                if subkey and not subkey(feat,otherfeat):
                     continue
                 matches.append(otherfeat)
                 if n and len(matches) >= n:
@@ -253,8 +257,8 @@ def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **
                     for otherfeat in other.quick_disjoint(feat.bbox):
                         nonoverlaps.append(otherfeat)
                 # filter by key
-                if key:
-                    nonoverlaps = (otherfeat for otherfeat in nonoverlaps if key(feat, otherfeat))
+                if subkey:
+                    nonoverlaps = (otherfeat for otherfeat in nonoverlaps if subkey(feat, otherfeat))
                 # then calc dist for nonoverlaps
                 if n:
                     nonoverlaps = list(nonoverlaps)
@@ -292,6 +296,7 @@ def spatial_join(data, other, condition, key=None, keepall=False, clip=False, **
         return out
 
     elif condition in ("intersects", "within", "contains", "crosses", "touches", "equals", "covers"):
+        # TODO: IMPLEMENT SUBKEY HERE TOO...
         # prep geoms in other
         for otherfeat in other:
             if not otherfeat.geometry:
