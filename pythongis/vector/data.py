@@ -877,13 +877,14 @@ class VectorData:
 
         return new
 
-    def aggregate(self, key, geomfunc, fieldmapping=[]):
+    def aggregate(self, key, geomfunc=None, fieldmapping=[]):
         """Aggregate values and geometries within key groupings.
         
         Arguments:
-            key: Name of field or function to group by. 
-            geomfunc: Specifies how to aggregate geometries, either intersection, union, difference,
-                or a function that takes all geometries to aggregate.
+            key: List of field names or a function to group by. 
+            geomfunc (optional): Specifies how to aggregate geometries, either intersection, union, difference,
+                or a function that takes all geometries to aggregate. If not set (default), does not aggregate geometries,
+                returning a non-spatial table with only null-geometries. 
             fieldmapping: Specifies a set of aggregation rules used to calculate the new value for each group. 
                 Specified as a list of (outfield,valuefield,stat) tuples, where outfield is the field name 
                 of a new or existing field to write, valuefield is the field name or function that retrieves the value
@@ -892,10 +893,19 @@ class VectorData:
                 Valid stat values include: 
                 - fdsf...
         """
-        # TODO: How is it different than manager.collapse()...?
         # TODO: Move to manager...?
         out = VectorData()
+
+        if isinstance(key, list):
+            keyfields = key
+            key = lambda f: [f[field] for f in keyfields]
+            # add keyfields to fieldmapping
+            fieldmapping = [(field,field,"first") for field in keyfields] + fieldmapping
+        
         out.fields = [fieldname for fieldname,_,_ in fieldmapping]
+
+        if not geomfunc:
+            geomfunc = lambda fs: None
 
         from . import sql
         
@@ -917,6 +927,11 @@ class VectorData:
         # TODO: Move to manager...?
         if subkey:
             # additional subgrouping based on eg attributes
+            if isinstance(subkey, list):
+                keyfields = subkey
+                subkey = lambda f: [f[field] for f in keyfields]
+                # add keyfields to fieldmapping
+                fieldmapping = [(field,field,"first") for field in keyfields] + fieldmapping
             keywrap = lambda f: (f.geometry, subkey(f))
         else:
             # only by geometry
