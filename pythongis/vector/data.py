@@ -898,7 +898,7 @@ class VectorData:
 
         if isinstance(key, list):
             keyfields = key
-            key = lambda f: [f[field] for f in keyfields]
+            key = lambda f: [f[field] for field in keyfields]
             # add keyfields to fieldmapping
             fieldmapping = [(field,field,"first") for field in keyfields] + fieldmapping
         
@@ -929,7 +929,7 @@ class VectorData:
             # additional subgrouping based on eg attributes
             if isinstance(subkey, list):
                 keyfields = subkey
-                subkey = lambda f: [f[field] for f in keyfields]
+                subkey = lambda f: [f[field] for field in keyfields]
                 # add keyfields to fieldmapping
                 fieldmapping = [(field,field,"first") for field in keyfields] + fieldmapping
             keywrap = lambda f: (f.geometry, subkey(f))

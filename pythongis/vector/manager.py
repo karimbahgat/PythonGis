@@ -193,9 +193,9 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
 
     out = VectorData()
     out.fields = list(data.fields)
-    out.fields += (field for field in other.fields if field not in self.fields)
+    out.fields += (field for field in other.fields if field not in data.fields)
     
-    otheridx = [i for i,field in enumerate(other.fields) if field not in self.fields]
+    otheridx = [i for i,field in enumerate(other.fields) if field not in data.fields]
 
     if isinstance(clip, basestring):
         clipname = clip
