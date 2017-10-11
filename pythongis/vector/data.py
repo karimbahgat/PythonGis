@@ -929,7 +929,10 @@ class VectorData:
 
     def join(self, other, key, fieldmapping=[], collapse=False, keepall=True):
         """Matches and joins the features in this dataset with the features in another dataset.
-        Returns a new joined dataset. 
+        Returns a new joined dataset.
+
+        Note: if the other dataset has fields with the same name as the main dataset, those will not be joined, keeping
+            only the ones in the main dataset. 
         
         Arguments:
             other: The other VectorData dataset to join to this one.
@@ -949,6 +952,8 @@ class VectorData:
         out = VectorData()
         out.fields = list(self.fields)
         out.fields += (field for field in other.fields if field not in self.fields)
+
+        otheridx = [i for i,field in enumerate(other.fields) if field not in self.fields]
 
         from . import sql
 
@@ -1003,7 +1008,6 @@ class VectorData:
                 for keyval,f2s in itertools.groupby(sorted(data2,key=key2), key=key2):
                     hsh[keyval] = list(f2s)
                 # iterate join
-                otheridx = [i for i,field in enumerate(other.fields) if field not in self.fields]
                 for f1 in data1:
                     keyval = key1(f1)
                     if keyval in hsh:
@@ -1011,7 +1015,7 @@ class VectorData:
                         for f2row in f2s:
                             yield f1,[f2row[i] for i in otheridx]
                     elif keepall:
-                        f2row = [None for field in other.fields if field not in self.fields]
+                        f2row = [None for i in otheridx]
                         yield f1,f2row
 
         for pair in grouppairs(self, key1, other, key2):
@@ -1096,7 +1100,9 @@ class VectorData:
     ###### SPATIAL INDEXING #######
 
     def create_spatial_index(self):
-        """Allows quick overlap search methods"""
+        """Creates spatial index to allow quick overlap search methods.
+        If features are changed, added, or dropped, the index must be created again.
+        """
         self.spindex = rtree.index.Index()
         for feat in self:
             if feat.geometry:
@@ -1135,12 +1141,17 @@ class VectorData:
     def quick_nearest(self, bbox, n=None, radius=None):
         """
         Quickly get n features whose bbox are nearest the specified bbox via the spatial index.
+
+        TODO: radius option not yet implemented. 
         """
         # TODO: special handling if points data, might be faster to just test all.
         # ...
         
         if not hasattr(self, "spindex"):
             raise Exception("You need to create the spatial index before you can use this method")
+
+        if radius != None:
+            raise NotImplementedError("Spatial index nearest with radius option not yet implemented")
         
         # ensure min,min,max,max pattern
         xs = bbox[0],bbox[2]

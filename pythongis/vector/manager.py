@@ -151,8 +151,35 @@ def where(data, other, condition, **kwargs):
 
 def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False, **kwargs):
     """
-    Pairwise joining with all unique pairs that match the spatial "condition" and the subkey function.
-    If set, clip can be intersection, difference, or union and will be performed on the joined geometries. 
+    Pairwise joining with all unique pairs that match the spatial "condition" and the optional "subkey" function.
+    Returns a new spatially joined dataset.
+
+    Note: if the other dataset has fields with the same name as the main dataset, those will not be joined, keeping
+        only the ones in the main dataset. 
+
+    Arguments:
+        data: The main VectorData dataset to be joined to.
+        other: The other VectorData dataset to join to the main one.
+        condition: The spatial condition required for joining a pair of features.
+            Valid options include:
+                - "distance" (along with "radius" and/or "n" args)
+                - "intersects", "within", "contains", "crosses", "touches", "equals", "covers"
+                - "disjoint"
+        subkey (optional): If set, acts as an additional non-spatial condition. Only the pairs that pass this condition
+            will be tested for the spatial condition. Specified as a function that takes a pair of features as its argument,
+            and returns True if they should be joined.
+        keepall (optional): If True, keeps all features in the main dataset regardless (default), otherwise only keeps the 
+            ones that match.
+        clip (optional): If the user is interested in the unique spatial relationship of each feature, the clip argument can
+            be used to clip or alter the geometry of each joined pair. The default behavior is for each joined pair to get the
+            geometry of the original left feature. 
+
+            Valid values include "intersection", "difference", "union", or a function
+            expecting two features and returning a GeoJSON dict or None, which will be performed on the joined geometries.
+
+            The clip argument can also be used to ignore geometries alltogether, especially since joins
+            with many matching pairs and duplicate geometries may lead to a large memory footprint. To reduce the memory footprint,
+            the clip argument can be set to a function that returns None, returning a non-spatial table without geometries. 
     """
 
     # TODO: switch if point is other
@@ -166,7 +193,9 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
 
     out = VectorData()
     out.fields = list(data.fields)
-    out.fields.extend(other.fields)
+    out.fields += (field for field in other.fields if field not in self.fields)
+    
+    otheridx = [i for i,field in enumerate(other.fields) if field not in self.fields]
 
     if isinstance(clip, basestring):
         clipname = clip
@@ -210,7 +239,7 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
             if not feat.geometry:
                 if keepall:
                     newrow = list(feat.row)
-                    newrow.extend( (None for _ in other.fields) )
+                    newrow += (None for i in otheridx)
                     out.add_feature(newrow, None)
                 continue
 
@@ -222,36 +251,26 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
             overlaps = []
             nonoverlaps = []
             for otherfeat in other.quick_overlap(feat.bbox):
+                if subkey and not subkey(feat,otherfeat):
+                    continue
                 if supergeom.intersects(otherfeat._shapely):
                     overlaps.append(otherfeat)
                 else:
                     nonoverlaps.append(otherfeat)
-            # check if sufficient
-            matches = []
-            for otherfeat in overlaps:
-                if subkey and not subkey(feat,otherfeat):
-                    continue
-                matches.append(otherfeat)
-                if n and len(matches) >= n:
-                    #print "ol",len(matches)
+                if n and len(overlaps) >= n:
+                    # check if sufficient
                     break
+            
             # otherwise proceed to nonoverlaps
+            matches = overlaps
             proceed = len(matches) < n if n else True
             if proceed:
                 # limit to those within radius
                 if radius:
-                    # make spindex for speedup
-##                    _nonoverlaps = VectorData()
-##                    for otherfeat in nonoverlaps:
-##                        newfeat = _nonoverlaps.add_feature(otherfeat.row, otherfeat.geometry)
-##                        newfeat._shapely = otherfeat._shapely
-##                    _nonoverlaps.create_spatial_index()
-##                    nonoverlaps = _nonoverlaps
                     # test within
                     # NOTE: seems faster to just use existing spindex and exclude those already added
                     nonoverlaps = (otherfeat for otherfeat in within(feat, other)
                                    if otherfeat not in matches)
-                    #print "within"
                 # add remainder of nonoverlaps
                 else:
                     for otherfeat in other.quick_disjoint(feat.bbox):
@@ -284,19 +303,18 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
                     else:
                         geoj = feat.geometry
                     newrow = list(feat.row)
-                    newrow.extend( match.row )
+                    newrow += (match.row[i] for i in otheridx)
                     out.add_feature(newrow, geoj)
                 
             elif keepall:
                 # no matches
                 newrow = list(feat.row)
-                newrow.extend( (None for _ in other.fields) )
+                newrow += (None for i in otheridx)
                 out.add_feature(newrow, feat.geometry)
                 
         return out
 
     elif condition in ("intersects", "within", "contains", "crosses", "touches", "equals", "covers"):
-        # TODO: IMPLEMENT SUBKEY HERE TOO...
         # prep geoms in other
         for otherfeat in other:
             if not otherfeat.geometry:
@@ -311,7 +329,7 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
             if not feat.geometry:
                 if keepall:
                     newrow = list(feat.row)
-                    newrow.extend( (None for _ in other.fields) )
+                    newrow += (None for i in otheridx)
                     out.add_feature(newrow, None)
                 continue
 
@@ -323,8 +341,13 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
             else:
                 matchtest = getattr(geom, condition)
 
-            # test conditions
-            matches = [otherfeat for otherfeat in other.quick_overlap(feat.bbox) if matchtest(otherfeat._shapely)]
+            # get spindex possibilities
+            matches = (otherfeat for otherfeat in other.quick_overlap(feat.bbox))
+            # filter by subkey
+            if subkey:
+                matches = (otherfeat for otherfeat in matches if subkey(feat, otherfeat))
+            # test spatial
+            matches = [otherfeat for otherfeat in matches if matchtest(otherfeat._shapely)]
             if matches:
                 for match in matches:
                     if clip:
@@ -332,42 +355,74 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
                     else:
                         geoj = feat.geometry
                     newrow = list(feat.row)
-                    newrow.extend( match.row )
+                    newrow += (match.row[i] for i in otheridx)
                     out.add_feature(newrow, geoj)
 
             elif keepall:
                 # no matches
                 newrow = list(feat.row)
-                newrow.extend( (None for _ in other.fields) )
+                newrow += (None for i in otheridx)
                 out.add_feature(newrow, feat.geometry)
                 
         return out
 
     elif condition in ("disjoint",):
-        # NOT FIXED....
-        raise NotImplementedError
-    
-        # TODO: check empty geom
-        # first add those whose bboxes clearly dont overlap
-        for feat in data.quick_disjoint(other.bbox):
-            out.add_feature(feat.row, feat.geometry)
+        # prep geoms in other
+        for otherfeat in other:
+            if not otherfeat.geometry:
+                continue
+            otherfeat._shapely = otherfeat.get_shapely()
 
-        # then check those that might overlap
-        for feat in data.quick_overlap(other.bbox):
+        # begin
+        for feat in data:
+
+            # check empty geom
+            if not feat.geometry:
+                if keepall:
+                    newrow = list(feat.row)
+                    newrow += (None for i in otheridx)
+                    out.add_feature(newrow, None)
+                continue
+            
+            # first add those whose bboxes clearly dont overlap
+            nonoverlaps = []
+            for otherfeat in other.quick_disjoint(feat.bbox):
+                if subkey and not subkey(feat,otherfeat):
+                    continue
+                nonoverlaps.append(otherfeat)
+
+            # then check those that might overlap
             geom = feat.get_shapely()
+            # get spindex possibilities
+            closeones = (otherfeat for otherfeat in other.quick_overlap(feat.bbox))
+            # filter by subkey
+            if subkey:
+                closeones = (otherfeat for otherfeat in closeones if subkey(feat, otherfeat))
+            # test spatial
+            closeones = [otherfeat for otherfeat in closeones if geom.disjoint(otherfeat._shapely)]
 
-            # has to be disjoint with all those that maybe overlap,
-            # ie a feature that intersects at least one feature in the
-            # other layer is not disjoint
-            disjoint = all((otherfeat.get_shapely().disjoint(geom) for otherfeat in other.quick_overlap(feat.bbox)))
+            # add
+            matches = nonoverlaps + closeones
+            if matches:
+                for match in matches:
+                    if clip:
+                        geoj = clip(feat, match)
+                    else:
+                        geoj = feat.geometry
+                    newrow = list(feat.row)
+                    newrow += (match.row[i] for i in otheridx)
+                    out.add_feature(newrow, geoj)
 
-            if disjoint:
-                out.add_feature(feat.row, feat.geometry)
+            elif keepall:
+                # no matches
+                newrow = list(feat.row)
+                newrow += (None for i in otheridx)
+                out.add_feature(newrow, feat.geometry)
 
         return out
     
     else:
-        raise Exception("Unknown join condition")
+        raise Exception("%s is not a valid join condition" % condition)
 
 
 
