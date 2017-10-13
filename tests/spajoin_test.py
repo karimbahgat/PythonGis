@@ -1,8 +1,8 @@
 import pythongis as pg
 from time import time
 
-poly = pg.VectorData(r"C:\Users\kimo\Downloads\ne_10m_admin_1_states_provinces\ne_10m_admin_1_states_provinces.shp", encoding="latin")
-points = pg.VectorData(r"C:\Users\kimo\Downloads\ne_10m_populated_places\ne_10m_populated_places.shp", encoding="latin")
+poly = pg.VectorData("data/ne_10m_admin_1_states_provinces.shp", encoding="latin")
+points = pg.VectorData("data/ne_10m_populated_places_simple.shp", encoding="latin")
 print points
 
 ##t=time()
@@ -12,8 +12,8 @@ print points
 ##print time()-t, join
 
 t=time()
-join = poly.manage.spatial_join(points, "intersects") # poly contains points
-print time()-t, join
+join = poly.manage.spatial_join(points, "intersects", clip=lambda f1,f2: f2.geometry) # poly contains points
+print "fast join country to each point", time()-t, join
 
 # HEAVY ONES
 
@@ -24,19 +24,16 @@ print time()-t, join
 ##print time()-t, join
 
 t=time()
-join = points.manage.spatial_join(poly, "distance", radius=60, n=1)
-print time()-t, join
+join = points.manage.spatial_join(poly, "distance", radius=60, n=1) 
+print "slow join closest country to point, within limit,", time()-t, join
 
 t=time()
 join = points.manage.spatial_join(poly, "distance", radius=60)
-print time()-t, join
+print "slow join all countries to point, within limit,", time()-t, join
 
 t=time()
 join = points.manage.spatial_join(poly, "distance", n=1)
-print time()-t, join
+print "slow join closest country to point, no limit,", time()-t, join
 
-# Somewhat faster poly-point
 
-t=time()
-join = poly.manage.spatial_join(points, "distance", n=1) 
-print time()-t, join
+

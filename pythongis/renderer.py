@@ -715,6 +715,8 @@ class VectorLayer:
         self.img = None
         self.img_text = None
 
+        self.effects = []
+
         self.legendoptions = legendoptions or dict()
         self.nolegend = nolegend
         self.datafilter = datafilter
@@ -875,6 +877,89 @@ class VectorLayer:
             for feat in features:
                 yield feat
 
+    def add_effect(self, effect, **kwargs):
+        
+        if isinstance(effect, basestring):
+
+            if effect == "shadow":
+                def effect(lyr):
+                    binary = lyr.img.point(lambda v: 255 if v > 0 else 0)
+                    drawer = pyagg.canvas.from_image(binary)
+                    drawer.replace_color((255,255,255,255), kwargs.get("color", (115,115,115,155)))
+                    drawer.move(kwargs.get("xdist"), kwargs.get("ydist"))
+                    drawer.paste(lyr.img)
+                    img = drawer.get_image()
+                    return img
+
+            elif effect == "glow":
+
+                def effect(lyr):
+                    import PIL, PIL.ImageMorph
+                    
+                    binary = lyr.img.point(lambda v: 255 if v > 0 else 0).convert("L")
+                    
+                    color = kwargs.get("color")
+                    if isinstance(color, list):
+                        # use gradient to set range of colors via incremental grow/shrink
+                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
+                        grad = pyagg.canvas.Gradient(color)
+                        for col in grad.interp(kwargs.get("size")):
+                            col = tuple(col)
+                            _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
+                            _,edge = PIL.ImageMorph.MorphOp(op_name="edge").apply(binary)
+                            if len(col) == 4:
+                                edge = edge.point(lambda v: col[3] if v == 255 else 0)
+                            newimg.paste(col[:3], (0,0), mask=edge)
+                        newimg.paste(lyr.img, (0,0), lyr.img)
+                    else:
+                        # entire area same color
+                        for _ in range(kwargs.get("size")):
+                            _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
+                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
+                        newimg.paste(color, (0,0), lyr.img)
+                        newimg.paste(lyr.img, (0,0), binary)
+                        
+                    return newimg
+                
+            elif effect in "inner":
+                # TODO: gets affected by previous effects, somehow only get original rendered image
+                # TODO: should do inner type on each feature, not the entire layer.
+                # OR: effect for entire layer, and separate for each feature via styleoptions...?
+                # TODO: canvas edge should not be counted...
+                # TODO: transp gradient not working, sees through even original layer...
+                    
+                def effect(lyr):
+                    import PIL, PIL.ImageMorph
+                    
+                    binary = lyr.img.point(lambda v: 255 if v > 0 else 0).convert("L")
+                    
+                    color = kwargs.get("color")
+                    if isinstance(color, list):
+                        # use gradient to set range of colors via incremental grow/shrink
+                        newimg = lyr.img.copy()
+                        grad = pyagg.canvas.Gradient(color)
+                        for col in grad.interp(kwargs.get("size")):
+                            col = tuple(col)
+                            _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
+                            _,edge = PIL.ImageMorph.MorphOp(op_name="edge").apply(binary)
+                            if len(col) == 4:
+                                edge = edge.point(lambda v: col[3] if v == 255 else 0)
+                            newimg.paste(col[:3], (0,0), mask=edge)
+                    else:
+                        # entire area same color
+                        for _ in range(kwargs.get("size")):
+                            _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
+                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
+                        newimg.paste(color, (0,0), lyr.img)
+                        newimg.paste(lyr.img, (0,0), binary)
+                        
+                    return newimg
+                
+            else:
+                raise Exception("Not a valid effect")
+        
+        self.effects.append(effect)
+
     def render(self, width, height, bbox=None, lock_ratio=True, flipy=False, antialias=False):
         if self.has_geometry():
             import time
@@ -976,6 +1061,10 @@ class VectorLayer:
             else:
                 self.img = drawer.get_image()
 
+            # effects
+            for eff in self.effects:
+                self.img = eff(self)
+
         else:
             self.img = None
 
@@ -1055,6 +1144,8 @@ class RasterLayer:
         self.data = data
         self.visible = True
         self.img = None
+
+        self.effects = []
 
         self.legendoptions = legendoptions or dict()
         self.nolegend = nolegend
