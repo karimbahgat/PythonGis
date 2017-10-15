@@ -677,7 +677,7 @@ def buffer(data, dist, join_style="round", cap_style="round", mitre_limit=1.0, g
     # get buffer func
     if geodetic:
         # geodetic
-        if data.type != "Point":
+        if data.type != None and data.type != "Point":
             raise Exception("Geodetic buffer only implemented for points")
 
         from ._helpers import geodetic_buffer

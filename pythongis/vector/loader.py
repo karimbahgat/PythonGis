@@ -108,6 +108,15 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
                     else:
                         return string.decode(encoding, errors=encoding_errors)
             rows = ([parsestring(cell) for cell in row] for row in rows)
+            
+            if "skip" in kwargs:
+                for _ in range(kwargs["skip"]):
+                    next(rows)
+
+            if "last" in kwargs:
+                last = kwargs["last"]
+                rows = (r for i,r in enumerate(rows) if i <= last)
+
             fields = next(rows)
 
         # excel
@@ -122,7 +131,13 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
                 rows = ([cell.value for cell in row] for row in sheet.get_rows())
                 
             elif filetype == "Excel":
-                raise NotImplementedError()
+                import openpyxl as pyxl
+                wb = pyxl.load_workbook(filepath)
+                if "sheet" in kwargs:
+                    sheet = wb[kwargs["sheet"]]
+                else:
+                    sheet = wb[wb.sheetnames[0]]
+                rows = ([cell.value for cell in row] for row in sheet.iter_rows())
 
             # some excel files may contain junk metadata near top and bottom rows that should be skipped
             # TODO: maybe change API/keywords here...

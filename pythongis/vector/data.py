@@ -1235,7 +1235,8 @@ class VectorData:
         if bbox:
             mapp.zoom_bbox(*bbox)
         else:
-            mapp.zoom_bbox(*mapp.layers.bbox)
+            if self.has_geometry():
+                mapp.zoom_bbox(*mapp.layers.bbox)
         mapp.render_all()
         return mapp
 
