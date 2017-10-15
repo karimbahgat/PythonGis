@@ -29,6 +29,7 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
     # handle zonaldata being vector type
     if not isinstance(zonaldata, RasterData):
         zonaldata = manager.rasterize(zonaldata, **valuedata.rasterdef)
+        zonaldata = zonaldata.conditional("val > 0") # necessary bc rasterize returns 8bit instead of binary
     
     # resample value grid into zonal grid
     if zonaldata.affine != valuedata.affine:

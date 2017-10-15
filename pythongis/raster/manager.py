@@ -318,11 +318,15 @@ def downscale(raster, stat="spread", **rasterdef):
 def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None, **rasterdef):
     """
     Rasterizes vectordata to a raster with the given rasterdef. 
-    By default returns a binary raster of the vector features. 
+    By default returns an 8-bit raster with 1 for the location of vector features. 
     If valuekey func, the cells take on the value of each feature and multiple
     feats in a cell are aggregated using stat.
     If priority func, multiple feats are filtered/chosen before aggregated. 
     If partialfunc, feats that only partially overlap cell are given a weight.
+
+    TODO: For non-valuekey, it currently returns an 8bit L raster with 0/1,
+        or should it return a binary raster with 0/255 (PIL weirdness)?
+        Or maybe binary rasters should be changed so uses 0/1 somehow...?
     """
 
     # TODO: allow 'custom' which instead sets every cell using custom method taking cell and feats (slow but flexible)
@@ -839,6 +843,7 @@ def clip(raster, clipdata, bbox=None, bandnum=0):
     if isinstance(clipdata, VectorData):
         # rasterize vector data
         valid = rasterize(clipdata, **georef).bands[0]
+        valid = valid.conditional("val > 0") # necessary bc rasterize returns 8bit instead of binary
     elif isinstance(clipdata, RasterData):
         # get boolean band where nodatavals
         valid = clipdata.bands[bandnum].conditional("val != %s" % clipdata.bands[bandnum].nodataval)

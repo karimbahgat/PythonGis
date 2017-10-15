@@ -527,7 +527,9 @@ class Band(object):
     def conditional(self, condition):
         """Return a binary band showing where a condition is true.
 
-        TODO: Does this, and should it, evaluate to True for nodata values? 
+        TODO: Does this, and should it, evaluate to True for nodata values?
+
+        TODO> This returns a binary 1bit mode image, where true is 255. Should that be the case, or 1?
 
         Args:
             condition: A string expression whose evaluation will determine which cell

@@ -678,6 +678,10 @@ class VectorData:
             val = feat.row[fieldindex]
             feat.row[fieldindex] = valfunc(val)
 
+    def values(self, field):
+        """Returns list of all the unique values in this field."""
+        return sorted(set(f[field] for f in self))
+
     def inspect_field(self, field):
         """Returns detailed stats unique values freq for a single field.
 
