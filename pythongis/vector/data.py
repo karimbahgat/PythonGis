@@ -678,107 +678,19 @@ class VectorData:
             val = feat.row[fieldindex]
             feat.row[fieldindex] = valfunc(val)
 
-    def values(self, field):
-        """Returns list of all the unique values in this field."""
-        return sorted(set(f[field] for f in self))
+    # INSPECTING
 
-    def inspect_field(self, field):
-        """Returns detailed stats unique values freq for a single field.
-
-        TODO: change so purpose of function is to print the text in IDLE rather than just return it.
-        TODO: split into multiple methods, eg field_stats vs field_values/frequencies
-        TODO: standardize table string formatting, eg as a vectordata.stringformat() method, and simply populate a stats vectordata table and call its method
-        TODO: sort freq table by percentages
-        TODO: fix unicode print error
-        """
-        
-        typ = self.field_type(field)
-        getval = lambda v: v
-        values = [f[field] for f in self]
-
-        def getmissing(v):
-            """Sets valid values to none so that only missing values are counted in stats"""
-            v = is_missing(getval(v))
-            v = True if v else None 
-            return v
-
-        from . import sql
-        
-        if typ in ("text",):
-            printfields = ["", "frequency", "percent"]
-            printrows = []
-
-            for uniq in sorted(set(values)):
-                freq = values.count(uniq)
-                perc = freq / float(len(self)) * 100
-                perc = "%.2f%%" % perc
-                printrow = [uniq, freq, perc]
-                printrows.append(printrow)
-            
-        elif typ in ("int","float"):
-            printfields = ["", "type", "min/minority", "max/majority", "mean", "stdev", "missing"]
-            printrows = []
-            fieldmapping = [("min",getval,"min"),
-                            ("max",getval,"max"),
-                            ("mean",getval,"mean"),
-                            #("stdev",getval,"stddev"),
-                            ("missing",getmissing,"count"),]
-            _min,_max,mean,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
-            missing = missing if missing else 0
-            missing = "%s (%.2f%%)" % (missing, missing/float(len(self))*100 )
-            printrow = [field, typ, _min, _max, mean, None, missing]
-            printrows.append(printrow)
-
-        # format outputstring
-        outstring = "Inspecting field: '%s' \n" % field
-        outstring += "type: %s \n" % typ
-        outstring += "values: " + "\n"
-
-        row_format = "{:>15}" * (len(printfields))
-        outstring += row_format.format(*printfields) + "\n"
-        for row in printrows:
-            outstring += row_format.format(*row) + "\n"
-
-        return outstring
-
-    def histogram(self, field, width=None, height=None, bins=10):
-        """Renders the value distribution of a given field in a histogram plot, 
-        returned as a PyAgg Canvas of size width/height. This canvas can be used
-        to call "save()" or "view()". Default histogram bins is 10.
-        
-        TODO:
-        - Should it return Canvas, or just straight view() it? 
-        """
-        import pyagg
-        import classypie
-        values = [f[field] for f in self]
-
-        bars = []
-        for (_min,_max),group in classypie.split(values, breaks="equal", classes=bins):
-            label = "%s to %s" % (_min,_max)
-            count = len(group)
-            bars.append((label,count))
-            
-        c = pyagg.graph.BarChart()
-        c.add_category(name="Title...", baritems=bars)
-        return c.draw() # draw returns the canvas
-
-    def describe(self, *fields):
-        """Returns table of fieldname, type, min/minority, max/majority, stdev, missing.
-        If specified, only calculates for the fields listed in *fields.
-
-        TODO: change so purpose of function is to print the text in IDLE rather than just return it.
-        TODO: maybe not use all those stats...
+    def describe(self):
+        """Prints a description of the dataset, such as geometry type, length, bbox, and lists each
+        field along with their name, type, valid, and missing.
         """
 
-        printfields = ["", "type", "min/minority", "max/majority", "mean", "stdev", "missing"]
+        printfields = ["", "type", "valid", "missing"]
         printrows = []
 
         from . import sql
-        if not fields:
-            fields = self.fields
         
-        for field in fields:
+        for field in self.fields:
             
             values = [feat[field] for feat in self]
             typ = self.field_type(field)
@@ -789,29 +701,16 @@ class VectorData:
                 v = is_missing(getval(v))
                 v = True if v else None 
                 return v
-            
-            if typ in ("text",):
-                fieldmapping = [("min/minority",getval,"minority"),
-                                ("max/majority",getval,"majority"),
-                                ("missing",getmissing,"count"),]
-                minor,major,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
-                printrow = [field, typ, minor, major, None, None, missing]
-                
-            elif typ in ("int","float"):
-                fieldmapping = [("min/minority",getval,"min"),
-                                ("max/majority",getval,"max"),
-                                ("mean",getval,"mean"),
-                                #("stdev",getval,"stddev"),
-                                ("missing",getmissing,"count"),]
-                _min,_max,mean,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
-                missing = missing if missing else 0
-                missing = "%s (%.2f%%)" % (missing, missing/float(len(self))*100 )
-                printrow = [field, typ, _min, _max, mean, None, missing]
+
+            missing = sum((1 for v in values if getmissing(v)))
+            valid = len(self) - missing
+            missing = "%s (%.2f%%)" % (missing, missing/float(len(self))*100 )
+            printrow = [field, typ, valid, missing]
                 
             printrows.append(printrow)
 
         # format outputstring
-        outstring = "Describing vector data:" + "\n"
+        outstring = "Describing vector dataset:" + "\n"
         outstring += "filepath: %s \n" % self.filepath
         outstring += "type: %s \n" % self.type
         outstring += "length: %s \n" % len(self) 
@@ -823,7 +722,62 @@ class VectorData:
         for row in printrows:
             outstring += row_format.format(*row) + "\n"
             
-        return outstring
+        print outstring
+
+    def summarystats(self, *fields):
+        """
+        Prints summary statistics for all fields. 
+        If specified, only calculates for the fields listed in *fields.
+
+        TODO: maybe also return a dict?
+        """
+
+        fields = fields or self.fields
+        
+        def getmissing(v):
+            """Sets valid values to none so that only missing values are counted in stats"""
+            v = is_missing(getval(v))
+            v = True if v else None 
+            return v
+
+        from . import sql
+
+        printfields = ["", "type", "obs", "min", "max", "mean", "stdev"]
+        printrows = []
+        getval = lambda v: v
+        fieldmapping = [("min",getval,"min"),
+                        ("max",getval,"max"),
+                        ("mean",getval,"mean"),
+                        #("stdev",getval,"stddev"),
+                        ("missing",getmissing,"count"),]
+
+        for field in fields:
+            typ = self.field_type(field)
+            if typ in ("text",):
+                printrow = [field, typ] + [None for _ in fieldmapping] + [None]
+                
+            elif typ in ("int","float"):
+                values = [feat[field] for feat in self]
+                _min,_max,mean,missing = sql.aggreg(values, aggregfuncs=fieldmapping)
+                missing = missing if missing else 0
+                valid = len(self) - missing
+                printrow = [field, typ, valid, _min, _max, mean, None]
+
+            printrows.append(printrow)
+
+        # format outputstring
+        outstring = "Summary statistics: \n"
+
+        row_format = "{:>15}" * (len(printfields))
+        outstring += row_format.format(*printfields) + "\n"
+        for row in printrows:
+            outstring += row_format.format(*row) + "\n"
+
+        print outstring
+
+    def field_values(self, field):
+        """Returns sorted list of all the unique values in this field."""
+        return sorted(set(f[field] for f in self))
 
     def field_type(self, field):
         """Determines and returns field type of field based on its values (ignoring missing values).
@@ -847,6 +801,72 @@ class VectorData:
                 typ = "text"
                 break
         return typ
+
+    def count(self, field):
+        """Prints a frequency count of the unique values for a single field.
+
+        TODO: split into multiple methods, eg field_stats vs field_values/frequencies
+        TODO: standardize table string formatting, eg as a vectordata.stringformat() method, and simply populate a stats vectordata table and call its method
+        TODO: sort freq table by percentages
+        TODO: fix unicode print error
+        TODO: maybe also return a dict?
+        """
+        
+        typ = self.field_type(field)
+        getval = lambda v: v
+        values = [f[field] for f in self]
+
+        def getmissing(v):
+            """Sets valid values to none so that only missing values are counted in stats"""
+            v = is_missing(getval(v))
+            v = True if v else None 
+            return v
+
+        from . import sql
+        
+        printfields = ["", "frequency", "percent"]
+        printrows = []
+
+        for uniq in sorted(set(values)):
+            freq = values.count(uniq)
+            perc = freq / float(len(self)) * 100
+            perc = "%.2f%%" % perc
+            printrow = [uniq, freq, perc]
+            printrows.append(printrow)
+
+        # format outputstring
+        outstring = "Frequency tabulation for field: '%s' \n" % field
+        outstring += "type: %s \n" % typ
+        outstring += "values: " + "\n"
+
+        row_format = "{:>15}" * (len(printfields))
+        outstring += row_format.format(*printfields) + "\n"
+        for row in printrows:
+            outstring += row_format.format(*row) + "\n"
+
+        print outstring
+
+    def histogram(self, field, width=None, height=None, bins=10):
+        """Renders the value distribution of a given field in a histogram plot, 
+        returned as a PyAgg Canvas of size width/height. This canvas can be used
+        to call "save()" or "view()". Default histogram bins is 10.
+        
+        TODO:
+        - Should it return Canvas, or just straight view() it? 
+        """
+        import pyagg
+        import classypie
+        values = [f[field] for f in self]
+
+        bars = []
+        for (_min,_max),group in classypie.split(values, breaks="equal", classes=bins):
+            label = "%s to %s" % (_min,_max)
+            count = len(group)
+            bars.append((label,count))
+            
+        c = pyagg.graph.BarChart()
+        c.add_category(name="Title...", baritems=bars)
+        return c.draw() # draw returns the canvas
 
     ### FILTERING ###
 
