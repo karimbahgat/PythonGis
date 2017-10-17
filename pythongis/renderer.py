@@ -132,7 +132,8 @@ class Layout:
 
         # title (these properties affect the actual rendered title after init)
         self.title = title
-        self.titleoptions = titleoptions or dict()
+        self.titleoptions = dict(textsize="6%w")
+        if titleoptions: self.titleoptions.update(titleoptions)
         self.foregroundgroup.add_layer(Title(self))
             
         self.img = self.drawer.get_image()
@@ -255,7 +256,8 @@ class Map:
 
         # title (these properties affect the actual rendered title after init)
         self.title = title
-        self.titleoptions = titleoptions or dict()
+        self.titleoptions = dict(textsize="6%w")
+        if titleoptions: self.titleoptions.update(titleoptions)
         self.foregroundgroup.add_layer(Title(self))
 
         self.dimensions = dict()
@@ -1356,7 +1358,11 @@ class Legend:
                     categories = set((cls.key(item),tuple(classval)) for item,classval in cls) # only the unique keys
                     breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
                 elif options.get("valuetype") == "proportional":
-                    raise NotImplementedError()
+                    breaks = options.get("ticks", cls.breaks)
+                    classvalues = cls.classvalues_interp
+                    options["length"] = options.get("length", "40%min")
+                    options["thickness"] = options.get("thickness", "4%min")
+                    options["direction"] = options.get("direction", "e")
                 else:
                     breaks = cls.breaks
                     classvalues = cls.classvalues_interp
@@ -1545,7 +1551,7 @@ class Title:
             titleoptions = self.layout.titleoptions.copy()
             titleoptions.pop("xy", None)
             titleoptions.pop("anchor", None)
-            rendered = pyagg.legend.Label(self.layout.title, **titleoptions).render() # pyagg label indeed implements a render method()
+            rendered = pyagg.legend.Label(self.layout.title, refcanvas=self.layout.drawer, **titleoptions).render() # pyagg label indeed implements a render method()
             self.img = rendered.get_image()
 
 
