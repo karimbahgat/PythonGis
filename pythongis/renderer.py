@@ -1400,7 +1400,7 @@ class Legend:
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
             options.update(override)
-            options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
+            #options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
 
             shape = options.pop("shape", None)
             shape = shape or layer.styleoptions.get("shape")
