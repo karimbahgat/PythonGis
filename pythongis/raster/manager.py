@@ -776,8 +776,10 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
 
     if bbox:
         x1,y1,x2,y2 = bbox
-        bcol1,brow1 = raster.geo_to_cell(x1,y1)
-        bcol2,brow2 = raster.geo_to_cell(x2,y2)        
+        bcol1,brow1 = raster.geo_to_cell(x1,y1) 
+        bcol2,brow2 = raster.geo_to_cell(x2,y2)
+        if bcol2 < bcol1: bcol1,bcol2 = bcol2,bcol1
+        if brow2 < brow1: brow1,brow2 = brow2,brow1
 
     if worldcoords:
         xscale,xskew,xoffset, yskew,yscale,yoffset = raster.meta["affine"]
@@ -788,7 +790,7 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
         tw,th = int(round(raster.width*xfrac)), int(round(raster.height*yfrac))
 
     minw,minh = 0,0
-    maxw,maxh = raster.width,raster.height
+    maxw,maxh = raster.width-1,raster.height-1
 
     def _floatrange(fromval,toval,step):
         # handles both ints and flots
@@ -797,15 +799,15 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
             yield val
             val += step
     
-    for row in _floatrange(minh, maxh, th):
-        row2 = row+th if row+th <= maxh else maxh
+    for row in _floatrange(minh, maxh-1, th):
+        row2 = row+th-1 if row+th <= maxh else maxh-1
 
         if bbox and (brow2 <= row or brow1 >= row2):
             # dont yield if outside desired bbox
             continue
         
         for col in _floatrange(minw, maxw, tw):
-            col2 = col+tw if col+tw <= maxw else maxw
+            col2 = col+tw-1 if col+tw <= maxw else maxw-1
 
             if bbox and (bcol2 <= col or bcol1 >= col2):
                 # dont yield if outside desired bbox
