@@ -6,6 +6,7 @@ from . import data
 from ..vector import sql
 
 import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMath
+import gc
 
 def mosaic(rasters, overlaprule="last", **rasterdef):
     """
@@ -726,22 +727,146 @@ def crop(raster, bbox, worldcoords=True):
     px2 += 1
     py2 += 1
 
+    # do bounds check
+    pxmin = min(px1,px2)
+    pymin = min(py1,py2)
+    pxmax = max(px1,px2) 
+    pymax = max(py1,py2)
+    
+    pxmin = max(0, pxmin)
+    pymin = max(0, pymin)
+    pxmax = min(raster.width-1, pxmax)
+    pymax = min(raster.height-1, pymax)
+
+    #print pxmin,pymin,pxmax,pymax
+
+    if pxmax < 0 or pxmin > raster.width or pymax < 0 or pymin > raster.height:
+        raise Exception("The cropping bbox is entirely outside the raster extent")
+
     # get new dimensions
     outrast = data.RasterData(**raster.meta)
-    width = abs(px2-px1)
-    height = abs(py2-py1)
-    if width == 0 or height == 0:
+    width = abs(pxmax-pxmin)
+    height = abs(pymax-pymin)
+    if width <= 0 or height <= 0:
         raise Exception("Cropping bbox was too small, resulting in 0 pixels")
     outrast.width = width
     outrast.height = height
 
+    print width,height
+
     # crop each and add as band
-    pxmin = min(px1,px2)
-    pymin = min(py1,py2)
-    pxmax = max(px1,px2) 
-    pymax = max(py1,py2) 
     for band in raster.bands:
-        img = band.img.crop((pxmin,pymin,pxmax,pymax))
+        img = band.img
+        if hasattr(img, 'filename') and hasattr(img, 'tile') and len(img.tile) > 1:
+            # not yet loaded, so open as new img and only load relevant tiles
+            fn = img.filename
+            encoding,firstbox,firstoffset,extra = img.tile[0]
+            #print img.tile[0]
+            if encoding == 'raw':
+                # raw encoding, so should be able to custom specify our own tile
+                # TODO: Not working properly for now so defaulting to compressed approach below
+                
+                # TODO: Do we also need to offset+subindex into specific bandnum if rgb etc?
+
+                # ALT1, using tile option
+                #dbyte = {'float32':4,'float16':2,'int32':4,'int16':2,'int8':1,'1bit':1}[band.mode]
+                #print pxmin,pymin,pxmax,pymax
+                #offset = ( (pymin*band.width) + pxmin) * dbyte
+                #print dbyte,offset
+                #img = PIL.Image.open(fn)
+                #img.tile = [(encoding, (0,0,width,height), firstoffset + offset, extra)]
+                #img.size = width,height
+                #img.load() # = img.crop((pxmin,pymin,pxmax,pymax))
+
+##                # ALT2, raw byte reading
+##                import struct
+##                with open(fn, 'rb') as fobj:
+##                    # TODO: support more formats?? 
+##                    dbyte = {'float32':4,'float16':2,'int32':4,'int16':2,'int8':1,'1bit':1}[band.mode]
+##                    dtype = {'float32':'f','int32':'i','int16':'h','int8':'b','1bit':'b'}[band.mode]
+##                    skipleft = pxmin * dbyte
+##                    skipright = (band.width - (pxmin + width)) * dbyte
+##                    #print pxmin,pymin,pxmax,pymax
+##                    lineformat = '{l}x{w}{typ}{r}x'.format(l=skipleft, r=skipright, w=width, typ=dtype)
+##                    #print lineformat
+##                    frmt = lineformat * height
+##                    
+##                    offset = pymin * band.width * dbyte
+##                    fobj.seek(firstoffset + offset)
+##                    sz = struct.calcsize(frmt)
+##                    #print 'sz',sz
+##                    raw = fobj.read(sz)
+##                    vals = struct.Struct(frmt).unpack(raw)
+##                    #print len(vals)#, str(vals)[:100]
+##
+##                    # create the image from data
+##                    #img = PIL.Image.frombytes(img.mode, (width,height), vals)
+##                    img = PIL.Image.new(img.mode, (width,height), 0)
+##                    #img.putdata(vals) # ideal, but slowly leaks memory, see https://github.com/python-pillow/Pillow/issues/1187
+##                    pixels = img.load()
+##                    for i,val in enumerate(vals):
+##                        r = i // width
+##                        c = i - (r*width)
+##                        pixels[c,r] = val
+##                    #import gc
+##                    del lineformat,offset,sz,frmt,raw,vals
+##                    gc.collect()
+
+                # ALT3, linewise, directly into array, virtually no memory use and yet fast                
+                import array
+                img = PIL.Image.new(img.mode, (width,height), band.nodataval)
+                pixels = img.load()
+                with open(fn, 'rb') as fobj:
+                    # TODO: support more formats?? 
+                    dbyte = {'float32':4,'float16':2,'int32':4,'int16':2,'int8':1,'1bit':1}[band.mode]
+                    arrtype = {'float32':'f','int32':'l','int16':'i','int8':'b','1bit':'b'}[band.mode]
+                    skipleft = pxmin * dbyte
+                    #print pxmin,pymin,pxmax,pymax
+
+                    for r in range(height):
+                        origrow = pymin + r
+                        offset = ( (origrow*band.width) + pxmin) * dbyte
+                        fobj.seek(firstoffset + offset)
+                        linevals = array.array(arrtype)
+                        linevals.fromfile(fobj, width)
+                        for c,val in enumerate(linevals):
+                            pixels[c,r] = val
+                    
+            else:
+                # compressed, so must use existing tiles,
+                # but can simply filter to those that overlap,
+                # and img.crop will load only those tiles and batch crop them fast
+                tiles = [(tenco,(txmin,tymin,txmax,tymax),offset,textra)
+                         for tenco,(txmin,tymin,txmax,tymax),offset,textra in img.tile
+                         if not (txmax < pxmin or txmin > pxmax or tymax < pymin or tymin > pymax)]
+                #print 'len',len(tiles),len(img.tile)
+                img = PIL.Image.open(fn)
+                img.tile = tiles
+                img = img.crop((pxmin,pymin,pxmax,pymax))
+
+                # OLD: iterate and stitch together existing tiles, but so much IO is super slow
+##                tiles = list(img.tile)
+##                img = PIL.Image.new(img.mode, (width,height), 0)
+##                for _,(txmin,tymin,txmax,tymax),offset,_ in tiles:
+##                    if txmax < pxmin or txmin > pxmax or tymax < pymin or tymin > pymax:
+##                        continue
+##                    else:
+##                        src = PIL.Image.open(fn)
+##                        src.tile = [(encoding, (txmin,tymin,txmax,tymax), offset, extra)]
+##                        #src.size = txmax-txmin, tymax-tymin
+##                        src = src.crop((txmin,tymin,txmax,tymax))
+##                        #print src, str(src.getcolors())[:100]
+##                        
+##                        # TODO: calc xypos to paste in new img
+##                        nxmin = txmin-pxmin
+##                        nymin = tymin-pymin
+##                        #print (pxmin,pymin,pxmax,pymax),(txmin,tymin,txmax,tymax)
+##                        #print nxmin,nymin,src.size
+##                        
+##                        img.paste(src, (nxmin,nymin))
+                    
+        else:
+            img = img.crop((pxmin,pymin,pxmax,pymax))
         outrast.add_band(img=img, nodataval=band.nodataval)
 
     # update output affine offset based on new upperleft corner
@@ -813,12 +938,15 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
                 # dont yield if outside desired bbox
                 continue
 
-            try:
-                tile = crop(raster, [col,row,col2,row2], False)
-                yield tile
-            except:
-                # HMMM, tile was too small...
-                pass
+            tile = crop(raster, [col,row,col2,row2], False)
+            yield tile
+
+##            try:
+##                tile = crop(raster, [col,row,col2,row2], False)
+##                yield tile
+##            except:
+##                # HMMM, tile was too small...
+##                pass
 
 def clip(raster, clipdata, bbox=None, bandnum=0):
     """Clips a raster by the areas containing data in a vector or raster data instance.
