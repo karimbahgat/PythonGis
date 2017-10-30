@@ -1570,9 +1570,9 @@ class Legend:
     def add_single_symbol(self, layer, **override):
         if isinstance(layer, VectorLayer):
             # use layer's legendoptions and possibly override
-            options = dict(layer.legendoptions)
+            options = dict(layer.styleoptions)
+            options.update(layer.legendoptions)
             options.update(override)
-            options.update(layer.styleoptions)
 
             shape = options.pop("shape", self._get_layer_shape(layer))
 

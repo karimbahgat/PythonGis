@@ -122,8 +122,7 @@ def from_file(filepath, **georef):
             
             # cellsize
             cellsize = float(_nextheader(headername="cellsize")[1])
-            georef["cellwidth"] = cellsize
-            georef["cellheight"] = cellsize
+            georef["cellsize"] = cellsize
             
             # nodata
             prevline = tempfile.tell()
@@ -143,15 +142,44 @@ def from_file(filepath, **georef):
                 nextline = tempfile.readline().strip()
             tempfile.seek(prevline)
             # collect flat list of cells instead of rows (because according to the ASCII format, the rows in the grid could be but aren't necessarily organized into separate lines)
-            data = []
-            for line in tempfile.readlines():
-                data.extend(float(cell) for cell in line.split())
-            # reshape values to correspond with row lists, and flatten again
-            def grouper(iterable, n):
-                args = [iter(iterable)] * n
-                return itertools.izip(*args)
-            #reshaped = itertools.izip(*grouper(data, cols))
-            #data = [cell for row in reshaped for cell in row]
+            def data():
+                cast = float
+                for line in tempfile: 
+                    for cell in line.split():
+                        cell = cast(cell)
+                        yield cell
+
+##            def data():
+##                cast = float
+##                for line in tempfile:
+##                    for cell in map(cast, line.split()):
+##                        yield cell
+##
+##            def data():
+##                lines = tempfile
+##                rows = itertools.imap(str.split, lines)
+##                flatvals = itertools.chain(*rows)
+##                cast = float
+##                for val in itertools.imap(cast, flatvals):
+##                    yield val
+##
+##            def data():
+##                lines = tempfile
+##                longstring = " ".join(lines)
+##                flatvals = longstring.split()
+##                print "splitted"
+##                cast = float
+##                for val in flatvals:
+##                    val = cast(val)
+##                    yield val
+
+            # load the data as an image
+            img = PIL.Image.new("F", (cols, rows))
+            _pixels = img.load()
+            for i,val in enumerate(data()):
+                row = i // cols
+                col = i - (row * cols)
+                _pixels[col,row] = val
 
         # Build geotransform
         if "affine" in georef_orig:
@@ -183,10 +211,6 @@ def from_file(filepath, **georef):
         # Nodata value
         nodataval = nodata
         
-        # load the data as an image
-        tempfile.close()
-        img = PIL.Image.new("F", (cols, rows))
-        img.putdata(data=data)
         # make a single-band tuple
         bands = [img]
 
@@ -491,7 +515,8 @@ def new(nodataval=-9999.0, crs=None, **georef):
         
     return georef, nodataval, bands, crs
 
-def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
+def compute_affine(xy_cell=None, xy_geo=None, cellsize=None,
+                   cellwidth=None, cellheight=None,
                    width=None, height=None, bbox=None,
                    xscale=None, yscale=None, xskew=0, yskew=0,
                    xoffset=None, yoffset=None,
@@ -501,12 +526,16 @@ def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
     if not xscale:
         if cellwidth:
             xscale = cellwidth
+        elif cellsize:
+            xscale = cellsize
         elif bbox and width:
             xwidth = bbox[2]-bbox[0]
             xscale = xwidth / float(width+1) # +1 is to account for the two half pixels padding of bbox
     if not yscale:
         if cellheight:
             yscale = cellheight
+        elif cellsize:
+            yscale = -cellsize # NOTE: since cellsize does not distinguish bw x and y, assume wgs84 and autoset cellsize to be negative
         elif bbox and height:
             yheight = bbox[3]-bbox[1]
             yscale = yheight / float(height+1) # +1 is to account for the two half pixels padding of bbox
@@ -553,13 +582,13 @@ def compute_affine(xy_cell=None, xy_geo=None, cellwidth=None, cellheight=None,
     if cell_anchor == "center":
         pass
     elif "n" in cell_anchor:
-        yoffset -= cellheight/2.0
+        yoffset -= xscale/2.0
     elif "s" in cell_anchor:
-        yoffset += cellheight/2.0
+        yoffset += yscale/2.0
     elif "w" in cell_anchor:
-        xoffset -= cellwidth/2.0
+        xoffset -= xscale/2.0
     elif "e" in cell_anchor:
-        xoffset += cellwidth/2.0
+        xoffset += yscale/2.0
 
     transform_coeffs = [xscale, xskew, xoffset, yskew, yscale, yoffset]
     return transform_coeffs
