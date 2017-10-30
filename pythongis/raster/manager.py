@@ -280,7 +280,7 @@ def upscale(raster, stat="sum", **rasterdef):
 
     # run moving focal window to group cells
     tilesize = (abs(xscale),abs(yscale))
-    print tilesize
+    #print tilesize
     for tile in tiled(raster, tilesize=tilesize, worldcoords=True):
         tilecenter = (tile.bbox[0]+tile.bbox[2])/2.0, (tile.bbox[1]+tile.bbox[3])/2.0
         targetpx = targetrast.geo_to_cell(*tilecenter)
@@ -421,7 +421,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
         for f1 in vectordata:
             if not f1.geometry:
                 continue
-            print ["f1",f1.id,len(vectordata)]
+            #print ["f1",f1.id,len(vectordata)]
 
             # first burn all maybe feats (ie get their combined union)
             img2 = PIL.Image.new("1", (raster.width,raster.height))
@@ -459,7 +459,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
         partialpix = partialmask.load()
 
         for y in range(raster.height):
-            print "%r of %r"%(y,raster.height)
+            #print "%r of %r"%(y,raster.height)
             for x in range(raster.width):
                 multicell = multipix[x,y]
                 partialcell = partialpix[x,y]
@@ -626,7 +626,7 @@ def vectorize(raster, mergecells=True, metavars=True, bandnum=0):
                     shp = Polygon(cell.poly["coordinates"][0])
                     shps.append(shp)
             union = shapely.ops.cascaded_union(shps)
-            print str(union)[:200]
+            #print str(union)[:200]
 
             outvec = VectorData()
             outvec.fields = ["id"]
@@ -656,7 +656,7 @@ def vectorize(raster, mergecells=True, metavars=True, bandnum=0):
                         shps.append(shp)
 
                 union = shapely.ops.cascaded_union(shps)
-                print str(union)[:200]
+                #print str(union)[:200]
 
                 if hasattr(union, "geoms"):
                     for poly in union.geoms:
@@ -752,7 +752,7 @@ def crop(raster, bbox, worldcoords=True):
     outrast.width = width
     outrast.height = height
 
-    print width,height
+    #print width,height
 
     # crop each and add as band
     for band in raster.bands:
