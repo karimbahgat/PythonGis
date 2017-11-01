@@ -762,7 +762,7 @@ def crop(raster, bbox, worldcoords=True):
             fn = img.filename
             encoding,firstbox,firstoffset,extra = img.tile[0]
             #print img.tile[0]
-            if encoding == 'raw':
+            if 0:#encoding == 'raw':
                 # raw encoding, so should be able to custom specify our own tile
                 # TODO: Not working properly for now so defaulting to compressed approach below
                 
