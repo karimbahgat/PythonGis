@@ -1159,15 +1159,20 @@ class RasterLayer:
             else:
                 options["type"] = "colorscale"
 
+        # autoset cutoff if big nrs and min/max not already set
+        if self.data.mode in 'float32 float16 int32 int16' and ('maxval' not in options or "minval" not in options):
+            options["cutoff"] = options.get("cutoff", (0.1,99.9))
+
+
         if options["type"] == "grayscale":
             options["bandnum"] = options.get("bandnum", 0)
             band = self.data.bands[options["bandnum"]]
             
             # cutoff bottom/top 0.1 percent outliers by default, if min/max are not already set
             # TODO: Now, only for big float and int data, maybe instead do some optimal distribution/outlier checking.
-            if self.data.mode in 'float32 float16 int32 int16' and ('maxval' not in options or "minval" not in options):
+            if "cutoff" in options:
 
-                mincut,maxcut = options.get("cutoff", (0.1,99.9))
+                mincut,maxcut = options["cutoff"]
 
                 # ALT1: cumulative count percentages
                 #print options
@@ -1240,6 +1245,15 @@ class RasterLayer:
                 options["minval"] = band.summarystats("min")["min"]
             if not "maxval" in options:
                 options["maxval"] = band.summarystats("max")["max"]
+
+            # optionally center so that min and max are equal distance from a given midpoint
+            if "center" in options:
+                center = options["center"]
+                mindiff = abs(options["minval"] - center)
+                maxdiff = abs(options["maxval"] - center)
+                diff = max(mindiff, maxdiff)
+                options["minval"] = center - diff
+                options["maxval"] = center + diff
 
         elif options["type"] == "colorscale":
             options["bandnum"] = options.get("bandnum", 0)
@@ -1247,9 +1261,9 @@ class RasterLayer:
 
             # cutoff bottom/top 0.1 percent outliers by default, if min/max are not already set
             # TODO: Now, only for big float and int data, maybe instead do some optimal distribution/outlier checking.
-            if self.data.mode in 'float32 float16 int32 int16' and ('maxval' not in options or "minval" not in options):
+            if "cutoff" in options:
 
-                mincut,maxcut = options.get("cutoff", (0.1,99.9))
+                mincut,maxcut = options["cutoff"]
 
                 # ALT1: cumulative count percentages
                 #print options
@@ -1322,6 +1336,15 @@ class RasterLayer:
                 options["minval"] = band.summarystats("min")["min"]
             if not "maxval" in options:
                 options["maxval"] = band.summarystats("max")["max"]
+
+            # optionally center so that min and max are equal distance from a given midpoint
+            if "center" in options:
+                center = options["center"]
+                mindiff = abs(options["minval"] - center)
+                maxdiff = abs(options["maxval"] - center)
+                diff = max(mindiff, maxdiff)
+                options["minval"] = center - diff
+                options["maxval"] = center + diff
 
             # process gradient
             if "gradcolors" in options:
@@ -1511,12 +1534,12 @@ class Legend:
                     gradient = [rgb("black"),rgb("white")]
                 else:
                     gradient = layer.styleoptions["gradcolors"]
-                ticks = options.get("ticks", [layer.styleoptions["minval"], layer.styleoptions["maxval"]])
-                length = options.get("length", "40%min")
-                thickness = options.get("thickness", "4%min")
+                options["ticks"] = options.get("ticks", [layer.styleoptions["minval"], layer.styleoptions["maxval"]])
+                options["length"] = options.get("length", "40%min")
+                options["thickness"] = options.get("thickness", "4%min")
                 options["direction"] = options.get("direction", "e")
-                self._legend.add_fillcolors(shape=None, breaks=ticks, classvalues=gradient,
-                                            valuetype="proportional", length=length, thickness=thickness,
+                self._legend.add_fillcolors(shape=None, breaks=options["ticks"], classvalues=gradient,
+                                            valuetype="proportional",
                                             **options)
 
     def add_fillsizes(self, layer, **override):
