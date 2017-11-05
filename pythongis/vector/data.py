@@ -802,7 +802,7 @@ class VectorData:
                 break
         return typ
 
-    def count(self, field):
+    def tab(self, field):
         """Prints a frequency count of the unique values for a single field.
 
         TODO: split into multiple methods, eg field_stats vs field_values/frequencies

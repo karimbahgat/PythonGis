@@ -885,9 +885,14 @@ class VectorLayer:
 
             if effect == "shadow":
                 def effect(lyr):
-                    binary = lyr.img.point(lambda v: 255 if v > 0 else 0)
+                    _,a = lyr.img.convert('LA').split()
+                    a = a.point(lambda v: v/3.0) # two thirds transparency
+                    binary = PIL.Image.new('L', lyr.img.size, 0) # black
+                    binary.putalpha(a)
                     drawer = pyagg.canvas.from_image(binary)
-                    drawer.replace_color((255,255,255,255), kwargs.get("color", (115,115,115,155)))
+                    #binary = lyr.img.point(lambda v: 255 if v > 0 else 0)
+                    #drawer = pyagg.canvas.from_image(binary)
+                    #drawer.replace_color((255,255,255,255), kwargs.get("color", (115,115,115,155)))
                     drawer.move(kwargs.get("xdist"), kwargs.get("ydist"))
                     drawer.paste(lyr.img)
                     img = drawer.get_image()
@@ -923,7 +928,7 @@ class VectorLayer:
                         
                     return newimg
                 
-            elif effect in "inner":
+            elif effect == "inner":
                 # TODO: gets affected by previous effects, somehow only get original rendered image
                 # TODO: should do inner type on each feature, not the entire layer.
                 # OR: effect for entire layer, and separate for each feature via styleoptions...?
@@ -1159,17 +1164,18 @@ class RasterLayer:
             else:
                 options["type"] = "colorscale"
 
-        # autoset cutoff if big nrs and min/max not already set
+        # auto cutoff bottom/top 0.1 percent outliers if big nrs and min/max not already set
+        # TODO: Now, only for big float and int data, maybe instead do some optimal distribution/outlier checking.
+        # TODO: How to prevent hiding values for binary or other small-range rasters?
+        # TODO: Maybe don't autoset to avoid confusion, instead having to set manually. 
         if self.data.mode in 'float32 float16 int32 int16' and ('maxval' not in options or "minval" not in options):
             options["cutoff"] = options.get("cutoff", (0.1,99.9))
 
-
-        if options["type"] == "grayscale":
+        # stretching
+        if options["type"] in ("grayscale","colorscale"):
             options["bandnum"] = options.get("bandnum", 0)
             band = self.data.bands[options["bandnum"]]
             
-            # cutoff bottom/top 0.1 percent outliers by default, if min/max are not already set
-            # TODO: Now, only for big float and int data, maybe instead do some optimal distribution/outlier checking.
             if "cutoff" in options:
 
                 mincut,maxcut = options["cutoff"]
@@ -1186,30 +1192,29 @@ class RasterLayer:
                 #pxcounts = sorted(pxcounts, key=lambda(c,v): v)
 
                 pxcounts = band.img.getcolors(band.width*band.height)
-                if len(pxcounts) > 256:
-                    pxcounts = [(c,v) for c,v in pxcounts if v != band.nodataval]
-                    pxcounts = sorted(pxcounts, key=lambda(c,v): v)
-                    tot = sum((c for c,v in pxcounts))
+                pxcounts = ((c,v) for c,v in pxcounts if v != band.nodataval)
+                pxcounts = sorted(pxcounts, key=lambda(c,v): v)
+                tot = sum((c for c,v in pxcounts))
 
-                    if 'minval' not in options:
-                        cumul = 0
-                        for count,val in pxcounts:
-                            cumul += count
-                            prog = cumul / float(tot) * 100
-                            #print val,count,cumul,prog
-                            if prog >= mincut:
-                                options["minval"] = val
-                                break
+                if 'minval' not in options:
+                    cumul = 0
+                    for count,val in pxcounts:
+                        cumul += count
+                        prog = cumul / float(tot) * 100
+                        #print val,count,cumul,prog
+                        if prog >= mincut:
+                            options["minval"] = val
+                            break
 
-                    if 'maxval' not in options:
-                        cumul = 0
-                        for count,val in pxcounts:
-                            cumul += count
-                            prog = cumul / float(tot) * 100
-                            #print val,count,cumul,prog
-                            if prog >= maxcut:
-                                options["maxval"] = val
-                                break
+                if 'maxval' not in options:
+                    cumul = 0
+                    for count,val in pxcounts:
+                        cumul += count
+                        prog = cumul / float(tot) * 100
+                        #print val,count,cumul,prog
+                        if prog >= maxcut:
+                            options["maxval"] = val
+                            break
 
                 #print options           
 
@@ -1255,96 +1260,13 @@ class RasterLayer:
                 options["minval"] = center - diff
                 options["maxval"] = center + diff
 
-        elif options["type"] == "colorscale":
-            options["bandnum"] = options.get("bandnum", 0)
-            band = self.data.bands[options["bandnum"]]
+        # set colors
+        if options['type'] == 'grayscale':
 
-            # cutoff bottom/top 0.1 percent outliers by default, if min/max are not already set
-            # TODO: Now, only for big float and int data, maybe instead do some optimal distribution/outlier checking.
-            if "cutoff" in options:
+            # process gradient
+            options["gradcolors"] = [rgb("black"),rgb("white")]
 
-                mincut,maxcut = options["cutoff"]
-
-                # ALT1: cumulative count percentages
-                #print options
-                
-                #pxcounts = band.img.histogram() #mask=band.mask)
-                #pxcounts = [(c,v) for c,v in pxcounts if v != band.nodataval]
-                
-                #vals = (cell.value for cell in band if cell.value != band.nodataval)
-                #from collections import Counter
-                #pxcounts = ((c,v) for v,c in Counter(vals).items())
-                #pxcounts = sorted(pxcounts, key=lambda(c,v): v)
-
-                pxcounts = band.img.getcolors(band.width*band.height)
-                if len(pxcounts) > 256:
-                    pxcounts = [(c,v) for c,v in pxcounts if v != band.nodataval]
-                    pxcounts = sorted(pxcounts, key=lambda(c,v): v)
-                    tot = sum((c for c,v in pxcounts))
-
-                    if 'minval' not in options:
-                        cumul = 0
-                        for count,val in pxcounts:
-                            cumul += count
-                            prog = cumul / float(tot) * 100
-                            #print val,count,cumul,prog
-                            if prog >= mincut:
-                                options["minval"] = val
-                                break
-
-                    if 'maxval' not in options:
-                        cumul = 0
-                        for count,val in pxcounts:
-                            cumul += count
-                            prog = cumul / float(tot) * 100
-                            #print val,count,cumul,prog
-                            if prog >= maxcut:
-                                options["maxval"] = val
-                                break
-
-                #print options           
-
-                # ALT2: value range percent, no frequency counting
-##                print options
-##                sortedvals = sorted(set((v for v in band.img.getdata() if v != band.nodataval)))
-##
-##                i1 = len(sortedvals) * mincut/100.0
-##                if i1.is_integer():
-##                    options["minval"] = sortedvals[int(i1)]
-##                else:
-##                    frac = i1 - int(i1)
-##                    diff = sortedvals[int(i1+1)] - sortedvals[int(i1)] 
-##                    options["minval"] = sortedvals[int(i1)] + (diff * frac)
-##
-##                i2 = len(sortedvals) * maxcut/100.0
-##                if i2.is_integer():
-##                    options["maxval"] = sortedvals[int(i2)]
-##                else:
-##                    frac = i2 - int(i2)
-##                    diff = sortedvals[int(i2+1)] - sortedvals[int(i2)] 
-##                    options["maxval"] = sortedvals[int(i2)] + (diff * frac)
-##
-##                print options
-
-                # ALT3: percent of min max range, fast but not meaningful
-                #rng = options["maxval"] - options["minval"]
-                #options["maxval"] = options["minval"] + rng / 100.0 * maxcut
-                #options["minval"] += rng / 100.0 * mincut
-            
-            # retrieve min and maxvals from data if not manually specified
-            if not "minval" in options:
-                options["minval"] = band.summarystats("min")["min"]
-            if not "maxval" in options:
-                options["maxval"] = band.summarystats("max")["max"]
-
-            # optionally center so that min and max are equal distance from a given midpoint
-            if "center" in options:
-                center = options["center"]
-                mindiff = abs(options["minval"] - center)
-                maxdiff = abs(options["maxval"] - center)
-                diff = max(mindiff, maxdiff)
-                options["minval"] = center - diff
-                options["maxval"] = center + diff
+        elif options['type'] == 'colorscale':
 
             # process gradient
             if "gradcolors" in options:

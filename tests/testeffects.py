@@ -6,9 +6,10 @@ poly = pg.VectorData("data/ne_10m_admin_0_countries.shp")
 mapp = pg.renderer.Map(1000,500,background=None) #,background=(255,0,0))
 lyr = mapp.add_layer(poly)
 
-#lyr.add_effect("shadow", xdist=10, ydist=10)
+
 lyr.add_effect("inner", color=[(255,111,111,255),(255,111,111,0)], size=10)
-lyr.add_effect("glow", color=[(111,111,255,255),(211,211,255,0)], size=10)
+#lyr.add_effect("glow", color=[(111,111,255,255),(211,211,255,0)], size=10)
+lyr.add_effect("shadow", xdist=10, ydist=10)
 
 mapp.view()
 
