@@ -53,7 +53,10 @@ def make_childrast(country, year):
 # mapit
 rast = pg.RasterData(r'C:\Users\kimok\Downloads\F182013.v4c_web.stable_lights.avg_vis.tif')
 #rast = pg.RasterData(r'C:\Users\kimok\Downloads\SVDNB_npp_20170701-20170731_75N060W_vcmcfg_v10_c201708061230.avg_rade9.tif')
-print rast
+print rast, rast.bands[0].summarystats()
+
+rast.view(minval=0, maxval=63)
+dfsd
 
 for iso in ['NGA','COD','YEM']:
     print iso

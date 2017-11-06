@@ -60,7 +60,7 @@ def warp(raster, tiepoints):
     
     raise NotImplementedError
 
-def reproject(raster, crs, algorithm="nearest", **rasterdef):
+def reproject(raster, crs, method="nearest", **rasterdef):
     """
     NOT YET IMPLEMENTED
 
@@ -73,7 +73,8 @@ def reproject(raster, crs, algorithm="nearest", **rasterdef):
     # TODO: How to handle coords that get transformed to infinity...
 
     import pyproj
-    
+
+    algorithm = method
     algocode = {"nearest":PIL.Image.NEAREST,
                 "bilinear":PIL.Image.BILINEAR,
                 "bicubic":PIL.Image.BICUBIC,
@@ -156,9 +157,9 @@ def reproject(raster, crs, algorithm="nearest", **rasterdef):
     # instead of every single pixel
     # https://caniban.files.wordpress.com/2011/04/tile-based-geospatial-information-systems.pdf
 
-def resample(raster, algorithm="nearest", **rasterdef):
+def resample(raster, method="nearest", **rasterdef):
     """Resamples raster extent, resolution, or affine transform.
-    Algorithm for resampling can be nearest (default), bilinear, bicubic."""
+    Method for resampling can be nearest (default), bilinear, bicubic."""
 
     algocodes = {"nearest":PIL.Image.NEAREST,
                 "bilinear":PIL.Image.BILINEAR,
@@ -167,51 +168,81 @@ def resample(raster, algorithm="nearest", **rasterdef):
     
     # first, create target raster based on rasterdef
     targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    for _ in range(len(raster.bands)):
+        targetrast.add_band()
 
     # fast PIL transform methods
+    algorithm = method
     if algorithm in algocodes:
         algocode = algocodes[algorithm.lower()] # resampling code used by PIL
-        
-        # get coords of all 4 target corners
-        xleft,ytop = targetrast.cell_to_geo(0,0)
-        xright,ybottom = targetrast.cell_to_geo(targetrast.width-1, targetrast.height-1)
-        targetcorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
-        
-        # find pixel locs of all these coords in the source raster
-        targetcorners_pixels = [raster.geo_to_cell(*point, fraction=True) for point in targetcorners]
-        # on raster, perform quad transform
-        flattened = [xory for point in targetcorners_pixels for xory in point]
 
-        # transform the mask too
-        # note: if we don't invert the mask, the transform will form a nontransparent outer edge
-        masktrans = PIL.ImageChops.invert(raster.mask.convert("L"))
-        masktrans = masktrans.transform((targetrast.width,targetrast.height),
-                                            PIL.Image.QUAD,
-                                            flattened,
-                                            resample=algocode)
-        masktrans = PIL.ImageChops.invert(masktrans).convert("1") # invert back
+        def trans(fromrast, torast):
+            # get coords of all 4 targettile corners
+            xleft,ytop = torast.cell_to_geo(0,0)
+            xright,ybottom = torast.cell_to_geo(torast.width-1, torast.height-1)
+            targettilecorners = [(xleft,ytop), (xleft,ybottom), (xright,ybottom), (xright,ytop)]
+            
+            # find pixel locs of all these coords in the source fromrast
+            targettilecorners_pixels = [fromrast.geo_to_cell(*point, fraction=True) for point in targettilecorners]
+            # on fromrast, perform quad transform
+            flattened = [xory for point in targettilecorners_pixels for xory in point]
 
-        # transform each band
-        for band in raster.bands:
-            datatrans = band.img.transform((targetrast.width,targetrast.height),
-                                            PIL.Image.QUAD,
-                                            flattened,
-                                            resample=algocode)
-            # set mask cells to nullvalue
-            if band.nodataval != None:
-                datatrans.paste(band.nodataval, mask=masktrans)
-                
-            # add band
-            targetrast.add_band(img=datatrans, nodataval=band.nodataval)
+            # transform the mask too
+            # note: if we don't invert the mask, the transform will form a nontransparent outer edge
+            masktrans = PIL.ImageChops.invert(fromrast.mask.convert("L"))
+            masktrans = masktrans.transform((torast.width,torast.height),
+                                                PIL.Image.QUAD,
+                                                flattened,
+                                                resample=algocode)
+            masktrans = PIL.ImageChops.invert(masktrans).convert("1") # invert back
 
-        targetrast.mask = masktrans
+            # transform each band
+            for i,band in enumerate(fromrast.bands):
+                datatrans = band.img.transform((torast.width,torast.height),
+                                                PIL.Image.QUAD,
+                                                flattened,
+                                                resample=algocode)
+                # set mask cells to nullvalue
+                if band.nodataval != None:
+                    datatrans.paste(band.nodataval, mask=masktrans)
+                    
+                # add band
+                torast.bands[i].img = datatrans
+                torast.bands[i].nodataval = band.nodataval
+
+            torast.mask = masktrans
+
+            return torast
+
+        # TODO: only use tiled version if memory error
+        # ...but somehow cleanup fails and results in another memory error
+
+##        try:
+##            cropped = crop(raster, targetrast.bbox, worldcoords=True)
+##            targetrast = trans(cropped, targetrast)
+##        except MemoryError:
+##            del cropped
+##            gc.collect()
+
+        if 1:
+            # for each source tile, transform towards target tile
+            for tilerast in tiled(raster, tilesize=(5000,5000), bbox=targetrast.bbox):
+                #print 't',tilerast
+                targettilerast = crop(targetrast, tilerast.bbox, worldcoords=True)
+                transrast = trans(tilerast, targettilerast)
+                del tilerast, targettilerast
+                gc.collect()
+                for i,band in enumerate(transrast.bands):
+                    x,y = transrast.cell_to_geo(0,0)
+                    px,py = targetrast.geo_to_cell(x,y)
+                    targetrast.bands[i].img.paste(band.img, (px,py))
 
     else:
         raise Exception("Not yet implemented")
 
     return targetrast
 
-def roll(raster, x, y, worldcoords=True):
+def roll(tilerast, x, y, worldcoords=True):
     """Offsets the cell values along the x and/or y axis, wrapping any
     overflowing cells around to the opposite edge.
     Useful for recentering the midpoint of a raster dataset.
@@ -917,26 +948,23 @@ def tiled(raster, tilesize=None, tiles=(10,10), worldcoords=False, bbox=None):
     minw,minh = 0,0
     maxw,maxh = raster.width-1,raster.height-1
 
-    def _floatrange(fromval,toval,step):
-        # handles both ints and flots
-        val = fromval
-        while val <= toval:
-            yield val
-            val += step
+    minw,minh,maxw,maxh,tw,th = map(int, [minw,minh,maxw,maxh,tw,th])
     
-    for row in _floatrange(minh, maxh-1, th):
-        row2 = row+th-1 if row+th <= maxh else maxh-1
+    for row in range(minh, maxh, th):
+        row2 = min(row+th-1, maxh) #row+th-1 if row+th <= maxh else maxh-1
 
         if bbox and (brow2 <= row or brow1 >= row2):
             # dont yield if outside desired bbox
             continue
         
-        for col in _floatrange(minw, maxw, tw):
-            col2 = col+tw-1 if col+tw <= maxw else maxw-1
+        for col in range(minw, maxw, tw):
+            col2 = min(col+tw-1, maxw) #col+tw-1 if col+tw <= maxw else maxw-1
 
             if bbox and (bcol2 <= col or bcol1 >= col2):
                 # dont yield if outside desired bbox
                 continue
+
+            #print [col,row,col2,row2]
 
             tile = crop(raster, [col,row,col2,row2], False)
             yield tile

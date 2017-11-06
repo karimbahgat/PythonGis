@@ -1296,7 +1296,7 @@ class RasterLayer:
         if "bbox" not in georef:
             georef["bbox"] = self.data.bbox
 
-        rendered = self.data.resample(algorithm=resampling, **georef)
+        rendered = self.data.resample(method=resampling, **georef)
 
         # TODO: Instead of resample need to somehow honor lock_ratio, maybe by not using from_image()
         # ...

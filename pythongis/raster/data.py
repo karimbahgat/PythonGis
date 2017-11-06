@@ -595,40 +595,39 @@ class Band(object):
         # get all stattypes unless specified
 
         statsdict = dict()
-        
-        if self.mode.endswith("8"):
-            # PIL.ImageStat only works for modes with values below 255
 
-            # retrieve stats
-            valid = self.mask.point(lambda v: 1 if v==0 else 0)
-            stats = PIL.ImageStat.Stat(self.img, valid)
-            _min,_max = stats.extrema[0]
+        try:
+            if self.mode.endswith("8"):
+                # PIL.ImageStat only works for modes with values below 255
 
-            if not stattypes or "count" in stattypes:
-                statsdict["count"] = stats.count[0]
-            if not stattypes or "sum" in stattypes:
-                statsdict["sum"] = stats.sum[0]
-            if not stattypes or "mean" in stattypes:
-                try: statsdict["mean"] = stats.mean[0]
-                except ZeroDivisionError: statsdict["mean"] = None
-            if not stattypes or "min" in stattypes:
-                statsdict["min"] = _min
-            if not stattypes or "max" in stattypes:
-                statsdict["max"] = _max
-            # some more stats
-            if not stattypes or "median" in stattypes:
-                sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[1]))
-                statsdict["median"] = sortedvals[len(sortedvals)//2][1]
-            if not stattypes or "majority" in stattypes:
-                sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
-                statsdict["majority"] = sortedvals[-1][1]
-            if not stattypes or "minority" in stattypes:
-                sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
-                statsdict["minority"] = sortedvals[0][1]
+                # retrieve stats
+                valid = self.mask.point(lambda v: 1 if v==0 else 0)
+                stats = PIL.ImageStat.Stat(self.img, valid)
+                _min,_max = stats.extrema[0]
 
-        elif self.mode.endswith(("16","32","1bit")):
-            
-            try:
+                if not stattypes or "count" in stattypes:
+                    statsdict["count"] = stats.count[0]
+                if not stattypes or "sum" in stattypes:
+                    statsdict["sum"] = stats.sum[0]
+                if not stattypes or "mean" in stattypes:
+                    try: statsdict["mean"] = stats.mean[0]
+                    except ZeroDivisionError: statsdict["mean"] = None
+                if not stattypes or "min" in stattypes:
+                    statsdict["min"] = _min
+                if not stattypes or "max" in stattypes:
+                    statsdict["max"] = _max
+                # some more stats
+                if not stattypes or "median" in stattypes:
+                    sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[1]))
+                    statsdict["median"] = sortedvals[len(sortedvals)//2][1]
+                if not stattypes or "majority" in stattypes:
+                    sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
+                    statsdict["majority"] = sortedvals[-1][1]
+                if not stattypes or "minority" in stattypes:
+                    sortedvals = list(sorted(self.img.getcolors(), key=lambda e: e[0]))
+                    statsdict["minority"] = sortedvals[0][1]
+
+            elif self.mode.endswith(("16","32","1bit")):
                 # manually get count of all unique pixelvalues and do math on it
                 # but do not include counts of nodataval
                 
@@ -667,49 +666,98 @@ class Band(object):
                     sortedvals = list(sorted(valuecounts, key=lambda e: e[0]))
                     statsdict["minority"] = sortedvals[0][1] if sortedvals else None
                 
-            except MemoryError:
+        except MemoryError:
 
-                # getcolors() resulted in too many values at once
-                # so fallback on manual iteration one pixel at a time
+            # PIL.ImageStat or getcolors() resulted in too many values at once
+            # so fallback on manual iteration one pixel at a time
 
-                if not self._pixelaccess:
-                    self._pixelaccess = self.img.load()
+            # TODO: Doesnt work yet, cus previous ImageStat and getcolors results in load() being called
+            # TODO: Right now only works if band has parent raster
+            # WARNING: Median here is only median of medians
 
-                nodata = self.nodataval
-                allvals = (self._pixelaccess[x,y] for y in range(self.height) for x in range(self.width))
-                values = [val for val in allvals if val != nodata]
+            import gc
+            del valid
+            gc.collect()
 
-                def _count():
-                    return sum((1 for val in values)) if values else 0
-                def _sum():
-                    return sum((val for val in values)) if values else None
-                def _mean():
-                    return _sum()/float(_count()) if values else None
-                def _min():
-                    return min(values) if values else None
-                def _max():
-                    return max(values) if values else None
-                
-                if not stattypes or "count" in stattypes:
-                    statsdict["count"] = _count()
-                if not stattypes or "sum" in stattypes:
-                    statsdict["sum"] = _sum()
-                if not stattypes or "mean" in stattypes:
-                    statsdict["mean"] = _mean()
-                if not stattypes or "max" in stattypes:
-                    statsdict["max"] = _max()
-                if not stattypes or "min" in stattypes:
-                    statsdict["min"] = _min()
-                # some more stats
-                if not stattypes or "median" in stattypes:
-                    sortedvals = list(sorted(values))
-                    statsdict["median"] = sortedvals[len(sortedvals)//2] if sortedvals else None
+            tilestats = []
+            i = self._rast.bands.index(self)
+            print self
+            for tile in self._rast.manage.tiled(tilesize=(3000,3000)):
+                print 9,tile
+                s = tile.bands[i].summarystats(*stattypes)
+                tilestats.append(s)
+                del tile
+                gc.collect()
+
+            def _count():
+                counts = [s['count'] for s in tilestats if s['count'] != None]
+                return sum(counts) if counts else None
+            def _sum():
+                sums = [s['sum'] for s in tilestats if s['sum'] != None]
+                return sum(sums) if sums else None
+            def _mean():
+                try: return _sum()/float(_count())
+                except: return None
+            def _min():
+                mins = [s['min'] for s in tilestats if s['min'] != None]
+                return min(mins) if mins else None
+            def _max():
+                maxs = [s['max'] for s in tilestats if s['max'] != None]
+                return max(maxs) if maxs else None
+            
+            if not stattypes or "count" in stattypes:
+                statsdict["count"] = _count()
+            if not stattypes or "sum" in stattypes:
+                statsdict["sum"] = _sum()
+            if not stattypes or "mean" in stattypes:
+                statsdict["mean"] = _mean()
+            if not stattypes or "max" in stattypes:
+                statsdict["max"] = _max()
+            if not stattypes or "min" in stattypes:
+                statsdict["min"] = _min()
+
+            # some more stats
+            nodata = self.nodataval
+            if not stattypes or "majority" in stattypes or "minority" in stattypes or "median" in stattypes:
+                majors = dict()
+                minors = dict()
+                medians = dict()
+                # pass1, get majority for each tile
+                for tile in self._rast.manage.tiled(tilesize=(3000,3000)):
+                    print 7,tile
+                    freqs = [(cnt,val) for cnt,val in tile.bands[i].img.getcolors(tile.width*tile.height) if val != nodata]
+                    sortedfreqs = sorted(freqs, key=lambda e: e[0])
+                    if sortedfreqs:
+                        if not stattypes or "majority" in stattypes:
+                            cnt,val = sortedfreqs[-1]
+                            majors[val] = cnt
+                        if not stattypes or "minority" in stattypes:
+                            cnt,val = sortedfreqs[0]
+                            minors[val] = cnt
+                        if not stattypes or "median" in stattypes:
+                            cnt,val = sortedfreqs[len(sortedfreqs)//2]
+                            medians[val] = cnt
+                    del freqs,sortedfreqs,tile
+                    gc.collect()
+                # pass2, collect counts for each majority group
+                for tile in self._rast.manage.tiled(tilesize=(3000,3000)):
+                    print 5,tile
+                    freqs = [(cnt,val) for cnt,val in tile.bands[i].img.getcolors(tile.width*tile.height) if val != nodata]
+                    for cnt,val in freqs:
+                        if val in majors:
+                            majors[val] += cnt
+                        if val in minors:
+                            minors[val] += cnt
+                    del freqs,tile
+                    gc.collect()
+                # choose min/majority w lowest/largest count
                 if not stattypes or "majority" in stattypes:
-                    sortedvals = list(sorted(values))
-                    statsdict["majority"] = sortedvals[-1] if sortedvals else None
+                    statsdict["majority"] = sorted(majors.items(), key=lambda e: e[1])[-1][0]
                 if not stattypes or "minority" in stattypes:
-                    sortedvals = list(sorted(values))
-                    statsdict["minority"] = sortedvals[0] if sortedvals else None
+                    statsdict["minority"] = sorted(minors.items(), key=lambda e: e[1])[0][0]
+                if not stattypes or "median" in stattypes:
+                    sortedmeds = sorted(medians.keys())
+                    statsdict["median"] = sortedmeds[len(sortedmeds)//2]
                 
         return statsdict
 
