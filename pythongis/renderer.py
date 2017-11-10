@@ -706,7 +706,7 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 class VectorLayer:
-    def __init__(self, data, legendoptions=None, nolegend=False, datafilter=None, **options):
+    def __init__(self, data, legendoptions=None, legend=True, datafilter=None, **options):
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -721,7 +721,7 @@ class VectorLayer:
         self.effects = []
 
         self.legendoptions = legendoptions or dict()
-        self.nolegend = nolegend
+        self.legend = legend
         self.datafilter = datafilter
         
         # by default, set random style color
@@ -865,7 +865,7 @@ class VectorLayer:
         new.img_text = self.img_text.copy() if self.img_text else None
 
         new.legendoptions = self.legendoptions
-        new.nolegend = self.nolegend
+        new.legend = self.legend
         new.datafilter = self.datafilter
         
         new.styleoptions = self.styleoptions.copy()
@@ -1160,7 +1160,7 @@ class VectorLayer:
 
         
 class RasterLayer:
-    def __init__(self, data, legendoptions=None, nolegend=False, **options):
+    def __init__(self, data, legendoptions=None, legend=True, **options):
         
         if not isinstance(data, RasterData):
             # assume data is filepath
@@ -1174,7 +1174,7 @@ class RasterLayer:
         self.effects = []
 
         self.legendoptions = legendoptions or dict()
-        self.nolegend = nolegend
+        self.legend = legend
 
         # by default, set random style color
         if not "type" in options:
@@ -1576,7 +1576,7 @@ class Legend:
         
         # build the legend automatically
         for layer in self.map:
-            if not layer.nolegend:
+            if layer.legend:
                 if isinstance(layer, VectorLayer):
                     # Todo: better handling when more than one classypie option for same layer
                     # perhaps grouping into basegroup under same layer label
