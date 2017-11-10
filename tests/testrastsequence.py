@@ -11,10 +11,11 @@ import gc
 ##    print clip
 ##    clip.save('data/pop%s.tif'%yr)
 
-for yr,rast in pg.raster.manager.sequence({1990: lambda: pg.RasterData(r'data/pop1990.tif'),
-                                            2000: lambda: pg.RasterData(r'data/pop2000.tif'),
-                                            2015: lambda: pg.RasterData(r'data/pop2015.tif')
-                                             }):
+for yr,rast in pg.raster.manager.sequence(range(1990,2015+1),
+                                          rasts={1990: lambda: pg.RasterData(r'data/pop1990.tif'),
+                                                2000: lambda: pg.RasterData(r'data/pop2000.tif'),
+                                                2015: lambda: pg.RasterData(r'data/pop2015.tif')
+                                                 }):
     print yr
     #print rast.bands[0].summarystats()
     #rast.view()

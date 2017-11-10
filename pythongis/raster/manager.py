@@ -47,7 +47,18 @@ def mosaic(rasters, overlaprule="last", **rasterdef):
 
     return outrast
 
-def sequence(rasts):
+def sequence(values, rasts):
+    """
+    Iterates through a sequence of linearly interpolated rasters.
+
+    Args:
+        values:
+            The unknown values for which new rasters will be interpolated and returned.
+        rasts:
+            A dictionary of the known values and rasters between which the interpolated rasters are calculated.
+            Dictionary entries consist of value-raster pairs, where raster can be either a preloaded raster, or a
+            function that loads and returns a raster (useful to avoid memory errors). 
+    """
 
     def _lerp(value, fromval, fromrast, toval, torast):
         if value == fromval:
@@ -85,22 +96,53 @@ def sequence(rasts):
 
     # loop pairs of fromrast torast
     rasts = sorted(rasts, key=lambda(val,rast): val)
-    gen1 = ((val,rast) for val,rast in rasts[:-1])
-    gen2 = ((val,rast) for val,rast in rasts[1:])
-    for (fromval,fromrast),(toval,torast) in zip(gen1,gen2):
-        fromrast = fromrast()
-        torast = torast()
-        # loop all values in between and yield
-        for val in range(fromval,toval):
-            rast = _lerp(val, fromval, fromrast, toval, torast)
-            yield val,rast
 
-        del fromrast,torast
-        gc.collect()
+    # NEW
+    rasts = iter(rasts)
+    
+    fromval,fromrast = next(rasts)
+    fromrast = fromrast()
+    
+    toval,torast = next(rasts)
+    torast = torast()
+    
+    for val in values:
+        if val < fromval:
+            raise NotImplementedError('Extrapolation not currently supported')
 
-    # last one as copy of the highest value
-    rast = rasts[-1][1]()
-    yield toval,rast
+        # increment to next pair
+        if val > toval:
+            if val > values[-1]:
+                raise NotImplementedError('Extrapolation not currently supported')
+
+            del fromrast
+            gc.collect()
+
+            fromval,fromrast = toval,torast
+            toval,torast = next(rasts)
+            torast = torast()
+
+        # interp
+        rast = _lerp(val, fromval, fromrast, toval, torast)
+        yield val,rast
+
+    # OLD
+##    gen1 = ((val,rast) for val,rast in rasts[:-1])
+##    gen2 = ((val,rast) for val,rast in rasts[1:])
+##    for (fromval,fromrast),(toval,torast) in zip(gen1,gen2):
+##        fromrast = fromrast()
+##        torast = torast()
+##        # loop all values in between and yield
+##        for val in range(fromval,toval):
+##            rast = _lerp(val, fromval, fromrast, toval, torast)
+##            yield val,rast
+##
+##        del fromrast,torast
+##        gc.collect()
+##
+##    # last one as copy of the highest value
+##    rast = rasts[-1][1]()
+##    yield toval,rast
 
 def warp(raster, tiepoints):
     """
