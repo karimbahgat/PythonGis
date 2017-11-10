@@ -1,4 +1,5 @@
 
+import math
 import random
 import itertools
 import pyagg, pyagg.legend
@@ -752,6 +753,7 @@ class VectorLayer:
                         val["classvalues"] = val.pop("colors")
                     else:
                         val["classvalues"] = val.pop("sizes")
+
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
                     if "color" in key and notclassified != None:
                         notclassified = rgb(notclassified)
@@ -776,6 +778,16 @@ class VectorLayer:
                                                    symbols=dict((id(f),classval) for f,classval in classifier),
                                                    notclassified=notclassified
                                                    )
+
+                    # convert from area to radius for more correct visual comparisons
+                    # first interpolation was done between areas, now convert to radius sizes
+                    # TODO: now only circles, test and calc for other shapes too
+                    if 'size' in key and 'Point' in self.data.type:
+                        shp = self.styleoptions.get('shape')
+                        if shp is None or shp == 'circle':
+                            #val['classvalues'] = [math.sqrt(v/math.pi) for v in val['classvalues']]
+                            classifier.classvalues_interp = [math.sqrt(v/math.pi) for v in classifier.classvalues_interp]
+                            self.styleoptions[key]['symbols'] = dict((id(f),classval) for f,classval in classifier)
                     
                 elif hasattr(val, "__call__"):
                     pass
@@ -785,7 +797,14 @@ class VectorLayer:
                     if "color" in key:
                         val = rgb(val)
                     else:
-                        pass #val = Unit(val)
+                        #pass #val = Unit(val)
+                        # convert from area to radius for more correct visual comparisons
+                        # TODO: now only circles, test and calc for other shapes too
+                        if 'Point' in self.data.type:
+                            shp = self.styleoptions.get('shape')
+                            if shp is None or shp == 'circle':
+                                val = math.sqrt(val/math.pi)
+
                     self.styleoptions[key] = val
 
         # set up text classifiers
