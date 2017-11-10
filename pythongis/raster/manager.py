@@ -47,6 +47,61 @@ def mosaic(rasters, overlaprule="last", **rasterdef):
 
     return outrast
 
+def sequence(rasts):
+
+    def _lerp(value, fromval, fromrast, toval, torast):
+        if value == fromval:
+            return fromrast
+        elif value == toval:
+            return torast
+        elif not fromval < value < toval:
+            raise Exception("Value to interpolate must be between fromval and toval")
+
+        # figure out relative position between rasters, and multiply this to the difference
+        prog = (value - fromval) / float(toval - fromval)
+        #print "prog",prog
+        diffband = torast.bands[0] - fromrast.bands[0]
+        #print diffband, diffband.summarystats()
+        offsetband = diffband * prog
+        #print offsetband, offsetband.summarystats()
+        newband = fromrast.bands[0] + offsetband
+
+        # finally assign to raster
+        outrast = fromrast.copy(shallow=True)
+        outrast.add_band(newband)
+
+        del diffband,offsetband
+        gc.collect()
+        
+        return outrast
+
+    # allow preloaded rasters or callables that load upon request
+    def _make_callable(rast):
+        if not hasattr(rast, '__call__'):
+            return lambda: rast
+        else:
+            return rast
+    rasts = ((val,_make_callable(rast)) for val,rast in rasts.items())
+
+    # loop pairs of fromrast torast
+    rasts = sorted(rasts, key=lambda(val,rast): val)
+    gen1 = ((val,rast) for val,rast in rasts[:-1])
+    gen2 = ((val,rast) for val,rast in rasts[1:])
+    for (fromval,fromrast),(toval,torast) in zip(gen1,gen2):
+        fromrast = fromrast()
+        torast = torast()
+        # loop all values in between and yield
+        for val in range(fromval,toval):
+            rast = _lerp(val, fromval, fromrast, toval, torast)
+            yield val,rast
+
+        del fromrast,torast
+        gc.collect()
+
+    # last one as copy of the highest value
+    rast = rasts[-1][1]()
+    yield toval,rast
+
 def warp(raster, tiepoints):
     """
     NOT YET IMPLEMENTED

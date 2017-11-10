@@ -676,14 +676,18 @@ class Band(object):
             # WARNING: Median here is only median of medians
 
             import gc
-            del valid
+            try:
+                del valid
+                del stats
+            except:
+                pass
             gc.collect()
 
             tilestats = []
             i = self._rast.bands.index(self)
-            print self
+            #print self
             for tile in self._rast.manage.tiled(tilesize=(3000,3000)):
-                print 9,tile
+                #print 'tile',tile
                 s = tile.bands[i].summarystats(*stattypes)
                 tilestats.append(s)
                 del tile
@@ -724,7 +728,7 @@ class Band(object):
                 medians = dict()
                 # pass1, get majority for each tile
                 for tile in self._rast.manage.tiled(tilesize=(3000,3000)):
-                    print 7,tile
+                    #print 'pass1',tile
                     freqs = [(cnt,val) for cnt,val in tile.bands[i].img.getcolors(tile.width*tile.height) if val != nodata]
                     sortedfreqs = sorted(freqs, key=lambda e: e[0])
                     if sortedfreqs:
@@ -741,7 +745,7 @@ class Band(object):
                     gc.collect()
                 # pass2, collect counts for each majority group
                 for tile in self._rast.manage.tiled(tilesize=(3000,3000)):
-                    print 5,tile
+                    #print 'pass2',tile
                     freqs = [(cnt,val) for cnt,val in tile.bands[i].img.getcolors(tile.width*tile.height) if val != nodata]
                     for cnt,val in freqs:
                         if val in majors:
