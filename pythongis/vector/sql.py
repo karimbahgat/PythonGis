@@ -74,6 +74,9 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
         elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))[0]
         elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))[0]
         elif agg == "mean": return lambda seq: sum(seq)/float(len(seq))
+        elif agg.endswith("concat"):
+            delim = agg[:-6]
+            return lambda seq: delim.join(seq)
         elif hasattr(agg, "__call__"):
             # agg is not a string but a function
             return agg

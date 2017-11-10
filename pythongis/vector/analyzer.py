@@ -13,7 +13,7 @@ from shapely.prepared import prep as supershapely
 
 # Overlay Analysis (transfer of values, but no clip)
 
-def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegroup=None, key=None, **kwargs):
+def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=None, key=None, **kwargs):
     """
     Summarizes the values of "valuedata" that overlap "groupbydata",
     and adds the summary statistics to the output data.
@@ -48,7 +48,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegr
             if not groupfeat.geometry:
                 if keepall:
                     newrow = list(groupfeat.row)
-                    newrow.extend( ("" for _ in fieldmapping) )
+                    newrow.extend( (None for _ in fieldmapping) )
                     out.add_feature(newrow, None)
 
                 continue
@@ -82,9 +82,9 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegr
                     yield valfeat
             matches = list(cleaned())
 
-            if valuegroup:
+            if subkey:
                 if matches:
-                    for group in sql.groupby(matches, valuegroup):
+                    for group in sql.groupby(matches, subkey):
                         aggreg = sql.aggreg(group, fieldmapping)
 
                         newrow = list(groupfeat.row)
@@ -93,7 +93,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegr
 
                 elif keepall:
                     newrow = list(groupfeat.row)
-                    newrow.extend( ("" for _ in fieldmapping) )
+                    newrow.extend( (None for _ in fieldmapping) )
                     out.add_feature(newrow, geom.__geo_interface__)
 
             else:
@@ -108,7 +108,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, valuegr
 
                 elif keepall:
                     newrow = list(groupfeat.row)
-                    newrow.extend( ("" for _ in fieldmapping) )
+                    newrow.extend( (None for _ in fieldmapping) )
                     out.add_feature(newrow, geom.__geo_interface__)
 
     else:
