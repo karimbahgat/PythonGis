@@ -159,15 +159,17 @@ def warp(raster, tiepoints):
 
 def reproject(raster, crs, method="nearest", **rasterdef):
     """
-    NOT YET IMPLEMENTED
+    EXPERIMENTAL
 
     Reprojects the raster from the input crs to a target crs.
     If given, **rasterdef will override the input raster structure.
     """
-    
-    raise NotImplementedError
 
-    # TODO: How to handle coords that get transformed to infinity...
+    # Experimental, some weird results
+    # prob due to not creating affine correctly (only based on bbox)
+    # actually also seems like y axis gets mirrored somehow...
+    # FIX THIS
+    # ...
 
     import pyproj
 
@@ -184,32 +186,92 @@ def reproject(raster, crs, method="nearest", **rasterdef):
     tocrs = pyproj.Proj(crs)
 
     # first, create target raster based on rasterdef
-    rasterdef = rasterdef or raster.rasterdef
-    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    projbox = []
+    if rasterdef:
+        targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    else:
+        # auto detect valid output bbox
+        # TODO: instead of bbox which cannot detect rotation or shear,
+        # ...construct georef from 2 or 3 tiepoints between grid coords and crs coords
+        # ...eg corner col,row and x,y
+        # ...will be implemented in create_affine(), see https://stackoverflow.com/questions/22954239/given-three-points-compute-affine-transformation
+        xs,ys = zip(*(raster.cell_to_geo(col,row) for row in range(raster.height) for col in range(raster.width)))
+        newcoords = zip(*pyproj.transform(fromcrs,tocrs,xs,ys))
+        newcoords = [new for new in newcoords if isinstance(new[0], float) and isinstance(new[1], float)]
+        newx,newy = zip(*newcoords)
+        xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
+        
+##        xmin,ymin,xmax,ymax = 0,0,0,0
+##        for row in range(raster.height):
+##            coords = [raster.cell_to_geo(col,row) for col in range(raster.width)]
+##            newcoords = [new for new in fromcrs.transform(coords) if isinstance(new[0], float) and isinstance(new[1], float)]
+##            newx,newy = zip(newcoords)
+##            xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
+##            # ...
+
+        bbox = [xmin,ymin,xmax,ymax]
+        print bbox
+        rasterdef = dict(width=raster.width,
+                         height=raster.height,
+                         bbox=bbox)
+        targetrast = data.RasterData(mode=raster.mode, **rasterdef)        
+            
     for band in raster:
         targetrast.add_band(img=band.img)
 
-    # get target coordinates
-    lons = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
-    lats = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
-
     # reproject coords using pyproj
-    for row,lat in enumerate(lats):
-        # convert crs coords
-        reproj = PIL.ImagePath.Path([pyproj.transform(fromcrs,tocrs,lon,lat) for lon in lons])
+    if method == 'nearest':
+        # TODO: should be best and easy with tiling and quadmesh
+        # ...
+        
+        # cell by cell, should work, but partially funky results...
+        xs,ys = zip(*(targetrast.cell_to_geo(col,row) for row in range(targetrast.height) for col in range(targetrast.width)))
+        newxs,newys = pyproj.transform(tocrs,fromcrs,xs,ys)
+        gridpos = ((col,row) for row in range(targetrast.height) for col in range(targetrast.width))
+        newcoords = zip(gridpos,newxs,newys)
+        newcoords = [(pos,nx,ny) for pos,nx,ny in newcoords if isinstance(nx, float) and isinstance(ny, float)]
+        for targetpos,nx,ny in newcoords:
+            tcol,trow = targetpos
+            sourcepos = raster.geo_to_cell(nx,ny)
+            for i,band in enumerate(raster):
+                sourcecell = band.get(*sourcepos)
+                try:targetrast.bands[i].set(tcol,trow,sourcecell.value)
+                except IndexError:pass
 
-        # go from reprojected target coordinates and over to source pixels
-        sourcepixels = reproj.transform(raster.inv_affine)
-
-        # manually get and set the pixels using some algorithm
-        if algorithm == "nearest":
-            for sourceband,targetband in zip(raster,targetrast):
-                for col,pixel in enumerate(sourcepixels):
-                    pixel = int(round(pixel[0])),int(round(pixel[1]))
-                    val = sourceband.get(*pixel)
-                    targetband.set(col,row,val)
-        else:
-            raise NotImplementedError("Not a valid algorithm")
+##        # get target coordinates
+##        xs = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
+##        ys = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
+##        
+##        for row,y in enumerate(ys):
+##            # convert crs coords
+##            cxs,cys = zip(*((x,y) for x in xs))
+##            newcoords = zip(*pyproj.transform(tocrs,fromcrs,cxs,cys))
+##            
+##            reproj = []
+##            valid = []
+##            for x in xs:
+##                nx,ny = pyproj.transform(fromcrs,tocrs,x,y)
+##                if isinstance(nx, (int,float)) and isinstance(ny, (int,float)):
+##                    reproj.append((nx,ny))
+##                    valid.append(True)
+##                else:
+##                    reproj.append((0,0))
+##                    valid.append(False)
+##            reproj = PIL.ImagePath.Path(reproj)
+##
+##            # go from reprojected target coordinates and over to source pixels
+##            reproj.transform(raster.inv_affine)
+##
+##            # manually get and set the pixels using some algorithm
+##            for sourceband,targetband in zip(raster,targetrast):
+##                for col,(isvalid,pixel) in enumerate(zip(valid,reproj)):
+##                    if not isvalid:
+##                        continue
+##                    pixel = int(round(pixel[0])),int(round(pixel[1]))
+##                    val = sourceband.get(*pixel)
+##                    targetband.set(col,row,val)
+    else:
+        raise NotImplementedError("Not a valid algorithm")
 
 ##    # first, create target raster based on rasterdef
 ##    rasterdef = rasterdef or raster.rasterdef

@@ -755,9 +755,11 @@ def cut(data, cutter):
         
     return outdata
 
-def reproject(data, fromcrs, tocrs):
+def reproject(data, tocrs):
     """Reprojects from one crs to another"""
     import pyproj
+
+    fromcrs = data.crs
 
     def _project(points):
         xs,ys = itertools.izip(*points)
