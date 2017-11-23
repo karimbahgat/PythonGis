@@ -3,7 +3,7 @@ import math
 import random
 import itertools
 import pyagg, pyagg.legend
-import PIL, PIL.Image, PIL.ImageChops
+import PIL, PIL.Image, PIL.ImageChops, PIL.ImageMath, PIL.ImageDraw, PIL.ImagePath
 import colour
 
 import classypie as cp
@@ -706,7 +706,7 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 class VectorLayer:
-    def __init__(self, data, legendoptions=None, legend=True, datafilter=None, **options):
+    def __init__(self, data, legendoptions=None, legend=True, datafilter=None, transparency=0, **options):
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -715,6 +715,7 @@ class VectorLayer:
         
         self.data = data
         self.visible = True
+        self.transparency = transparency
         self.img = None
         self.img_text = None
 
@@ -1012,7 +1013,6 @@ class VectorLayer:
                 #print "preint",time.time()-t
                 import time
                 t=time.time()
-                import PIL.ImageDraw, PIL.ImagePath
                 img = PIL.Image.new("RGBA", (width,height), None)
                 PIL_drawer = PIL.ImageDraw.Draw(img)   #self.PIL_drawer
 
@@ -1087,6 +1087,14 @@ class VectorLayer:
             else:
                 self.img = drawer.get_image()
 
+            # transparency
+            if self.transparency:
+                transp = int(256*(self.transparency/100.0))
+                
+                r,g,b,a = self.img.split()
+                a = PIL.ImageMath.eval('min(alpha,transp)', alpha=a, transp=transp).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                self.img.putalpha(a)
+                
             # effects
             for eff in self.effects:
                 self.img = eff(self)
@@ -1153,6 +1161,14 @@ class VectorLayer:
                 
             self.img_text = drawer.get_image()
 
+            # transparency
+            if self.transparency:
+                transp = int(256*(self.transparency/100.0))
+                
+                r,g,b,a = self.img_text.split()
+                a = PIL.ImageMath.eval('min(alpha,transp)', alpha=a, transp=transp).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                self.img_text.putalpha(a)
+
         else:
             self.img_text = None
 
@@ -1160,7 +1176,7 @@ class VectorLayer:
 
         
 class RasterLayer:
-    def __init__(self, data, legendoptions=None, legend=True, **options):
+    def __init__(self, data, legendoptions=None, legend=True, transparency=0, **options):
         
         if not isinstance(data, RasterData):
             # assume data is filepath
@@ -1169,6 +1185,7 @@ class RasterLayer:
         
         self.data = data
         self.visible = True
+        self.transparency = transparency
         self.img = None
 
         self.effects = []
@@ -1402,12 +1419,27 @@ class RasterLayer:
         #rendered.mask.save('rendmask.png')
         #print "rendmask",rendered.mask
         #img.save("prealph.png")
-        img.putalpha(PIL.ImageChops.invert(mask.convert("L"))) # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        
+        ###OLDONE: #img.putalpha(PIL.ImageChops.invert(mask.convert("L"))) # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        
+        r,g,b,a = img.split()
+        invmask = PIL.ImageChops.invert(mask.convert("L"))
+        newalpha = PIL.ImageMath.eval('min(alpha,invmask)', alpha=a, invmask=invmask).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        img.putalpha(newalpha)
+        
         #img.save("postalph.png")
         # ...
 
         # final
         self.img = img
+        
+        # transparency
+        if self.transparency:
+            transp = int(256*(self.transparency/100.0))
+            
+            r,g,b,a = self.img.split()
+            a = PIL.ImageMath.eval('min(alpha,transp)', alpha=a, transp=transp).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            self.img.putalpha(a)
 
     def render_text(self, resampling="nearest", lock_ratio=True, **georef):
         self.img_text = None
