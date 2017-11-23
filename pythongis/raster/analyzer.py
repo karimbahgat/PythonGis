@@ -91,7 +91,7 @@ def zonal_statistics(zonaldata, valuedata, zonalband=0, valueband=0, outstat="me
 
 # Raster math
 
-def math(mathexpr, rasters):
+def mathexpr(mathexpr, rasters):
     """Performs math operations on one or more raster datasets.
     The math is given in "mathexpr" as a string expression, where each input raster is
     referred to as "rast1", "rast2", etc, according to their order in the input raster list.

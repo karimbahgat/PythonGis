@@ -376,14 +376,17 @@ def resample(raster, method="nearest", **rasterdef):
         # TODO: only use tiled version if memory error
         # ...but somehow cleanup fails and results in another memory error
 
-##        try:
-##            cropped = crop(raster, targetrast.bbox, worldcoords=True)
-##            targetrast = trans(cropped, targetrast)
-##        except MemoryError:
-##            del cropped
-##            gc.collect()
+        try:
+            cropped = crop(raster, targetrast.bbox, worldcoords=True)
+            targetrast = trans(cropped, targetrast)
+        except MemoryError:
+            # TODO: Maybe issue warning when memoryerror about using slower method
+            # TODO: Temporarily disabled,
+            # transp mask in targetrast does not work here, must fix...
+            del cropped
+            gc.collect()
 
-        if 1:
+        #if 1:
             # for each source tile, transform towards target tile
             for tilerast in tiled(raster, tilesize=(5000,5000), bbox=targetrast.bbox):
                 #print 't',tilerast
