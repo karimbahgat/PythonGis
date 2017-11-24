@@ -293,6 +293,9 @@ def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
     Alias: convolve, blur, heatmap (but incorrect usage). 
     """
 
+    # TODO: this assumes points, but isnt smoothing generally understood to apply to existing rasters? 
+    # ...or are these the same maybe? 
+
     if not pointdata.type == "Point":
         raise Exception("Pointdata must be of type point")
 
@@ -357,9 +360,10 @@ def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
         def valfunc(feat):
             val = feat[valuefield] if valuefield else 1
             return val
+        aggfunc = kwargs.get("aggfunc", "sum")
         fieldmapping = [("aggval",valfunc,aggfunc)]
         for (px,py),feats in itertools.groupby(pointdata, key=key):
-            aggval = sql.aggreg(feats, fieldmapping)
+            aggval = sql.aggreg(feats, fieldmapping)[0]
             newband.set(px,py, aggval)
 
         # apply gaussian filter
@@ -376,6 +380,11 @@ def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
             # Gauss calculation in pure Python
             # algorithm 1 from http://blog.ivank.net/fastest-gaussian-blur.html
             # TODO: implement much faster algorithm 4
+
+            # TODO: output seems to consider a square around each feat, shouldnt it be circle
+            # TODO: output values are very low decimals, is that correct? maybe it's just a
+            # ...probability weight that has to be appleied to orig value?
+            # check out: https://homepages.inf.ed.ac.uk/rbf/HIPR2/gsmooth.htm
             
             origband = newband.copy()
             raster.convert("float32") # output values will be floats
