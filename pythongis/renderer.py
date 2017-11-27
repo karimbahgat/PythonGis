@@ -733,6 +733,10 @@ class VectorLayer:
         # override default if any manually specified styleoptions
         self.styleoptions.update(options)
 
+        # make sure has geom
+        if not self.data.has_geometry():
+            return
+
         # set up symbol classifiers
         features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
         for key,val in self.styleoptions.copy().items():
@@ -1089,10 +1093,10 @@ class VectorLayer:
 
             # transparency
             if self.transparency:
-                transp = int(256*(self.transparency/100.0))
+                opac = 256 - int(256*(self.transparency/100.0))
                 
                 r,g,b,a = self.img.split()
-                a = PIL.ImageMath.eval('min(alpha,transp)', alpha=a, transp=transp).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
                 self.img.putalpha(a)
                 
             # effects
@@ -1163,10 +1167,10 @@ class VectorLayer:
 
             # transparency
             if self.transparency:
-                transp = int(256*(self.transparency/100.0))
+                opac = 256 - int(256*(self.transparency/100.0))
                 
                 r,g,b,a = self.img_text.split()
-                a = PIL.ImageMath.eval('min(alpha,transp)', alpha=a, transp=transp).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
                 self.img_text.putalpha(a)
 
         else:
@@ -1435,10 +1439,10 @@ class RasterLayer:
         
         # transparency
         if self.transparency:
-            transp = int(256*(self.transparency/100.0))
+            opac = 256 - int(256*(self.transparency/100.0))
             
             r,g,b,a = self.img.split()
-            a = PIL.ImageMath.eval('min(alpha,transp)', alpha=a, transp=transp).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
             self.img.putalpha(a)
 
     def render_text(self, resampling="nearest", lock_ratio=True, **georef):
