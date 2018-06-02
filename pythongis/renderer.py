@@ -1450,8 +1450,9 @@ class RasterLayer:
 
 
 class Legend:
-    def __init__(self, map, autobuild=True, **options):
+    def __init__(self, map, layers=None, autobuild=True, **options):
         self.map = map
+        self.layers = layers or []
         self.img = None
         self.autobuild = autobuild
         self.options = options
@@ -1611,30 +1612,32 @@ class Legend:
         self._legend = pyagg.legend.Legend(refcanvas=self.map.drawer, **self.options)
         
         # build the legend automatically
-        for layer in self.map:
-            if layer.legend:
-                if isinstance(layer, VectorLayer):
-                    # Todo: better handling when more than one classypie option for same layer
-                    # perhaps grouping into basegroup under same layer label
-                    # ...
-                    anydynamic = False
-                    if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
-                        # is dynamic and should be highlighted specially
-                        #print 999,layer,layer.legendoptions
-                        self.add_fillcolors(layer, **layer.legendoptions)
-                        anydynamic = True
-                    if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
-                        # is dynamic and should be highlighted specially
-                        self.add_fillsizes(layer, **layer.legendoptions)
-                        anydynamic = True
-                        
-                    # add as static symbol if none of the dynamic ones
-                    if not anydynamic:
-                        self.add_single_symbol(layer, **layer.legendoptions)
+        # either based on all map layers with the legend flag
+        # or based on specified layer instances, even if legend flag is off
+        layers = self.layers or [l for l in self.map if l.legend]
+        for layer in layers:
+            if isinstance(layer, VectorLayer):
+                # Todo: better handling when more than one classypie option for same layer
+                # perhaps grouping into basegroup under same layer label
+                # ...
+                anydynamic = False
+                if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
+                    # is dynamic and should be highlighted specially
+                    #print 999,layer,layer.legendoptions
+                    self.add_fillcolors(layer, **layer.legendoptions)
+                    anydynamic = True
+                if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
+                    # is dynamic and should be highlighted specially
+                    self.add_fillsizes(layer, **layer.legendoptions)
+                    anydynamic = True
+                    
+                # add as static symbol if none of the dynamic ones
+                if not anydynamic:
+                    self.add_single_symbol(layer, **layer.legendoptions)
 
-                elif isinstance(layer, RasterLayer):
-                    if layer.styleoptions["type"] in ("grayscale","colorscale"):
-                        self.add_fillcolors(layer, **layer.legendoptions)
+            elif isinstance(layer, RasterLayer):
+                if layer.styleoptions["type"] in ("grayscale","colorscale"):
+                    self.add_fillcolors(layer, **layer.legendoptions)
 
     def render(self):
         # ensure the drawer is created so pyagg legend can use it to calculate sizes etc

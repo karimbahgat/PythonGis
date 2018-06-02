@@ -1,5 +1,6 @@
 
 import itertools, operator, math
+import warnings
 from .data import *
 
 import shapely, shapely.ops, shapely.geometry
@@ -199,7 +200,63 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
 
     if isinstance(clip, basestring):
         clipname = clip
-        clip = lambda f1,f2: getattr(f1.get_shapely(), clipname)(f2._shapely).__geo_interface__
+        
+        # determine correct output type for each operation
+        if clipname == 'intersection':
+            # lowest dimension
+            if 'Point' in (data.type,other.type):
+                newtyp = 'Point'
+                newmultiobj = shapely.geometry.MultiPoint
+            elif 'LineString' in (data.type,other.type):
+                newtyp = 'LineString'
+                newmultiobj = shapely.geometry.MultiLineString
+            elif 'Polygon' in (data.type,other.type):
+                newtyp = 'Polygon'
+                newmultiobj = shapely.geometry.MultiPolygon
+        elif clipname == 'union':
+            # highest dimension
+            if 'Polygon' in (data.type,other.type):
+                newtyp = 'Polygon'
+                newmultiobj = shapely.geometry.MultiPolygon
+            elif 'LineString' in (data.type,other.type):
+                newtyp = 'LineString'
+                newmultiobj = shapely.geometry.MultiLineString
+            elif 'Point' in (data.type,other.type):
+                newtyp = 'Point'
+                newmultiobj = shapely.geometry.MultiPoint
+        elif clipname == 'difference':
+            # same as main
+            newtyp = data.type
+            if 'Point' in newtyp: newmultiobj = shapely.geometry.MultiPoint
+            elif 'LineString' in newtyp: newmultiobj = shapely.geometry.MultiLineString
+            elif 'Polygon' in newtyp: newmultiobj = shapely.geometry.MultiPolygon
+
+        print newtyp,newmultiobj
+            
+        def clip(f1,f2):
+            clipfunc = getattr(f1.get_shapely(), clipname)
+            #print 'clipping feat'
+            try:
+                geom = clipfunc(f2._shapely)
+            except shapely.errors.TopologicalError:
+                warnings.warn('A clip operation failed due to invalid geometries, replacing with null-geometry')
+                return None
+                
+            if geom:
+                #print geom.geom_type
+                if geom.geom_type == 'GeometryCollection':
+                    # only get the subgeoms corresponding to the right type
+                    sgeoms = [g for g in geom.geoms if g.geom_type == newtyp] # single geoms
+                    mgeoms = [g for g in geom.geoms if g.geom_type == 'Multi'+newtyp] # multi geoms
+                    flatmgeoms = [g for mg in mgeoms for g in mg.geoms] # flatten multigeoms
+                    geom = newmultiobj(sgeoms + flatmgeoms)
+                    return geom.__geo_interface__
+                elif newtyp in geom.geom_type:
+                    # normal
+                    return geom.__geo_interface__
+                else:
+                    # ignore wrong types
+                    return None            
 
     if condition in ("distance",):
         radius = kwargs.get("radius")

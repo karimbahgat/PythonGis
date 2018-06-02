@@ -89,7 +89,8 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
             # auto detect delimiter
             # NOTE: only based on first 10 mb, otherwise gets really slow for large files
             # TODO: run sniffer regardless, and allow sending all kwargs to overwrite
-            dialect = csv.Sniffer().sniff(fileobj.read(1056*10)) 
+            sniffsize = kwargs.pop('sniffsize', 10)
+            dialect = csv.Sniffer().sniff(fileobj.read(1056*sniffsize)) 
             fileobj.seek(0)
             # overwrite with user input
             for k,v in kwargs.items():
