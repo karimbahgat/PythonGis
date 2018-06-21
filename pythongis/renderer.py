@@ -328,6 +328,7 @@ class Map:
         self.drawer.move(xmove, ymove)
         #self.zooms.append(func)
         self.changed = True
+        self.img = self.drawer.get_image()
 
     def resize(self, width, height):
         self.width = width

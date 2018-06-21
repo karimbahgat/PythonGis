@@ -123,6 +123,8 @@ class MapView(tk.Canvas):
             if self.last_zoomed: return
             self.mousepressed = True
             self.startxy = self.canvasx(event.x), self.canvasy(event.y)
+            #imx,imy = self.coords(self.image_on_canvas)
+            #self.startxy = imx + self.startxy[0], imy + self.startxy[1]
             if self.mouse_mode == "zoom":
                 startx,starty = self.startxy
                 self.rect = self.create_rectangle(startx, starty, startx+1, starty+1, fill=None)
@@ -153,10 +155,14 @@ class MapView(tk.Canvas):
                 curx,cury = self.canvasx(event.x), self.canvasy(event.y)
                 xmoved = int(curx - startx)
                 ymoved = int(cury - starty)
+                print startx,starty,curx,cury,xmoved,ymoved
                 if xmoved or ymoved:
                     # offset image rendering
-                    self.renderer.offset(xmoved, ymoved) 
-                    self.threaded_rendering()
+                    self.renderer.offset(xmoved, ymoved)
+                    # since threaded rendering will update the offset image, reanchor the dragged canvas image
+                    self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
+                    # render
+                    self.threaded_rendering() #update_image=False)
             elif self.mouse_mode == "zoom":
                 startx,starty = self.startxy
                 curx,cury = self.canvasx(event.x), self.canvasy(event.y)
@@ -228,7 +234,7 @@ class MapView(tk.Canvas):
         x,y = self.renderer.pixel2coord(px, py)
         return x,y
 
-    def threaded_rendering(self):
+    def threaded_rendering(self, update_image=True):
         # perform render/zoom in separate thread
         if self.onstart:
             self.onstart()
@@ -263,7 +269,8 @@ class MapView(tk.Canvas):
 
         # display zoomed image while waiting
         # previous zooms and changes to the view extent are already stored in the render img, just update it to the screen
-        self.update_image()
+        if update_image:
+            self.update_image()
 
         # begin rendering thread
         t=time.time()
