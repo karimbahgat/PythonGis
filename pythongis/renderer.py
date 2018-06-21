@@ -337,6 +337,14 @@ class Map:
         self.drawer.resize(width, height, lock_ratio=True)
         self.img = self.drawer.get_image()
 
+    def crop(self, xmin, ymin, xmax, ymax):
+        if not self.drawer: self._create_drawer()
+        self.changed = True
+        self.drawer.crop(xmin,ymin,xmax,ymax)
+        self.width = self.drawer.width
+        self.height = self.drawer.height
+        self.img = self.drawer.get_image()
+
     # Zooming
 
     def zoom_auto(self):
@@ -345,6 +353,7 @@ class Map:
         self.zoom_bbox(*bbox)
         #self.zooms.append(func)
         self.changed = True
+        self.img = self.drawer.get_image()
 
     def zoom_bbox(self, xmin, ymin, xmax, ymax):
         if not self.drawer: self._create_drawer()
@@ -356,6 +365,7 @@ class Map:
             self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=False)
         #self.zooms.append(func)
         self.changed = True
+        self.img = self.drawer.get_image()
 
     def zoom_in(self, factor, center=None):
         if not self.drawer: self._create_drawer()
@@ -363,6 +373,7 @@ class Map:
         #func = lambda: self.drawer.zoom_in(factor, center=center)
         #self.zooms.append(func)
         self.changed = True
+        self.img = self.drawer.get_image()
 
     def zoom_out(self, factor, center=None):
         if not self.drawer: self._create_drawer()
@@ -370,12 +381,14 @@ class Map:
         #func = lambda: self.drawer.zoom_out(factor, center=center)
         #self.zooms.append(func)
         self.changed = True
+        self.img = self.drawer.get_image()
 
     def zoom_units(self, units, center=None):
         if not self.drawer: self._create_drawer()
         self.drawer.zoom_units(units, center=center)
         #self.zooms.append(func)
         self.changed = True
+        self.img = self.drawer.get_image()
 
     # Layers
 

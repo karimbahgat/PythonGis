@@ -46,9 +46,9 @@ class MapView(tk.Canvas):
             # record resize time
             self.last_resized = time.time()
             # schedule to check if finished resizing after x millisecs
-            self.after(300, lambda: process_if_finished(event))
+            self.after(300, lambda: resize_if_finished(event))
             
-        def process_if_finished(event):
+        def resize_if_finished(event):
             # only if x time since last resize event
             if time.time() - self.last_resized > 0.3:
                 self.last_resized = time.time()
@@ -69,7 +69,7 @@ class MapView(tk.Canvas):
             # record zoom time
             self.last_zoomed = time.time()
             # schedule to check if finished zooming after x millisecs
-            self.after(300, zoom_if_finished)
+            self.after(300, self.zoom_if_finished)
 
         def doubleright(event):
             self.zoomfactor += 1
@@ -79,7 +79,7 @@ class MapView(tk.Canvas):
             # record zoom time
             self.last_zoomed = time.time()
             # schedule to check if finished zooming after x millisecs
-            self.after(300, zoom_if_finished)
+            self.after(300, self.zoom_if_finished)
 
         def mousewheel(event):
             # FIX: since we bind to all, event coordinates are captured by root
@@ -93,16 +93,21 @@ class MapView(tk.Canvas):
             else:
                 doubleleft(event)
 
-        def zoom_if_finished():
-            if time.time() - self.last_zoomed >= 0.3:
-                if self.zoomdir == "out":
-                    self.renderer.zoom_out(self.zoomfactor, center=self.zoomcenter)
-                else:
-                    self.renderer.zoom_in(self.zoomfactor, center=self.zoomcenter)
-                self.threaded_rendering()
-                # reset zoomfactor
-                self.zoomfactor = 1
-                self.last_zoomed = None
+##        def zoom_if_finished():
+##            if time.time() - self.last_zoomed >= 0.2:
+##                # remember old bbox
+##                oldbbox = list(self.renderer.drawer.coordspace_bbox)
+##                # get new bbox from zoom
+##                if self.zoomdir == "out":
+##                    self.renderer.zoom_out(self.zoomfactor, center=self.zoomcenter)
+##                else:
+##                    self.renderer.zoom_in(self.zoomfactor, center=self.zoomcenter)
+##
+##                # render fresh
+##                self.threaded_rendering(oldbbox)
+##                # reset zoomfactor
+##                self.zoomfactor = 1
+##                self.last_zoomed = None
 
         self.bind("<Double-Button-1>", doubleleft)
         self.bind("<Double-Button-3>", doubleright)
@@ -165,8 +170,7 @@ class MapView(tk.Canvas):
                 curx,cury = self.renderer.drawer.pixel2coord(curx,cury)
                 bbox = [startx, starty, curx, cury]
                 #self.rough_zoom_bbox(bbox)
-                self.renderer.zoom_bbox(*bbox)
-                self.threaded_rendering()
+                self.zoom_bbox(bbox)
 
         self.zoomicon_tk = icons.get("zoom_rect.png", width=30, height=30)
         def mouseenter(event):
@@ -201,10 +205,12 @@ class MapView(tk.Canvas):
         self.controls.append(control)
 
     def zoom_global(self):
+        # get new bbox
         layerbboxes = (layer.bbox for layer in self.renderer.layers)
         xmins,ymins,xmaxs,ymaxs = zip(*layerbboxes)
         globalbbox = [min(xmins), min(ymins), max(xmaxs), max(ymaxs)]
         self.renderer.zoom_bbox(*globalbbox)
+        # render fresh
         self.threaded_rendering()
 
     def zoom_rect(self):
@@ -212,7 +218,9 @@ class MapView(tk.Canvas):
         self.event_generate("<Enter>")
 
     def zoom_bbox(self, bbox):
+        # get new bbox from zoom
         self.renderer.zoom_bbox(*bbox)
+        # fresh render
         self.threaded_rendering()
 
     def mouse2coords(self, x, y):
@@ -226,6 +234,38 @@ class MapView(tk.Canvas):
             self.onstart()
         print "rendering thread..."
         import time
+
+##        if oldbbox:
+##            # perform a fast cropzoom before rendering in full
+##            t=time.time()
+##            oldw,oldh = self.renderer.width,self.renderer.height
+##            newbbox = list(self.renderer.drawer.coordspace_bbox)
+##            # crop then resize existing image from oldbbox to newbbox
+##            # get zoomratio by comparing old to new width
+##            # ...although could also use height, both have same ratio due to
+##            # ...zoom box should always be fitted inside window ratio
+##            zoomratio = (oldbbox[2]-oldbbox[0]) / float(newbbox[2]-newbbox[0])
+##            if zoomratio < 1:
+##                # newbox is larger than oldbox, meaning zooms out
+##                # so to avoid very large images from crop(), resize to smaller first
+##                # we multiply by x to get slightly better quality
+##                supersample = 1
+##                self.renderer.resize(int(oldw*zoomratio*supersample), int(oldh*zoomratio*supersample))
+##                print self.renderer.img
+##            self.renderer.zoom_bbox(*oldbbox)
+##            self.renderer.crop(*newbbox)
+##            self.renderer.resize(oldw, oldh)
+##            # update image
+##            self.tkimg = self.renderer.get_tkimage()
+##            self.itemconfig(self.image_on_canvas, image=self.tkimg )
+##            self.update()
+            #print "-cropzoom",time.time()-t
+
+        # display zoomed image while waiting
+        # previous zooms and changes to the view extent are already stored in the render img, just update it to the screen
+        self.update_image()
+
+        # begin rendering thread
         t=time.time()
         pending = self.master.new_thread(self.renderer.render_all)
 
@@ -278,10 +318,13 @@ class MapView(tk.Canvas):
 
     def zoom_if_finished(self):
         if time.time() - self.last_zoomed >= 0.3:
+            # get new bbox from zoom
             if self.zoomdir == "out":
-                self.renderer.zoom_out(self.zoomfactor)
+                self.renderer.zoom_out(self.zoomfactor, center=self.zoomcenter)
             else:
-                self.renderer.zoom_in(self.zoomfactor)
+                self.renderer.zoom_in(self.zoomfactor, center=self.zoomcenter)
+
+            # render fresh
             self.threaded_rendering()
             # reset zoomfactor
             self.zoomfactor = 1
