@@ -3,6 +3,10 @@ import time
 import Tkinter as tk
 import tk2
 import pythongis as pg
+import os
+
+from . import icons
+
 
 
 
@@ -16,7 +20,7 @@ class MapView(tk.Canvas):
         self.renderer = renderer
         self.controls = []
 
-        # Other
+        # Attributes
         self.onstart = None
         self.onsuccess = None
         self.onfinish = None
@@ -29,18 +33,14 @@ class MapView(tk.Canvas):
         self.zoomdir = None
         self.last_zoomed = None
 
-        # Assign a renderer just after startup, because only then can one know the required window size
-        def on_startup():
-            # link to self
-            self.renderer.mapview = self
-            # fill with blank image
-            self.tkimg = self.renderer.get_tkimage()
-            self.image_on_canvas = self.create_image(0, 0, anchor="nw", image=self.tkimg )
-
-        self.after(10, on_startup)
+        # Setup
+        # link to self
+        self.renderer.mapview = self
+        # fill with blank image
+        self.tkimg = None
+        self.image_on_canvas = self.create_image(0, 0, anchor="nw", image=self.tkimg )
         
         # Schedule resize map on window resize
-        
         self.last_resized = None
         def resizing(event):
             # record resize time
@@ -168,18 +168,18 @@ class MapView(tk.Canvas):
                 self.renderer.zoom_bbox(*bbox)
                 self.threaded_rendering()
 
+        self.zoomicon_tk = icons.get("zoom_rect.png", width=30, height=30)
         def mouseenter(event):
             if self.mouse_mode == "zoom":
                 # replace mouse with zoomicon
-                self.zoomicon_tk = icons.get("zoom_rect.png", width=30, height=30)
-                self.zoomicon_on_canvas = self.create_image(event.x, event.y, anchor="center", image=self.zoomicon_tk )
-                self.config(cursor="none")
+                self.zoomicon_on_canvas = self.create_image(event.x, event.y, anchor="nw", image=self.zoomicon_tk )
+                #self.config(cursor="none")
 
         def mouseleave(event):
             if self.mouse_mode == "zoom":
                 # back to normal mouse
                 self.delete(self.zoomicon_on_canvas)
-                self.config(cursor="arrow")
+                #self.config(cursor="arrow")
 
         def cancel(event):
             if self.mouse_mode == "zoom":

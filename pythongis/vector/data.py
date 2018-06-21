@@ -288,48 +288,49 @@ class Feature:
 
     # convenient visualizing
 
-    def render(self, width, height, bbox=None, flipy=True, **styleoptions):
-        """Shortcut for easily rendering and returning the feature geometry on a Map instance.
-
-        TODO: Check that works correctly. Have experienced that adding additional layers on top
-        of this results in mismatch and layers jumping around. 
-        
-        Args:
-            width/height: Desired width/height of the rendered map.
-            bbox (optional): If given, only renders the given bbox, specified as (xmin,ymin,xmax,ymax).
-            flipy (optional): If True, flips the direction of the y-coordinate axis so that it increases towards the top of the screen
-                instead of the bottom of the screen. This is useful for rendering unprojected long/lat coordinates and is the default. 
-                Should only be changed when rendering projected x/y coordinates, whose y-axis typically increases towards the bottom. 
-            **styleoptions (optional): How to style the feature geometry, as documented in "renderer.VectorLayer".
-        """
-        from .. import renderer
-        singledata = renderer.VectorData()
+    def dataset(self):
+        singledata = VectorData()
         if self._data:
             singledata.fields = self._data.fields
             singledata.add_feature(self.row, self.geometry)
         else:
+            singledata.fields = []
             singledata.add_feature([], self.geometry)
-        
-        lyr = renderer.VectorLayer(singledata, **styleoptions)
-        lyr.render(width=width, height=height, bbox=bbox, flipy=flipy)
-        return lyr
+        return singledata
 
-    def view(self, width, height, bbox=None, flipy=True, **styleoptions):
-        """Renders and opens a Tkinter window for viewing and interacting with the map.
+    def map(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        """Shortcut for easily creating a Map instance containing this feature as a layer.
         
-        Args are same as for "render()".
+        Args:
+            width/height (optional): Desired width/height of the map. This can be changed again later. 
+            bbox (optional): If given, only renders the given bbox, specified as (xmin,ymin,xmax,ymax).
+            title (optional): Title to be shown on the map.
+            background (optional): Background color of the map.
+            **styleoptions (optional): How to style the feature geometry, as documented in "renderer.VectorLayer".
         """
-        lyr = self.render(width, height, bbox, flipy, **styleoptions)
+        from .. import renderer
+        mapp = renderer.Map(width, height, title=title, background=background)
         
-        import Tkinter as tk
-        import PIL.ImageTk
+        singledata = self.dataset()
+        mapp.add_layer(singledata, **styleoptions)
         
-        app = tk.Tk()
-        tkimg = PIL.ImageTk.PhotoImage(lyr.img)
-        lbl = tk.Label(image=tkimg)
-        lbl.tkimg = tkimg
-        lbl.pack()
-        app.mainloop()
+        if bbox:
+            mapp.zoom_bbox(*bbox)
+        else:
+            if singledata.has_geometry():
+                mapp.zoom_bbox(*mapp.layers.bbox)
+        return mapp
+
+    def view(self, bbox=None, title="", background=None, **styleoptions):
+        """Opens a Tkinter window for viewing and interacting with the feature on a map.
+        
+        Args are same as for "map()".
+        """
+        from .. import app
+        mapp = self.map(None, None, bbox, title=title, background=background, **styleoptions)
+        # make gui
+        win = app.builder.MultiLayerGUI(mapp)
+        win.mainloop()
 
 
 
@@ -1248,7 +1249,16 @@ class VectorData:
         #if hasattr(self, "spindex"): new.spindex = self.spindex.copy() # NO SUCH METHOD
         return new
     
-    def render(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
+    def map(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+        """Shortcut for easily creating a Map instance containing this dataset as a layer.
+        
+        Args:
+            width/height (optional): Desired width/height of the map. This can be changed again later. 
+            bbox (optional): If given, only renders the given bbox, specified as (xmin,ymin,xmax,ymax).
+            title (optional): Title to be shown on the map.
+            background (optional): Background color of the map.
+            **styleoptions (optional): How to style the feature geometry, as documented in "renderer.VectorLayer".
+        """
         from .. import renderer
         mapp = renderer.Map(width, height, title=title, background=background)
         mapp.add_layer(self, **styleoptions)
@@ -1257,10 +1267,14 @@ class VectorData:
         else:
             if self.has_geometry():
                 mapp.zoom_bbox(*mapp.layers.bbox)
-        mapp.render_all()
         return mapp
 
     def browse(self, limit=None):
+        """Opens a Tkinter window for viewing and interacting with the rows contained in this dataset.
+        
+        Args:
+            limit (optional): Limits the number of rows to be displayed, in case of very large datasets. 
+        """
         from .. import app
         win = app.builder.TableGUI()
         if limit:
@@ -1276,24 +1290,18 @@ class VectorData:
         win.browser.table.populate(self.fields, rows())
         win.mainloop()
 
-    def view(self, width=None, height=None, bbox=None, flipy=True, title="", background=None, **styleoptions):
+    def view(self, bbox=None, title="", background=None, **styleoptions):
+        """Opens a Tkinter window for viewing and interacting with the feature on a map.
+        
+        Args are same as for "map()".
+        """
         from .. import app
-        mapp = self.render(width, height, bbox, flipy, title=title, background=background, **styleoptions)
+        mapp = self.map(None, None, bbox, title=title, background=background, **styleoptions)
         # make gui
         win = app.builder.MultiLayerGUI(mapp)
         win.mainloop()
-        
-##        mapp = self.render(width, height, bbox, flipy, **styleoptions)
-##        
-##        import Tkinter as tk
-##        import PIL.ImageTk
-##        
-##        app = tk.Tk()
-##        tkimg = PIL.ImageTk.PhotoImage(mapp.img)
-##        lbl = tk.Label(image=tkimg)
-##        lbl.tkimg = tkimg
-##        lbl.pack()
-##        app.mainloop()
+
+
 
 
     

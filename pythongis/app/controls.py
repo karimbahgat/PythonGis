@@ -5,9 +5,8 @@ import tk2
 import pythongis as pg
 from . import dialogs
 from . import builder
+from . import icons
 
-def iconpath(name):
-    return os.path.join(os.path.dirname(__file__), "icons", name)
 
 class LayersControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
@@ -15,7 +14,7 @@ class LayersControl(tk2.basics.Label):
 
         self.layersbut = tk2.basics.Button(self)
         self.layersbut["command"] = self.toggle_layers
-        self.layersbut.set_icon(iconpath("layers.png"), width=40, height=40)
+        self.layersbut.set_icon(icons.iconpath("layers.png"), width=40, height=40)
         self.layersbut.pack()
 
         self.layers = []
@@ -90,6 +89,7 @@ class LayersControl(tk2.basics.Label):
         def browse():
             from . import builder
             win = tk2.Window()
+            win.state('zoom')
             browser = builder.TableBrowser(win)
             browser.pack(fill="both", expand=1)
             lyr = widget.item
@@ -109,12 +109,12 @@ class NavigateControl(tk2.basics.Label):
 
         self.zoomglob = tk2.basics.Button(self)
         self.zoomglob["command"] = lambda: self.mapview.zoom_global()
-        self.zoomglob.set_icon(iconpath("zoom_global.png"), width=40, height=40)
+        self.zoomglob.set_icon(icons.iconpath("zoom_global.png"), width=40, height=40)
         self.zoomglob.pack(side="left")
 
         self.zoomrect = tk2.basics.Button(self)
         self.zoomrect["command"] = lambda: self.mapview.zoom_rect()
-        self.zoomrect.set_icon(iconpath("zoom_rect.png"), width=40, height=40)
+        self.zoomrect.set_icon(icons.iconpath("zoom_rect.png"), width=40, height=40)
         self.zoomrect.pack(side="left")
 
 class ZoomControl(tk2.basics.Label):
@@ -136,39 +136,69 @@ class IdentifyControl(tk2.basics.Label):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
         self.identifybut = tk2.basics.Button(self, command=self.begin_identify)
-        self.identifybut.set_icon(iconpath("identify.png"), width=40, height=40)
+        self.identifybut.set_icon(icons.iconpath("identify.png"), width=40, height=40)
         self.identifybut.pack()
+
+        self.mouseicon_tk = icons.get("identify.png", width=30, height=30)
 
     def begin_identify(self):
         print "begin identify..."
+        # replace mouse with identicon
+        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="nw", image=self.mouseicon_tk )
+        #self.mapview.config(cursor="none")
+        def follow_mouse(event):
+            # gets called for entire app, so check to see if directly on canvas widget
+            root = self.winfo_toplevel()
+            rootxy = root.winfo_pointerxy()
+            mousewidget = root.winfo_containing(*rootxy)
+            if mousewidget == self.mapview:
+                curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+                self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
+        self.followbind = self.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
+        # identify once clicked
         def callident(event):
+            # reset
+            cancel()
+            # find
             x,y = self.mapview.mouse2coords(event.x, event.y)
             self.identify(x, y)
-        self.winfo_toplevel().bind_once("<Button-1>", callident, "+")
+        self.clickbind = self.winfo_toplevel().bind("<ButtonRelease-1>", callident, "+")
+        # cancel with esc button
+        def cancel(event=None):
+            self.winfo_toplevel().unbind('<Motion>', self.followbind)
+            self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
+            self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+            #self.mapview.config(cursor="arrow")
+            self.mapview.delete(self.mouseicon_on_canvas)
+        self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
 
     def identify(self, x, y):
         print "identify: ",x, y
         infowin = tk2.Window()
-        infoframe = tk2.ScrollFrame(infowin)
+        infowin.state('zoomed')
+
+        title = tk2.Label(infowin, text="Hits for coordinates: %s, %s" % (x, y))
+        title.pack(fill="x")#, expand=1)
+        
+        infoframe = tk2.Frame(infowin)
         infoframe.pack(fill="both", expand=1)
 
-        title = tk2.Label(infoframe, text="Hits for coordinates: %s, %s" % (x, y))
-        title.pack(fill="x", expand=1)
+        # find coord distance for approx 5 pixel uncertainty
+        pixelbuff = 10
+        p1 = self.mapview.renderer.pixel2coord(0, 0)
+        p2 = self.mapview.renderer.pixel2coord(pixelbuff, 0)
+        coorddist = self.mapview.renderer.drawer.measure_dist(p1, p2)
+
+        # create uncertainty buffer around clickpoint
+        from shapely.geometry import Point
+        p = Point(x, y).buffer(coorddist)
         
-        anyhits = None        
+        anyhits = None
         for layer in self.mapview.renderer.layers:
             print layer
-            if isinstance(layer.data, pg.VectorData):
-                feats = None
-                if layer.data.type == "Polygon":
-                    from shapely.geometry import Point
-                    p = Point(x, y)
-                    feats = [feat for feat in layer.data.quick_overlap([x,y,x,y]) if feat.get_shapely().intersects(p)]
-                            
-                else:
-                    # need a closest algorithm
-                    raise NotImplementedError("Point and line identify not yet implemented")
-
+            if isinstance(layer.data, pg.VectorData):                
+                feats = [feat for feat in layer.data.quick_overlap(p.bounds) if feat.get_shapely().intersects(p)]
+                
                 if feats:
                     anyhits = True
                     layerframe = tk2.Frame(infoframe, label=layer.data.name)
@@ -213,7 +243,9 @@ class TimeControl(tk2.basics.Label):
 ##        if not start:
 ##            start = min(
 
-
+class InsetMapControl:
+    def __init__(self, master, *args, **kwargs):
+        pass
 
 
 

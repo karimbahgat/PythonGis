@@ -10,6 +10,8 @@ class TableGUI(tk2.Tk):
 
         self.browser = TableBrowser(self)
         self.browser.pack(fill="both", expand=1)
+
+        self.state('zoomed')
         
 
 class MultiLayerGUI(tk2.Tk):
@@ -18,6 +20,8 @@ class MultiLayerGUI(tk2.Tk):
 
         self.map = MultiLayerMap(self, mapp, time=time)
         self.map.pack(fill="both", expand=1)
+
+        self.state('zoomed')
 
 # move below to "widgets.py"..?
 

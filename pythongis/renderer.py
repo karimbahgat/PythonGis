@@ -706,7 +706,14 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 class VectorLayer:
-    def __init__(self, data, legendoptions=None, legend=True, datafilter=None, transparency=0, **options):
+    def __init__(self, data, legendoptions=None, legend=True, datafilter=None, transparency=0, flipy=True, **options):
+        """
+        UNFINISHED docstring...
+        
+            flipy (optional): If True, flips the direction of the y-coordinate axis so that it increases towards the top of the screen
+                instead of the bottom of the screen. This is useful for rendering unprojected long/lat coordinates and is the default. 
+                Should only be changed to False when rendering projected x/y coordinates, whose y-axis typically increases towards the bottom.
+        """
 
         if not isinstance(data, VectorData):
             # assume data is filepath
@@ -716,6 +723,7 @@ class VectorLayer:
         self.data = data
         self.visible = True
         self.transparency = transparency
+        self.flipy = flipy
         self.img = None
         self.img_text = None
 
@@ -991,19 +999,17 @@ class VectorLayer:
         
         self.effects.append(effect)
 
-    def render(self, width, height, bbox=None, lock_ratio=True, flipy=False, antialias=False):
+    def render(self, width, height, bbox=None, antialias=False):
+
         if self.has_geometry():
             import time
             t=time.time()
 
             if not bbox:
                 bbox = self.bbox
-
-            if flipy:
-                bbox = bbox[0],bbox[3],bbox[2],bbox[1]
             
             drawer = pyagg.Canvas(width, height, background=None)
-            drawer.custom_space(*bbox, lock_ratio=lock_ratio)
+            drawer.custom_space(*bbox, lock_ratio=True)
             
             features = self.features(bbox=bbox)
 
@@ -1106,19 +1112,16 @@ class VectorLayer:
         else:
             self.img = None
 
-    def render_text(self, width, height, bbox=None, lock_ratio=True, flipy=False):
+    def render_text(self, width, height, bbox=None):
         if self.has_geometry() and self.styleoptions.get("text"):
 
             textkey = self.styleoptions["text"]
             
             if not bbox:
                 bbox = self.bbox
-
-            if flipy:
-                bbox = bbox[0],bbox[3],bbox[2],bbox[1]
             
             drawer = pyagg.Canvas(width, height, background=None)
-            drawer.custom_space(*bbox, lock_ratio=lock_ratio)
+            drawer.custom_space(*bbox, lock_ratio=True)
 
             
             features = self.features(bbox=bbox)
@@ -1329,7 +1332,7 @@ class RasterLayer:
     def is_empty(self):
         return False # for now
 
-    def render(self, resampling="nearest", lock_ratio=True, antialias=None, **georef):
+    def render(self, resampling="nearest", antialias=None, **georef):
         # position in space
         # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
         # LIKELY DUE TO HALF CELL CENTER VS CORNER
@@ -1337,9 +1340,6 @@ class RasterLayer:
             georef["bbox"] = self.data.bbox
 
         rendered = self.data.resample(method=resampling, **georef)
-
-        # TODO: Instead of resample need to somehow honor lock_ratio, maybe by not using from_image()
-        # ...
 
         # TODO: binary 1bit rasters dont show correctly
         # ...
@@ -1445,7 +1445,7 @@ class RasterLayer:
             a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
             self.img.putalpha(a)
 
-    def render_text(self, resampling="nearest", lock_ratio=True, **georef):
+    def render_text(self, resampling="nearest", **georef):
         self.img_text = None
 
 
