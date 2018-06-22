@@ -1291,7 +1291,7 @@ class VectorData:
         win.mainloop()
 
     def view(self, bbox=None, title="", background=None, **styleoptions):
-        """Opens a Tkinter window for viewing and interacting with the feature on a map.
+        """Opens a Tkinter window for viewing and interacting with the dataset on a map.
         
         Args are same as for "map()".
         """

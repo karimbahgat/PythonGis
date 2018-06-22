@@ -597,8 +597,7 @@ class Map:
 ##        return self._tkim
 
     def view(self):
-        mapp = self.copy()
-        mapp.render_all()
+        mapp = self.copy() # ???
         # make gui
         from . import app
         win = app.builder.MultiLayerGUI(mapp)
@@ -621,6 +620,9 @@ class LayerGroup:
     def __iter__(self):
         for layer in self._layers:
             yield layer
+
+    def __len__(self):
+        return len(self._layers)
 
     def __getitem__(self, i):
         return self._layers[i]

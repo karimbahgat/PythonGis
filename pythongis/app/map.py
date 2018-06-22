@@ -142,7 +142,7 @@ class MapView(tk.Canvas):
                     self.coords(self.image_on_canvas, xmoved, ymoved) # offset the image rendering
             elif self.mouse_mode == "zoom":
                 curx,cury = self.canvasx(event.x), self.canvasy(event.y)
-                self.coords(self.zoomicon_on_canvas, curx, cury)
+                self.coords(self.zoomicon_on_canvas, curx + 30, cury + 10)
                 if self.mousepressed:
                     startx,starty = self.startxy
                     self.coords(self.rect, startx, starty, curx, cury)
@@ -182,7 +182,7 @@ class MapView(tk.Canvas):
         def mouseenter(event):
             if self.mouse_mode == "zoom":
                 # replace mouse with zoomicon
-                self.zoomicon_on_canvas = self.create_image(event.x, event.y, anchor="nw", image=self.zoomicon_tk )
+                self.zoomicon_on_canvas = self.create_image(event.x, event.y, anchor="center", image=self.zoomicon_tk )
                 #self.config(cursor="none")
 
         def mouseleave(event):

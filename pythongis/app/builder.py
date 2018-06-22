@@ -1,5 +1,6 @@
 
 from .map import MapView
+from . import icons
 
 import pythongis as pg
 import tk2
@@ -18,9 +19,158 @@ class MultiLayerGUI(tk2.Tk):
     def __init__(self, mapp, time=False, *args, **kwargs):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 
+        self.ribbon = tk2.Ribbon(self)
+        #self.ribbon.pack(fill="x", padx=15, pady=5)
+
+        _hometab = self.ribbon.add_tab('Home')
+        viewmode = tk2.Frame(_hometab, label="View Mode")
+        viewmode.pack(side='left')
+        mode2d = tk2.Button(viewmode)
+        mode2d.set_icon(icons.iconpath('flatmap.jfif'), width=40, height=40)
+        mode2d.pack(side='left')
+        modelyr = tk2.Button(viewmode)
+        modelyr.set_icon(icons.iconpath('layers.png'), width=40, height=40)
+        modelyr.pack(side='left')
+        mode3d = tk2.Button(viewmode)
+        mode3d.set_icon(icons.iconpath('3d icon.png'), width=40, height=40)
+        mode3d.pack(side='left')
+
+        ###
         self.map = MultiLayerMap(self, mapp, time=time)
         self.map.pack(fill="both", expand=1)
 
+        ###
+##        _filtertab = self.ribbon.add_tab('Filters')
+##        layers = tk2.scrollwidgets.OrderedList(_filtertab)
+##        layers.pack(fill="both", expand=1)
+##        def filter_options(widget):
+##            widget.pack(fill="x", expand=1)
+##
+##            # left image/name part
+##            left = tk2.Frame(widget)
+##            left.pack(side="left")
+##
+##            #tkim = pg.app.icons.get('zoom_global.png', width=200, height=200)
+##            lyr = widget.item
+##            lyr.render(width=300, height=150)
+##            im = lyr.img
+##            lyr.img = None
+##            print im, im.mode
+##            import PIL, PIL.ImageTk
+##            tkim = PIL.ImageTk.PhotoImage(im)
+##            thumb = tk2.basics.Label(left, image=tkim)
+##            thumb.tkim = tkim
+##            thumb.pack(side="top")
+##            
+##            text = widget.item.data.name
+##            if len(text) > 30:
+##                text = "..."+text[-27:]
+##            name = tk2.basics.Label(left, text=text)
+##            name.pack(side="bottom")
+##
+##            # right paramaters and controls
+##            right = tk2.Frame(widget)
+##            right.pack(side="right")
+##
+##            dfilt = pg.app.controls.LayerFilterControl(right, layer=lyr)
+##            dfilt.pack(side="left", fill="y", expand=1)
+##            
+##        for lyr in self.map.mapp.layers:
+##            layers.add_item(lyr, filter_options)
+
+        ###
+##        _styletab = self.ribbon.add_tab('Styling')
+##        layers = tk2.scrollwidgets.OrderedList(_styletab, title="Layer Styles:")
+##        layers.pack(fill="both", expand=1)
+##        def style_options(widget):
+##            widget.pack(fill="x", expand=1)
+##
+##            # left image/name part
+##            left = tk2.Frame(widget)
+##            left.pack(side="left")
+##
+##            text = widget.item.data.name
+##            if len(text) > 30:
+##                text = "..."+text[-27:]
+##            name = tk2.basics.Label(left, text=text)
+##            name.pack(side="top")
+##
+##            #tkim = pg.app.icons.get('zoom_global.png', width=200, height=200)
+##            import PIL, PIL.Image, PIL.ImageTk
+##            lyr = widget.item
+##            lyr.render(width=300, height=150, bbox=[lyr.bbox[0],lyr.bbox[3],lyr.bbox[2],lyr.bbox[1]])
+##            im = lyr.img #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
+##            lyr.img = None
+##            print im, im.mode
+##            tkim = PIL.ImageTk.PhotoImage(im)
+##            thumb = tk2.basics.Label(left, image=tkim)
+##            thumb.tkim = tkim
+##            thumb.pack(side="bottom")
+##
+##            # right paramaters and controls
+##            right = tk2.Frame(widget)
+##            right.pack(side="right", fill="y", expand=1)
+##
+##            _filtframe = tk2.Frame(right, label="Filtering")
+##            _filtframe.pack(side="left", fill="y", expand=1)
+##            dfilt = pg.app.controls.LayerFilterControl(_filtframe, layer=lyr)
+##            dfilt.pack(side="top")
+##
+##            # fillcolor
+##            _fillcolframe = tk2.Frame(right, label="Fillcolor")
+##            _fillcolframe.pack(side="left", fill="y", expand=1)
+##            _fillcoltypes = tk2.Ribbon(_fillcolframe)
+##            _fillcoltypes.pack(side="left", fill="y", expand=1)
+##            
+##            _fillcolsingle = _fillcoltypes.add_tab("Single Color")
+##            _ = tk2.Label(_fillcolsingle, text="Color")
+##            _.pack(side="top") 
+##            fillcol = tk2.ColorButton(_fillcolsingle)
+##            fillcol.pack(side="top")
+##            _ = tk2.Label(_fillcolsingle, text="Transparency")
+##            _.pack(side="top") 
+##            filltransp = tk2.Slider(_fillcolsingle)
+##            filltransp.pack(side="top")
+##
+##            _fillcolgrad = _fillcoltypes.add_tab("Color Gradient")
+##            fillcolbrk = tk2.Entry(_fillcolgrad, label="Gradient")
+##            fillcolbrk.pack(side="top")
+##            fillcolval = tk2.Entry(_fillcolgrad, label="Field Value")
+##            fillcolval.pack(side="top")
+##            fillcolbrk = tk2.Entry(_fillcolgrad, label="Value Breaks")
+##            fillcolbrk.pack(side="top")
+##            fillcolexc = tk2.Entry(_fillcolgrad, label="Exclude")
+##            fillcolexc.pack(side="top")
+##
+##            _fillcolgrad = _fillcoltypes.add_tab("Categories")
+##            fillcolbrk = tk2.Entry(_fillcolgrad, label="Colors")
+##            fillcolbrk.pack(side="top")
+##            fillcolval = tk2.Entry(_fillcolgrad, label="Field Value")
+##            fillcolval.pack(side="top")
+##            fillcolexc = tk2.Entry(_fillcolgrad, label="Exclude")
+##            fillcolexc.pack(side="top")
+##
+##            # initiate with styleoptions
+##            realfillcol = lyr.styleoptions.get('fillcolor')
+##            if realfillcol:
+##                if isinstance(realfillcol, dict):
+##                    # breaks
+##                    if realfillcol['breaks'] == 'unique':
+##                        # ...
+##                        _fillcoltypes.switch(tabname="Categories")
+##                    else:
+##                        # ...
+##                        _fillcoltypes.switch(tabname="Color Gradient")
+##                else:
+##                    fillcol.set_color(realfillcol[:3])
+##                    _fillcoltypes.switch(tabname="Single Color")
+##            
+##        for lyr in reversed(self.map.mapp.layers):
+##            layers.add_item(lyr, style_options)
+##
+##        ###
+##        self.ribbon.switch(tabname='Map')
+                        
         self.state('zoomed')
 
 # move below to "widgets.py"..?
@@ -29,24 +179,26 @@ class MultiLayerMap(tk2.basics.Label):
     def __init__(self, master, mapp, time=False, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
+        self.mapp = mapp
+
         mapview = pg.app.map.MapView(self, mapp)
         mapview.pack(fill="both", expand=1)
 
         layerscontrol = pg.app.controls.LayersControl(mapview)
         layerscontrol.layers = mapp.layers
-        layerscontrol.place(relx=0.98, rely=0.02, anchor="ne")
+        layerscontrol.place(relx=0.99, rely=0.02, anchor="ne")
         mapview.add_control(layerscontrol)
-
-        identcontrol = pg.app.controls.IdentifyControl(mapview)
-        identcontrol.place(relx=0.98, rely=0.98, anchor="se")
-        mapview.add_control(identcontrol)
 
         navigcontrol = pg.app.controls.NavigateControl(mapview)
         navigcontrol.place(relx=0.5, rely=0.02, anchor="n")
         mapview.add_control(navigcontrol)
 
+        identcontrol = pg.app.controls.IdentifyControl(navigcontrol)
+        identcontrol.pack(fill='y', expand=1, side="right") #place(relx=0.98, rely=0.11, anchor="ne")
+        mapview.add_control(identcontrol)
+
         zoomcontrol = pg.app.controls.ZoomControl(mapview)
-        zoomcontrol.place(relx=0.02, rely=0.02, anchor="nw")
+        zoomcontrol.place(relx=0.01, rely=0.02, anchor="nw") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
         mapview.add_control(zoomcontrol)
 
         #bottom = tk2.Label(self)
@@ -70,11 +222,16 @@ class MultiLayerMap(tk2.basics.Label):
             coords["text"] = "%s, %s" % (x,y)
         self.winfo_toplevel().bind("<Motion>", showcoords, "+")
 
-        if True:#time:
+        if False:#time:
             # must be dict
             timecontrol = pg.app.controls.TimeControl(mapview)#, **time)
             timecontrol.place(relx=0.5, rely=0.98, anchor="s")
             mapview.add_control(timecontrol)
+
+        def dndfunc(event):
+            for filepath in event.data:
+                layerscontrol.add_layer(filepath)
+        self.winfo_toplevel().bind_dnddrop(dndfunc, "Files", event='<Drop>')
 
 class TableBrowser(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):

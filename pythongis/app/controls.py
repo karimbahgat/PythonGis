@@ -23,7 +23,7 @@ class LayersControl(tk2.basics.Label):
         while w.master:
             w = w.master
         self._root = w
-        self.layerslist = tk2.scrollwidgets.OrderedList(self._root)
+        self.layerslist = tk2.scrollwidgets.OrderedList(self._root, title="Map Layers:")
 
     def toggle_layers(self):
         if self.layerslist.winfo_ismapped():
@@ -34,32 +34,74 @@ class LayersControl(tk2.basics.Label):
     def show_layers(self):
         for w in self.layerslist.items:
             w.destroy()
-        for lyr in self.layers:
+        for lyr in reversed(self.layers):
             self.layerslist.add_item(lyr, self.layer_decor)
-            
-        def add_layer():
-            # TODO: maybe open another dialogue where can set encoding, filtering, etc, before adding
+
+        def ask_layer():
             filepath = tk2.filedialog.askopenfilename()
-            datawin = dialogs.LoadDataDialog(filepath=filepath)
-            def onsuccess(data):
-                # TODO: should prob be threaded...
-                lyr = self.mapview.renderer.add_layer(data)
-                self.show_layers()
-                self.mapview.renderer.render_one(lyr)
-                self.mapview.renderer.update_draworder()
-                self.mapview.update_image()
-            datawin.onsuccess = onsuccess
+            self.add_layer(filepath)
         def buttondecor(w):
-            but = tk2.Button(w, text="Add Layer", command=add_layer)
+            but = tk2.Button(w, text="Add Layer", command=ask_layer)
             but.pack()
         self.layerslist.add_item(None, buttondecor)
         
         screenx,screeny = self.layersbut.winfo_rootx(),self.layersbut.winfo_rooty()
         x,y = screenx - self._root.winfo_rootx(), screeny - self._root.winfo_rooty()
-        self.layerslist.place(anchor="ne", x=x, y=y)
+        self.layerslist.place(anchor="ne", x=x, y=y, relheight=0.75) #, relwidth=0.9)
+
+    def add_layer(self, filepath):
+        # TODO: maybe open another dialogue where can set encoding, filtering, etc, before adding
+        datawin = dialogs.LoadDataDialog(filepath=filepath)
+        def onsuccess(data):
+            # TODO: should prob be threaded...
+            lyr = self.mapview.renderer.add_layer(data)
+            self.mapview.renderer.render_one(lyr)
+            self.mapview.renderer.update_draworder()
+            self.mapview.update_image()
+        datawin.onsuccess = onsuccess
 
     def hide_layers(self):
         self.layerslist.place_forget()
+
+##    def layer_decor(self, widget):
+##        """
+##        Default way to decorate each layer with extra widgets
+##        Override method to customize. 
+##        """
+##        widget.pack(fill="x", expand=1)
+##        
+##        visib = tk2.basics.Checkbutton(widget)
+##        visib.select()
+##        def toggle():
+##            lyr = widget.item
+##            lyr.visible = not lyr.visible
+##            if lyr.visible:
+##                self.mapview.renderer.render_one(lyr)
+##            self.mapview.renderer.update_draworder()
+##            self.mapview.update_image()
+##        visib["command"] = toggle
+##        visib.pack(side="left")
+##        
+##        text = widget.item.data.name
+##        if len(text) > 50:
+##            text = "..."+text[-47:]
+##        name = tk2.basics.Label(widget, text=text)
+##        name.pack(side="left", fill="x", expand=1)
+##        
+##        def browse():
+##            from . import builder
+##            win = tk2.Window()
+##            win.state('zoom')
+##            browser = builder.TableBrowser(win)
+##            browser.pack(fill="both", expand=1)
+##            lyr = widget.item
+##            fields = lyr.data.fields
+##            rows = (feat.row for feat in lyr.features()) # respects the filter
+##            browser.table.populate(fields, rows)
+##            
+##        browse = tk2.basics.Button(widget, text="Browse", command=browse)
+##        browse.pack(side="right")
+
 
     def layer_decor(self, widget):
         """
@@ -67,8 +109,32 @@ class LayersControl(tk2.basics.Label):
         Override method to customize. 
         """
         widget.pack(fill="x", expand=1)
-        
-        visib = tk2.basics.Checkbutton(widget)
+
+
+        # left image/name part
+        left = tk2.Frame(widget)
+        left.pack(side="left")
+
+        #tkim = pg.app.icons.get('zoom_global.png', width=200, height=200)
+        import PIL, PIL.Image, PIL.ImageTk
+        lyr = widget.item
+        #lyr.render(width=300, height=150, bbox=[lyr.bbox[0],lyr.bbox[3],lyr.bbox[2],lyr.bbox[1]])
+        w,h = self.mapview.renderer.width, self.mapview.renderer.height
+        w,h = w/4, h/4
+        if lyr.img:
+            im = lyr.img.resize((w,h), resample=PIL.Image.BILINEAR) #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
+            tkim = PIL.ImageTk.PhotoImage(im)
+        else:
+            tkim = icons.get('zoom_global.png', width=w, height=h)
+        thumb = tk2.basics.Label(left, image=tkim)
+        thumb.tkim = tkim
+        thumb.pack(side="bottom")
+
+        i = len(self.mapview.renderer.layers) - self.mapview.renderer.layers.get_position(lyr)
+        laynum = tk2.Label(left, text=i)
+        laynum.pack(side="left")
+    
+        visib = tk2.basics.Checkbutton(left)
         visib.select()
         def toggle():
             lyr = widget.item
@@ -81,11 +147,19 @@ class LayersControl(tk2.basics.Label):
         visib.pack(side="left")
         
         text = widget.item.data.name
-        if len(text) > 50:
-            text = "..."+text[-47:]
-        name = tk2.basics.Label(widget, text=text)
-        name.pack(side="left", fill="x", expand=1)
-        
+        if len(text) > 30:
+            text = "..."+text[-27:]
+        name = tk2.basics.Label(left, text=text)
+        name.pack(side="left", fill="x", expand=1)        
+
+        # right paramaters and controls
+        right = tk2.Frame(widget)
+        right.pack(side="right", fill="y", expand=1)
+
+        _datframe = tk2.Frame(right, label="Data")
+        _datframe.pack(side="left", fill="y", expand=1)
+        dfilt = pg.app.controls.LayerFilterControl(_datframe, layer=lyr)
+        dfilt.pack(side="top")
         def browse():
             from . import builder
             win = tk2.Window()
@@ -96,9 +170,57 @@ class LayersControl(tk2.basics.Label):
             fields = lyr.data.fields
             rows = (feat.row for feat in lyr.features()) # respects the filter
             browser.table.populate(fields, rows)
-            
-        browse = tk2.basics.Button(widget, text="Browse", command=browse)
-        browse.pack(side="right")
+        browse = tk2.basics.Button(_datframe, text="Browse Dataset", command=browse)
+        browse.pack(pady=20)
+
+        # fillcolor
+        _fillcolframe = tk2.Frame(right, label="Fillcolor")
+        _fillcolframe.pack(side="left", fill="y", expand=1)
+        _fillcoltypes = tk2.Ribbon(_fillcolframe)
+        _fillcoltypes.pack(side="left", fill="y", expand=1)
+        
+        _fillcolsingle = _fillcoltypes.add_tab("Single Color")
+        _ = tk2.Label(_fillcolsingle, text="Color")
+        _.pack(side="top") 
+        fillcol = tk2.ColorButton(_fillcolsingle)
+        fillcol.pack(side="top")
+        _ = tk2.Label(_fillcolsingle, text="Transparency")
+        _.pack(side="top") 
+        filltransp = tk2.Slider(_fillcolsingle)
+        filltransp.pack(side="top")
+
+        _fillcolgrad = _fillcoltypes.add_tab("Color Gradient")
+        fillcolbrk = tk2.Entry(_fillcolgrad, label="Gradient")
+        fillcolbrk.pack(side="top")
+        fillcolval = tk2.Entry(_fillcolgrad, label="Attribute")
+        fillcolval.pack(side="top")
+        fillcolbrk = tk2.Entry(_fillcolgrad, label="Breaks")
+        fillcolbrk.pack(side="top")
+        fillcolexc = tk2.Entry(_fillcolgrad, label="Exclude")
+        fillcolexc.pack(side="top")
+
+        _fillcolgrad = _fillcoltypes.add_tab("Categories")
+        fillcolbrk = tk2.Entry(_fillcolgrad, label="Colors")
+        fillcolbrk.pack(side="top")
+        fillcolval = tk2.Entry(_fillcolgrad, label="Attribute")
+        fillcolval.pack(side="top")
+        fillcolexc = tk2.Entry(_fillcolgrad, label="Exclude")
+        fillcolexc.pack(side="top")
+
+        # initiate with styleoptions
+        realfillcol = lyr.styleoptions.get('fillcolor')
+        if realfillcol:
+            if isinstance(realfillcol, dict):
+                # breaks
+                if realfillcol['breaks'] == 'unique':
+                    # ...
+                    _fillcoltypes.switch(tabname="Categories")
+                else:
+                    # ...
+                    _fillcoltypes.switch(tabname="Color Gradient")
+            else:
+                fillcol.set_color(realfillcol[:3])
+                _fillcoltypes.switch(tabname="Single Color")
 
     def move_layer(self):
         pass
@@ -121,15 +243,17 @@ class ZoomControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
-        self.zoomin = tk2.basics.Button(self)
+        self.zoomin = tk2.basics.Button(self)#, height=40)
+        self.zoomin.set_icon(icons.iconpath('plus.png'), width=22, height=22)
         self.zoomin["command"] = lambda: self.mapview.zoom_in()
-        self.zoomin["text"] = "+"
-        self.zoomin.pack()
+        self.zoomin["text"] = u"\u2795" #"+"
+        self.zoomin.pack(fill='y', expand=1, side='top')
 
-        self.zoomout = tk2.basics.Button(self)
+        self.zoomout = tk2.basics.Button(self)#, height=40)
+        self.zoomout.set_icon(icons.iconpath('minus.ico'), width=22, height=22)
         self.zoomout["command"] = lambda: self.mapview.zoom_out()
-        self.zoomout["text"] = "-"
-        self.zoomout.pack()
+        self.zoomout["text"] = u"\u2796" #"-"
+        self.zoomout.pack(fill='y', expand=1, side='bottom')
 
 class IdentifyControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
@@ -144,7 +268,7 @@ class IdentifyControl(tk2.basics.Label):
     def begin_identify(self):
         print "begin identify..."
         # replace mouse with identicon
-        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="nw", image=self.mouseicon_tk )
+        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
         #self.mapview.config(cursor="none")
         def follow_mouse(event):
             # gets called for entire app, so check to see if directly on canvas widget
@@ -152,7 +276,7 @@ class IdentifyControl(tk2.basics.Label):
             rootxy = root.winfo_pointerxy()
             mousewidget = root.winfo_containing(*rootxy)
             if mousewidget == self.mapview:
-                curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+                curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
                 self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
         self.followbind = self.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
         # identify once clicked
@@ -196,7 +320,7 @@ class IdentifyControl(tk2.basics.Label):
         anyhits = None
         for layer in self.mapview.renderer.layers:
             print layer
-            if isinstance(layer.data, pg.VectorData):                
+            if isinstance(layer.data, pg.VectorData):
                 feats = [feat for feat in layer.data.quick_overlap(p.bounds) if feat.get_shapely().intersects(p)]
                 
                 if feats:
@@ -229,8 +353,26 @@ class IdentifyControl(tk2.basics.Label):
         if not anyhits:
             infowin.destroy()
 
-class TimeControl(tk2.basics.Label):
-    def __init__(self, master, key=None, start=None, end=None, *args, **kwargs):
+class LayerFilterControl(tk2.basics.Label):
+    def __init__(self, master, layer, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.layer = layer
+
+        self.filterfield = tk2.Entry(self, label="Filter Expression", labelside="top") #tk2.texteditor.Text()
+        self.filterfield.pack(side="top")
+
+        #self.runbut = tk2.Button(self, text="Apply", command=self.run)
+        #self.runbut.pack(side="bottom")
+
+    def run(self):
+        expr = self.filterfield.get()
+        print expr
+        filtfunc = eval('lambda f: %s' % expr)
+        self.layer.datafilter = filtfunc
+
+class FilterSliderControl(tk2.basics.Label):
+    def __init__(self, master, fromval=0, toval=0, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
         self.slider = tk2.Slider(self)
