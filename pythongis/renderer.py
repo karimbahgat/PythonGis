@@ -721,6 +721,128 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 
+def initSharedData(datadict):
+    print 'initfunc'
+    global sharedData
+    sharedData = datadict
+
+def parallel_vecrend(features, width, height, bbox, styleoptions, antialias=False):
+
+    import time
+    t=time.time()
+
+    print 'hello'
+
+    #self = sharedData['data']
+    
+    drawer = pyagg.Canvas(width, height, background=None)
+    drawer.custom_space(*bbox, lock_ratio=True)
+
+    #features = self.features(bbox=bbox)
+
+    # custom draworder (sortorder is only used with sortkey)
+    if "sortkey" in styleoptions:
+        features = sorted(features, key=styleoptions["sortkey"],
+                          reverse=styleoptions["sortorder"].lower() == "decr")
+
+    # prep PIL if non-antialias polygon
+    if 1: #not antialias and "Polygon" in self.data.type:
+        #print "preint",time.time()-t
+        import time
+        t=time.time()
+        img = PIL.Image.new("RGBA", (width,height), None)
+        PIL_drawer = PIL.ImageDraw.Draw(img)   #self.PIL_drawer
+
+    # for each
+    for row,geometry in features:
+        
+        # get symbols
+        rendict = dict()
+        if "shape" in styleoptions: rendict["shape"] = styleoptions["shape"]
+        for key in "fillcolor fillsize outlinecolor outlinewidth".split():
+            if key in styleoptions:
+                val = styleoptions[key]
+                if isinstance(val, dict):
+                    # lookup self in precomputed symboldict
+                    fid = id(feat)
+                    if fid in val["symbols"]:
+                        rendict[key] = val["symbols"][fid]
+                    else:
+                        rendict[key] = val["notclassified"]
+                elif hasattr(val, "__call__"):
+                    rendict[key] = val(feat)
+                else:
+                    rendict[key] = val
+
+        # draw
+
+        # fast PIL Approach for non-antialias polygons
+        if not antialias and "Polygon" in geometry["type"]:
+
+            if "Multi" in geometry["type"]:
+                geoms = geometry["coordinates"]
+            else:
+                geoms = [geometry["coordinates"]]
+
+            fill = tuple((int(c) for c in rendict["fillcolor"])) if rendict.get("fillcolor") else None
+            outline = tuple((int(c) for c in rendict["outlinecolor"])) if rendict.get("outlinecolor") else None
+            
+            for poly in geoms:
+                coords = poly[0]
+                if len(poly) > 1:
+                    holes = poly[1:0]
+                else:
+                    holes = []
+
+                # first exterior
+                path = PIL.ImagePath.Path([tuple(p) for p in coords])
+                path.transform(drawer.coordspace_transform)
+                #print "draw",str(path.tolist())[:300]
+                path.compact(1)
+                #print "draw",str(path.tolist())[:100]
+                if len(path) > 1:
+                    PIL_drawer.polygon(path, fill, None)
+                    PIL_drawer.line(path, outline, 1)
+
+                # then holes
+                for hole in holes:
+                    path = PIL.ImagePath.Path([tuple(p) for p in hole])
+                    path.transform(drawer.coordspace_transform)
+                    path.compact(1)
+                    if len(path) > 1:
+                        PIL_drawer.polygon(path, (0,0,0,0), None)
+                        PIL_drawer.line(path, outline, 1)
+
+        else:
+            # high qual geojson
+            drawer.draw_geojson(geometry, **rendict)
+
+    # flush
+    print "internal",time.time()-t
+    if 1: #not antialias and "Polygon" in self.data.type:
+        img = img
+    else:
+        img = drawer.get_image()
+
+##    # transparency
+##    if self.transparency:
+##        opac = 256 - int(256*(self.transparency/100.0))
+##        
+##        r,g,b,a = self.img.split()
+##        a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+##        self.img.putalpha(a)
+##        
+##    # effects
+##    for eff in self.effects:
+##        self.img = eff(self)
+
+    #img.show()
+
+    return None
+
+
+
+
 class VectorLayer:
     def __init__(self, data, legendoptions=None, legend=True, datafilter=None, transparency=0, flipy=True, **options):
         """
@@ -1017,6 +1139,44 @@ class VectorLayer:
 
     def render(self, width, height, bbox=None, antialias=False):
 
+        # parallel experiment
+##        import time
+##        t=time.time()
+##        
+##        import multiprocessing
+##        #sharedData = dict(data=self)
+##        pool = multiprocessing.Pool(multiprocessing.cpu_count())#, initSharedData, (sharedData,))
+##
+##        drawer = pyagg.Canvas(width, height, background=None)
+##        drawer.custom_space(*bbox, lock_ratio=True)
+##
+##        tasks = []
+##        bbox = drawer.coordspace_bbox
+##        w,h = abs(bbox[2]-bbox[0]), abs(bbox[3]-bbox[1])
+##        tw,th = w/(3), h/(3) # 9 tiles in total
+##        nw,nh = width/3, height/3
+##        print bbox,w,h,tw,th
+##        for ix in range(3):
+##            x = bbox[0]+tw*ix
+##            for iy in range(3):
+##                y = bbox[3]+th*iy
+##                tbox = x, y, x+tw, y+th
+##                features = [(f.row,f.geometry) for f in self.features(bbox=tbox)]
+##                styleoptions = self.styleoptions
+##                print repr((nw,nh,tbox,styleoptions,features))[:300]
+##                #print map(type,(features,width,height,bbox,))
+##                # UN/PICKLING THE FEATURES IS SUPER SLOW, NEED ANOTHER WAY W/O DATA TRANSFER
+##                task = pool.apply_async(parallel_vecrend, args=(features,nw,nh,tbox,styleoptions))
+##                tasks.append(task)
+##
+##        for task in tasks:
+##            resdc = task.get()
+##            print 'finished',task
+##
+##        print 'all processed finished',time.time()-t
+##        fdasf
+
+        # normal way
         if self.has_geometry():
             import time
             t=time.time()

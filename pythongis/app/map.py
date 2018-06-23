@@ -296,14 +296,42 @@ class MapView(tk.Canvas):
         self.master.process_thread(pending, finish, mslag=1, msinterval=21) # faster checking/update of tk img
 
     def update_image(self):
-        #import PIL, PIL.ImageTk
-        #img = PIL.Image.open("C:/Users/kimo/Desktop/best/2017-02-26 044.jpg").resize(self.renderer.img.size).convert("RGBA")
+
+        # direct image blit (windows only)
+##        from PIL import ImageWin
+##        t=time.time() 
+##        dib=ImageWin.Dib(self.renderer.img)
+##        hwnd = ImageWin.HWND(self.winfo_id())
+##        dib.expose(hwnd)
+##        self.bind("<Expose>", lambda e: dib.expose(hwnd))
+##        print "-tkfresh",time.time()-t
+
+        # tkimage update threadded
+##        t=time.time()
+##        pending = self.master.new_thread(self.renderer.get_tkimage)
+##
+##        def finish(result):
+##            if isinstance(result, Exception):
+##                tk2.messagebox.showerror(self, "Rendering error: " + str(result) )
+##            else:
+##                #import time
+##                print "-tkfresh3",time.time()-t
+##                # update renderings
+##                self.tkimg = result
+##                self.itemconfig(self.image_on_canvas, image=self.tkimg )
+##        
+##            # stop progbar
+##            if self.onfinish:
+##                self.onfinish()
+##        print "-tkfresh",time.time()-t
+##        self.master.process_thread(pending, finish, mslag=1, msinterval=121) # faster checking/update of tk img
+##        print "-tkfresh2",time.time()-t
+
+        # tkimage update        
         tt=time.time()
-        #self.renderer.img = self.renderer.img.convert("RGB")
         self.tkimg = self.renderer.get_tkimage()
         print "-tkfresh",time.time()-tt
         self.itemconfig(self.image_on_canvas, image=self.tkimg )
-        
 
     def zoom_in(self):
         self.zoomfactor += 1
