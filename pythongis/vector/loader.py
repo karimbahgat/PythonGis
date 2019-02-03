@@ -49,11 +49,11 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
     
     # shapefile
     if filetype == "Shapefile":
-        shapereader = pyshp.Reader(filepath, **kwargs) # TODO: does pyshp take kwargs?
+        shapereader = pyshp.Reader(filepath, encoding=encoding, encodingErrors=encoding_errors, **kwargs) # TODO: does pyshp take kwargs?
         
         # load fields, rows, and geometries
-        fields = [decode(fieldinfo[0]) for fieldinfo in shapereader.fields[1:]]
-        rows = ( [decode(value) for value in record] for record in shapereader.iterRecords() )
+        fields = [fieldinfo[0] for fieldinfo in shapereader.fields[1:]]
+        rows = ( [value for value in record] for record in shapereader.iterRecords() )
         def getgeoj(obj):
             geoj = obj.__geo_interface__
             if hasattr(obj, "bbox"): geoj["bbox"] = list(obj.bbox)

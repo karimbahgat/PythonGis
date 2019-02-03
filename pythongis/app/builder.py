@@ -181,7 +181,7 @@ class MultiLayerMap(tk2.basics.Label):
 
         self.mapp = mapp
 
-        mapview = pg.app.map.MapView(self, mapp)
+        mapview = self.mapview = pg.app.map.MapView(self, mapp)
         mapview.pack(fill="both", expand=1)
 
         layerscontrol = pg.app.controls.LayersControl(mapview)

@@ -883,6 +883,13 @@ class VectorLayer:
         if not self.data.has_geometry():
             return
 
+        # classify
+        self.update()
+
+    def update(self):
+        # reset spatial index
+        self.data.create_spatial_index()
+        
         # set up symbol classifiers
         features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
         for key,val in self.styleoptions.copy().items():
@@ -1056,7 +1063,8 @@ class VectorLayer:
             if effect == "shadow":
                 def effect(lyr):
                     _,a = lyr.img.convert('LA').split()
-                    a = a.point(lambda v: v/3.0) # two thirds transparency
+                    opacity = kwargs.get('opacity', 0.777) # dark/strong shadow
+                    a = a.point(lambda v: v*opacity) 
                     binary = PIL.Image.new('L', lyr.img.size, 0) # black
                     binary.putalpha(a)
                     drawer = pyagg.canvas.from_image(binary)

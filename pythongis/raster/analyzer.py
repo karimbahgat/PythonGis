@@ -104,7 +104,7 @@ def mathexpr(mathexpr, rasters):
     
     Alias: Raster algebra.
     """
-    print rasters
+    #print rasters
     
     # align all to same affine
     rasters = (rast for rast in rasters)
