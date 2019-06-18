@@ -216,15 +216,15 @@ class Layout:
         # Special image format needed by Tkinter to display it in the GUI
         return self.drawer.get_tkimage()
 
-    def view(self):
+    def view(self, **kwargs):
         if self.changed:
-            self.render_all()
+            self.render_all(**kwargs)
             self.changed = False
         self.drawer.view()
 
-    def save(self, savepath):
+    def save(self, savepath, **kwargs):
         if self.changed:
-            self.render_all(antialias=True)
+            self.render_all(antialias=True, **kwargs)
             self.changed = False
         self.drawer.save(savepath)
 
@@ -384,9 +384,22 @@ class Map:
         self.changed = True
         self.img = self.drawer.get_image()
 
-    def zoom_units(self, units, center=None):
+    def zoom_units(self, units, center=None, geodetic=False):
         if not self.drawer: self._create_drawer()
-        self.drawer.zoom_units(units, center=center)
+        if geodetic:
+            from .vector._helpers import _vincenty_distance
+            desired_km = units
+            unit_width = self.drawer.coordspace_width
+            x1,y1,x2,y2 = self.drawer.coordspace_bbox
+            cur_km = _vincenty_distance((y1,x1), (y1,x1+unit_width))
+            ratio = desired_km/cur_km
+            if ratio < 1: ratio = -1/ratio
+            ratio = -ratio
+            #units = unit_width * ratio # transformed
+            #print units
+        #self.drawer.zoom_units(units, center=center)
+        self.drawer.zoom_factor(ratio)
+        #print _vincenty_distance((y1,x1), (y1,x1+self.drawer.coordspace_width))
         #self.zooms.append(func)
         self.changed = True
         self.img = self.drawer.get_image()
@@ -875,6 +888,8 @@ class VectorLayer:
         randomcolor = rgb("random")
         self.styleoptions = {"fillcolor": randomcolor,
                              "sortorder": "incr"}
+        if 'Line' in self.data.type:
+            self.styleoptions['outlinecolor'] = None
             
         # override default if any manually specified styleoptions
         self.styleoptions.update(options)
@@ -1283,10 +1298,12 @@ class VectorLayer:
 
             # transparency
             if self.transparency:
-                opac = 256 - int(256*(self.transparency/100.0))
+                #opac = 256 - int(256*(self.transparency/100.0))
+                opac = 1 - self.transparency
                 
                 r,g,b,a = self.img.split()
-                a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
                 self.img.putalpha(a)
                 
             # effects
@@ -1354,10 +1371,12 @@ class VectorLayer:
 
             # transparency
             if self.transparency:
-                opac = 256 - int(256*(self.transparency/100.0))
+                #opac = 256 - int(256*(self.transparency/100.0))
+                opac = 1 - self.transparency
                 
                 r,g,b,a = self.img_text.split()
-                a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+                a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
                 self.img_text.putalpha(a)
 
         else:
@@ -1623,11 +1642,17 @@ class RasterLayer:
         
         # transparency
         if self.transparency:
-            opac = 256 - int(256*(self.transparency/100.0))
+            #opac = int(256*self.transparency)
+            #opac = 256 - int(256*self.transparency)
+            opac = 1 - self.transparency
             
             r,g,b,a = self.img.split()
-            a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #a = PIL.ImageMath.eval('max(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #print a, a.getextrema()
             self.img.putalpha(a)
+            #self.img = PIL.Image.merge('RGBA', [r,g,b,a])
 
     def render_text(self, resampling="nearest", **georef):
         self.img_text = None

@@ -210,7 +210,7 @@ def reproject(raster, crs, method="nearest", **rasterdef):
 ##            # ...
 
         bbox = [xmin,ymin,xmax,ymax]
-        print bbox
+        #print bbox
         rasterdef = dict(width=raster.width,
                          height=raster.height,
                          bbox=bbox)
@@ -326,6 +326,7 @@ def resample(raster, method="nearest", **rasterdef):
                 }
     
     # first, create target raster based on rasterdef
+    #print rasterdef
     targetrast = data.RasterData(mode=raster.mode, **rasterdef)
     for _ in range(len(raster.bands)):
         targetrast.add_band()
@@ -377,7 +378,10 @@ def resample(raster, method="nearest", **rasterdef):
         # ...but somehow cleanup fails and results in another memory error
 
         try:
+            #print raster.bbox, targetrast.bbox
+            #cropped = crop(raster, [0,0,raster.width,raster.height], worldcoords=False) # just testing
             cropped = crop(raster, targetrast.bbox, worldcoords=True)
+            #print cropped
             targetrast = trans(cropped, targetrast)
         except MemoryError:
             # TODO: Maybe issue warning when memoryerror about using slower method
@@ -542,9 +546,9 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
 
         # if fill val is None, then draw binary outline
         fill = val
-        outline = 1.0 if val is None else None
-        holefill = 0.0 if val is not None else None
-        holeoutline = 1.0 if val is None else None
+        outline = 1 if val is None else None
+        holefill = 0 if val is not None else None
+        holeoutline = 1 if val is None else None
         #print ["burnmain",fill,outline,"burnhole",holefill,holeoutline]
 
         # make all multis so can treat all same
@@ -587,7 +591,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
     for feat in vectordata:
         if not feat.geometry:
             continue
-        val = float(valuekey(feat)) if valuekey else 1.0
+        val = float(valuekey(feat)) if valuekey else 1
         burn(val, feat, drawer)
 
     # create raster from the drawn image
@@ -837,7 +841,7 @@ def vectorize(raster, mergecells=True, metavars=True, bandnum=0):
             band = raster.bands[bandnum]
             zonevalues = (val for count,val in band.img.getcolors(raster.width*raster.height))
             for zoneval in zonevalues:
-                print zoneval
+                #print zoneval
                 
                 # exclude nullzone
                 if zoneval == band.nodataval: continue
@@ -894,42 +898,29 @@ def crop(raster, bbox, worldcoords=True):
     xscale,xskew,xoffset, yskew,yscale,yoffset = raster.meta["affine"]
 
     if worldcoords:
-        # bbox is only used manually by user and should include the corners (+- half cellsize)
-        # need to remove this padding to get it right
-        if x2 > x1:
-            x1 += xscale/2.0
-            x2 -= xscale/2.0
-        else:
-            x1 -= xscale/2.0
-            x2 += xscale/2.0
-        if y2 > y1:
-            y1 += yscale/2.0
-            y2 -= yscale/2.0
-        else:
-            y1 -= yscale/2.0
-            y2 += yscale/2.0
-
         # get nearest pixels of bbox coords
         px1,py1 = raster.geo_to_cell(x1,y1)
         px2,py2 = raster.geo_to_cell(x2,y2)
+        # MAYBE subtract 1 pixel if cell is integer (exactly on border to next pixel)
     else:
         # already in pixels
         px1,py1,px2,py2 = x1,y1,x2,y2
 
     # PIL doesnt include the max pixel coords
+    #print raster, px1,py1,px2,py2
     px2 += 1
     py2 += 1
 
     # do bounds check
     pxmin = min(px1,px2)
     pymin = min(py1,py2)
-    pxmax = max(px1,px2) 
+    pxmax = max(px1,px2)
     pymax = max(py1,py2)
     
     pxmin = max(0, pxmin)
     pymin = max(0, pymin)
-    pxmax = min(raster.width-1, pxmax)
-    pymax = min(raster.height-1, pymax)
+    pxmax = min(raster.width, pxmax)
+    pymax = min(raster.height, pymax)
 
     #print pxmin,pymin,pxmax,pymax
 
@@ -940,10 +931,13 @@ def crop(raster, bbox, worldcoords=True):
     outrast = data.RasterData(**raster.meta)
     width = abs(pxmax-pxmin)
     height = abs(pymax-pymin)
+    #print 77,px1,py1,px2,py2
+    #print 88,pxmin,pymin,pxmax,pymax
     if width <= 0 or height <= 0:
         raise Exception("Cropping bbox was too small, resulting in 0 pixels")
     outrast.width = width
     outrast.height = height
+    #print 99,outrast
 
     #print width,height
 
@@ -1029,6 +1023,7 @@ def crop(raster, bbox, worldcoords=True):
                 # compressed, so must use existing tiles,
                 # but can simply filter to those that overlap,
                 # and img.crop will load only those tiles and batch crop them fast
+                # TODO: consider if txmax includes that last pixel or just up until (pxmax is only the index of last)
                 tiles = [(tenco,(txmin,tymin,txmax,tymax),offset,textra)
                          for tenco,(txmin,tymin,txmax,tymax),offset,textra in img.tile
                          if not (txmax < pxmin or txmin > pxmax or tymax < pymin or tymin > pymax)]

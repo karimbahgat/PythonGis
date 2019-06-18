@@ -3,7 +3,7 @@ Module containing the data structures and interfaces for operating with raster d
 """
 
 # import builtins
-import sys, os, itertools, operator
+import sys, os, itertools, operator, math
 
 # import internals
 from . import loader
@@ -69,6 +69,8 @@ class Cell(object):
         
         self.band = band
         self.col, self.row = col, row
+        if not (0 <= col < self.band.width and 0 <= row < self.band.height):
+            raise Exception('Cell index {} out of bounds'.format((col,row)))
         self._x = None
         self._y = None
 
@@ -87,10 +89,10 @@ class Cell(object):
     def poly(self):
         trans = self.band._rast.cell_to_geo
         return {"type":"Polygon",
-                "coordinates": [[trans(self.col-0.5, self.row-0.5),
-                                 trans(self.col-0.5, self.row+0.5),
-                                 trans(self.col+0.5, self.row+0.5),
-                                 trans(self.col+0.5, self.row-0.5),
+                "coordinates": [[trans(self.col, self.row),
+                                 trans(self.col, self.row+1),
+                                 trans(self.col+1, self.row+1),
+                                 trans(self.col+1, self.row),
                                  ]]}
 
     @property
@@ -376,6 +378,8 @@ class Band(object):
 
     def set(self, col, row, value):
         """Sets the value of the cell located in the specified column and row numbers."""
+        if not (0 <= col < self.width and 0 <= row < self.height):
+            raise Exception('Cell index {} out of bounds'.format((col,row)))
         if not self._pixelaccess:
             self._pixelaccess = self.img.load()
         self._pixelaccess[col,row] = value
@@ -1122,9 +1126,9 @@ class RasterData(object):
 
     @property
     def bbox(self):
-        # get corner coordinates of raster (including cell area corners, not just centroids)
-        xleft_coord,ytop_coord = self.cell_to_geo(0-0.5, 0-0.5)
-        xright_coord,ybottom_coord = self.cell_to_geo(self.width-1+0.5, self.height-1+0.5)
+        # get corner coordinates of raster
+        xleft_coord,ytop_coord = self.cell_to_geo(0, 0)
+        xright_coord,ybottom_coord = self.cell_to_geo(self.width, self.height) # width and height is actually top left corner of one pixel beyond last
         return [xleft_coord,ytop_coord,xright_coord,ybottom_coord]
 
     def copy(self, shallow=False):
@@ -1237,7 +1241,7 @@ class RasterData(object):
         row = x*yskew + y*yscale + yoffset
         if not fraction:
             # round to nearest cell
-            column,row = int(round(column)), int(round(row))
+            column,row = math.floor(column), math.floor(row)
         return column,row
 
     @property

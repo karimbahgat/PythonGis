@@ -133,7 +133,7 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
                 
             elif filetype == "Excel":
                 import openpyxl as pyxl
-                wb = pyxl.load_workbook(filepath)
+                wb = pyxl.load_workbook(filepath, read_only=True)
                 if "sheet" in kwargs:
                     sheet = wb[kwargs["sheet"]]
                 else:

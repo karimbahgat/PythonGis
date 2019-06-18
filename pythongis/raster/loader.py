@@ -1,6 +1,6 @@
 
 # import internals
-import sys, os, itertools, operator
+import sys, os, itertools, operator, warnings
 
 # import PIL as the image loader
 import PIL.Image
@@ -202,7 +202,8 @@ def from_file(filepath, **georef):
                     try:
                         georef["affine"] = compute_affine(**georef)
                     except:
-                        raise Exception("Couldn't find the manual georef options, world file, or file georef parameters needed to position the image in space")
+                        georef["affine"] = [1, 0, 0, 0, 1, 0]
+                        warnings.warn("Couldn't find the manual georef options, world file, or file georef parameters needed to position the image in space")
 
         # Read coordinate ref system
         # esri ascii doesnt have any crs so assume default
@@ -296,7 +297,8 @@ def from_file(filepath, **georef):
                 [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
                 georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
             else:
-                raise Exception("Couldn't find any georef options, geotiff tags, or world file needed to position the image in space")
+                georef["affine"] = [1, 0, 0, 0, 1, 0]
+                warnings.warn("Couldn't find any georef options, geotiff tags, or world file needed to position the image in space")
 
         # read nodata
         nodataval = read_nodata(raw_tags)
@@ -334,7 +336,8 @@ def from_file(filepath, **georef):
                 [xscale,yskew,xskew,yscale,xoff,yoff] = transform_coeffs
                 georef["affine"] = [xscale,xskew,xoff,yskew,yscale,yoff]
             else:
-                raise Exception("Couldn't find the world file nor the manual georef options needed to position the image in space")
+                georef["affine"] = [1, 0, 0, 0, 1, 0]
+                warnings.warn("Couldn't find the world file nor the manual georef options needed to position the image in space")
                 
         # group image bands into band tuples
         bands = [im for im in main_img.split()]
@@ -530,7 +533,7 @@ def compute_affine(xy_cell=None, xy_geo=None, cellsize=None,
             xscale = cellsize
         elif bbox and width:
             xwidth = bbox[2]-bbox[0]
-            xscale = xwidth / float(width+1) # +1 is to account for the two half pixels padding of bbox
+            xscale = xwidth / float(width) 
     if not yscale:
         if cellheight:
             yscale = cellheight
@@ -538,25 +541,25 @@ def compute_affine(xy_cell=None, xy_geo=None, cellsize=None,
             yscale = -cellsize # NOTE: since cellsize does not distinguish bw x and y, assume wgs84 and autoset cellsize to be negative
         elif bbox and height:
             yheight = bbox[3]-bbox[1]
-            yscale = yheight / float(height+1) # +1 is to account for the two half pixels padding of bbox
+            yscale = yheight / float(height) 
 
     # bbox is only used manually by user and should include the corners (+- half cellsize)
     # need to remove this padding to get it right
-    if bbox:
-        x1,y1,x2,y2 = bbox
-        if x2 > x1:
-            x1 += xscale/2.0
-            x2 -= xscale/2.0
-        else:
-            x1 -= xscale/2.0
-            x2 += xscale/2.0
-        if y2 > y1:
-            y1 += yscale/2.0
-            y2 -= yscale/2.0
-        else:
-            y1 -= yscale/2.0
-            y2 += yscale/2.0
-        bbox = x1,y1,x2,y2
+##    if bbox:
+##        x1,y1,x2,y2 = bbox
+##        if x2 > x1:
+##            x1 += xscale/2.0
+##            x2 -= xscale/2.0
+##        else:
+##            x1 -= xscale/2.0
+##            x2 += xscale/2.0
+##        if y2 > y1:
+##            y1 += yscale/2.0
+##            y2 -= yscale/2.0
+##        else:
+##            y1 -= yscale/2.0
+##            y2 += yscale/2.0
+##        bbox = x1,y1,x2,y2
 
     # get skew values from bbox if not specified
     # ...
