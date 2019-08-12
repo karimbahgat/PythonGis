@@ -1,4 +1,5 @@
 
+
 # The API
 
 class Geography(object):
@@ -62,6 +63,43 @@ class Geography(object):
         else:
             length = _handle(self)
             return length
+
+    @property
+    def area(self):
+        from geographiclib.geodesic import Geodesic
+        geod = Geodesic.WGS84
+        
+        if 'Polygon' in self.type:
+
+            def ringarea(coords):
+                geopol = geod.Polygon()
+                for x,y in coords:
+                    geopol.AddPoint(y, x)
+                num, perim, area = geopol.Compute(reverse=True)
+                return area
+            
+            def polyarea(poly):
+                ext = poly[0]
+                holes = poly[1:] if len(poly) > 1 else []
+                    
+                area = abs(ringarea(ext))
+                for hole in holes:
+                    area -= abs(ringarea(hole.coords))
+                return area
+
+            if self.type == 'Polygon':
+                area = polyarea(self.coordinates)
+                
+            elif self.type == 'MultiPolygon':
+                area = sum((polyarea(poly) for poly in self.coordinates))
+
+            # m2 to km2
+            area = area / 1000000.0
+
+            return area
+
+        else:
+            raise Exception('Area calculation only available for polygon type geometries')            
 
     def distance(self, other):
         if self.type == "Point" and other.type == "Point":

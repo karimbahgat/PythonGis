@@ -715,7 +715,7 @@ class VectorData:
         outstring += "filepath: %s \n" % self.filepath
         outstring += "type: %s \n" % self.type
         outstring += "length: %s \n" % len(self) 
-        outstring += "bbox: %s \n" % repr(self.bbox) if self.has_geometry else None       
+        outstring += "bbox: %s \n" % repr(self.bbox) if self.has_geometry() else None       
         outstring += "fields:" + "\n"
         
         row_format = "{:>15}" * (len(printfields))

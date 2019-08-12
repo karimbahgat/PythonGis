@@ -18,33 +18,36 @@ def mosaic(rasters, overlaprule="last", **rasterdef):
 
     TODO: Add more overlap rules. 
     """
+    rasters = (rast for rast in rasters)
+    firstrast = next(rasters)
     # use resampling to the same dimensions as the first raster
-    rasterdef = rasterdef or rasters[0].rasterdef
+    rasterdef = rasterdef or firstrast.rasterdef
     # TODO: Also set total bbox and dims to combined bboxes...
-    outrast = data.RasterData(mode=rasters[0].mode, **rasterdef)
-    maxbands = max((len(rast) for rast in rasters))
-    # align to common grid
-    rasters = [align(rast, **rasterdef) for rast in rasters]
-    # paste
-    for i in range(maxbands):
-        outband = outrast.add_band()
-        if overlaprule == "last":
-            for rast in rasters:
-                if len(rast) >= i:
-                    outband.img.paste(rast.bands[i].img, (0,0), rast.mask)
-        elif overlaprule == "first":
-            for rast in reversed(rasters):
-                if len(rast) >= i:
-                    outband.img.paste(rast.bands[i].img, (0,0), rast.mask)
-        elif overlaprule == "sum":
-            # if image bbox overlap
-            # find overlap via img1 & img2
-            # use img1 + img2 via math
-            # paste using overlap as mask
-            raise NotImplemented("Overlap rule not supported")
-        else:
-            raise NotImplemented("Overlap rule not supported")
+    # ...
+    outrast = data.RasterData(mode=firstrast.mode, **rasterdef)
+    numbands = len(firstrast.bands)
+    for _ in range(numbands):
+        outrast.add_band()
+    
+    def process(rast):
+        # align to common grid
+        rast = align(rast, **rasterdef)
+        # find output pixel for topleft coord of the source raster
+        (x,y) = rast.cell_to_geo(0, 0)
+        (px,py) = outrast.geo_to_cell(x, y)
+        # paste
+        for i in range(numbands):
+            band = rast.bands[i]
+            outrast.bands[i].img.paste(band.img, (px,py)) #, rast.mask)
+            #outrast.bands[i].img.show()
+            
+    # process first
+    process(firstrast)
 
+    # then rest
+    for rast in rasters:
+        process(rast)
+    
     return outrast
 
 def sequence(values, rasts):
@@ -436,18 +439,32 @@ def roll(tilerast, x, y, worldcoords=True):
 
 def align(raster, **rasterdef):
     """Aligns a raster to the given rasterdef (via resampling), so that
-    the x/yoffset starts on the same x/yoffset as the rasterdef.
+    the x/yoffset starts on the nearest x/yscale tick relative to the
+    rasterdef offset.
     """
-    # TODO: Not sure if should use same x/yoffset or just as a multiple...
     rasterdef = rasterdef.copy()
     ref = data.RasterData(mode="1bit", **rasterdef)
     
     xscale,xskew,xoffset,yskew,yscale,yoffset = raster.meta["affine"]
-    xoffset,yoffset = ref.meta["affine"][2], ref.meta["affine"][5]
+    xoffset_ref,yoffset_ref = ref.meta["affine"][2], ref.meta["affine"][5]
+    xscale_ref,yscale_ref = ref.meta["affine"][0], ref.meta["affine"][4]
+
+    # enforce that same scales
+    if not (xscale == xscale_ref and yscale == yscale_ref):
+        raise Exception('Aligning is only for adjusting the offsets of two rasters with the same x/yscale - these do not.')
+
+    # convert into reference coordsys by subtraction, align to scale tickmarks, convert back to original
+    def nearest_multiple(x, base):
+        return int(base * round(float(x)/base))
+    #print xoffset, xoffset_ref, xoffset-xoffset_ref, xscale_ref
+    xoffset = nearest_multiple(xoffset-xoffset_ref, xscale_ref) + xoffset_ref
+    #print yoffset, yoffset_ref, yoffset-yoffset_ref, yscale_ref
+    yoffset = nearest_multiple(yoffset-yoffset_ref, yscale_ref) + yoffset_ref
+    
     resampledef = {"width":raster.width,
                    "height":raster.height,
                    "affine":[xscale,xskew,xoffset,yskew,yscale,yoffset]}
-    
+    #print raster.meta["affine"], resampledef, resampledef
     aligned = resample(raster, **resampledef)
     return aligned
 
@@ -466,6 +483,7 @@ def upscale(raster, stat="sum", **rasterdef):
     # ...
     
     # first resample to coincide with rasterdef
+    #print rasterdef
     targetrast = data.RasterData(mode="float32", **rasterdef)
     xscale,_,_, _,yscale,_ = targetrast.affine
     targetrast.bands = []
@@ -473,7 +491,7 @@ def upscale(raster, stat="sum", **rasterdef):
         targetrast.add_band()
 
     # maybe align the valueraster to rasterdef by rounding the xoff and yoff to georef
-    raster = align(raster, **rasterdef)
+    #raster = align(raster, **rasterdef)
 
     # run moving focal window to group cells
     tilesize = (abs(xscale),abs(yscale))
@@ -486,7 +504,10 @@ def upscale(raster, stat="sum", **rasterdef):
         for bandnum,tileband in enumerate(tile.bands):
             
             # aggregate tile stats
-            aggval = tileband.summarystats(stat)[stat]
+            if isinstance(stat, basestring):
+                aggval = tileband.summarystats(stat)[stat]
+            else:
+                aggval = stat(tileband)
             
             # set corresponding targetrast band cell value
             cell = targetrast.bands[bandnum].get(*targetpx)
@@ -611,8 +632,9 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
         # prepare geometries
         from shapely.prepared import prep
         for f in vectordata:
-            f._shapely = f.get_shapely()
-            f._prepped = prep(f._shapely)
+            if f.geometry:
+                f._shapely = f.get_shapely()
+                f._prepped = prep(f._shapely)
 
         # burn all self intersections onto mask (constant time, slower for easy small geoms)
         for f1 in vectordata:
@@ -627,13 +649,13 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
                 if not f2.geometry:
                     continue
                 if f1 is not f2:
-                    burn(1.0, f2, d2)
+                    burn(1, f2, d2)
 
             # if any, then get common raster intersection with main feat
             if img2.getbbox():
                 img1 = PIL.Image.new("1", (raster.width,raster.height))
                 d1 = PIL.ImageDraw.Draw(img1)
-                burn(1.0, f1, d1)
+                burn(1, f1, d1)
                 intsec = PIL.ImageMath.eval("convert(img1 & img2, '1')", img1=img1, img2=img2)
                 multimask.paste(1, mask=intsec)
 
@@ -664,12 +686,12 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
                 # single values have already been written, now only overwrite multis or partials
                 if multicell or partialcell:
                     cell = outband.get(x, y)
-                    cellgeom = asShape(cell.poly)
+                    cellgeom = asShape(cell.poly).centroid
                     
                     # get features in that cell
                     spindex = list(vectordata.quick_overlap(cellgeom.bounds))
                     intsecs = [feat for feat in spindex
-                               if feat.geometry and not feat._prepped.disjoint(cellgeom)]
+                               if feat.geometry and feat._prepped.intersects(cellgeom)]
                     if not intsecs:
                         continue
 
@@ -679,6 +701,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
 
                     # get feature values
                     vals = [valuekey(feat) for feat in intsecs]
+                    #print('multi',vals)
 
                     # calculate and apply weight for cells where features are only partially present
                     if partial and partialcell:
@@ -687,6 +710,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
                     # aggregate stat if multiple
                     if len(vals) > 1:
                         value = sql.aggreg(vals, [("val", lambda v: v, stat)])[0]
+                        #print('agg',vals,value)
                     else:
                         value = vals[0]
 
@@ -929,8 +953,8 @@ def crop(raster, bbox, worldcoords=True):
 
     # get new dimensions
     outrast = data.RasterData(**raster.meta)
-    width = abs(pxmax-pxmin)
-    height = abs(pymax-pymin)
+    width = int(abs(pxmax-pxmin))
+    height = int(abs(pymax-pymin))
     #print 77,px1,py1,px2,py2
     #print 88,pxmin,pymin,pxmax,pymax
     if width <= 0 or height <= 0:
@@ -1168,7 +1192,7 @@ def clip(raster, clipdata, bbox=None, bandnum=0):
         
         # paste data onto blank image where 'valid' is true
         img = PIL.Image.new(band.img.mode, band.img.size, 0) # avoid initializing with None, bc sometimes results in pixel noise
-        if band.nodataval != None: img.paste(band.nodataval) # set background to nodataval
+        if band.nodataval != None: img.paste(band.nodataval, box=(0,0,img.width,img.height)) # set background to nodataval
         img.paste(band.img, mask=valid.img)
         outrast.add_band(img=img, nodataval=band.nodataval)
 

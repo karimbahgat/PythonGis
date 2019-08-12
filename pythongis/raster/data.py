@@ -1242,6 +1242,7 @@ class RasterData(object):
         if not fraction:
             # round to nearest cell
             column,row = math.floor(column), math.floor(row)
+            column,row = int(column),int(row)
         return column,row
 
     @property
