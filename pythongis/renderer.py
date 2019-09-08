@@ -230,7 +230,7 @@ class Layout:
 
 
 class Map:
-    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, *args, **kwargs):
+    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, ppi=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -249,6 +249,7 @@ class Map:
         # setting width and height locks the ratio, otherwise map size will adjust to the coordspace
         self.width = width or None
         self.height = height or None
+        self.ppi = ppi
         self.drawer = None
         #self.zooms = []
 
@@ -294,7 +295,7 @@ class Map:
                 self.width = int(self.height * aspect)
             
         # factor in zooms (zoombbx should somehow be crop, so alters overall img dims...)
-        self.drawer = pyagg.Canvas(self.width, self.height, None)
+        self.drawer = pyagg.Canvas(self.width, self.height, None, ppi=self.ppi)
         self.drawer.geographic_space()
         #for zoom in self.zooms:
         #    zoom()

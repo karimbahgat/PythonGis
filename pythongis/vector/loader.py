@@ -55,6 +55,8 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
         fields = [fieldinfo[0] for fieldinfo in shapereader.fields[1:]]
         rows = ( [value for value in record] for record in shapereader.iterRecords() )
         def getgeoj(obj):
+            if obj.shapeTypeName == 'NULL':
+                return
             geoj = obj.__geo_interface__
             if hasattr(obj, "bbox"): geoj["bbox"] = list(obj.bbox)
             return geoj
