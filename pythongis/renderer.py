@@ -8,6 +8,8 @@ import colour
 
 import classypie as cp
 
+import pycrs
+
 from .vector.data import VectorData
 from .vector.loader import detect_filetype as vector_filetype
 from .raster.data import RasterData
@@ -114,6 +116,34 @@ def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
     rgba = [int(round(v * 255)) for v in rgb] + [opacity or 255]
     return tuple(rgba)
 
+def get_crs_transformer(fromcrs, tocrs):
+    if not (fromcrs and tocrs):
+        return None
+    
+    if isinstance(fromcrs, basestring):
+        fromcrs = pycrs.parse.from_unknown_text(fromcrs)
+
+    if isinstance(tocrs, basestring):
+        tocrs = pycrs.parse.from_unknown_text(tocrs)
+
+    fromcrs = fromcrs.to_proj4()
+    tocrs = tocrs.to_proj4()
+    
+    if fromcrs != tocrs:
+        import pyproj
+        fromcrs = pyproj.Proj(fromcrs)
+        tocrs = pyproj.Proj(tocrs)
+        def _project(points):
+            xs,ys = itertools.izip(*points)
+            xs,ys = pyproj.transform(fromcrs,
+                                     tocrs,
+                                     xs, ys)
+            newpoints = list(itertools.izip(xs, ys))
+            return newpoints
+    else:
+        _project = None
+
+    return _project
     
 
 class Layout:
@@ -230,7 +260,7 @@ class Layout:
 
 
 class Map:
-    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, ppi=None, *args, **kwargs):
+    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, ppi=None, crs=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -251,6 +281,7 @@ class Map:
         self.height = height or None
         self.ppi = ppi
         self.drawer = None
+        self.crs = crs or '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
         #self.zooms = []
 
         # foreground layergroup for non-map decorations
@@ -312,7 +343,8 @@ class Map:
 ##            self.drawer.resize(self.width, self.height, lock_ratio=False)
 
     def copy(self):
-        dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy())
+        dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy(),
+                   title=self.title, titleoptions=self.titleoptions, ppi=self.ppi, crs=self.crs)
         dupl.backgroundgroup = self.backgroundgroup.copy()
         if self.drawer: dupl.drawer = self.drawer.copy()
         dupl.foregroundgroup = self.foregroundgroup.copy()
@@ -516,7 +548,12 @@ class Map:
             layer.render(width=self.drawer.width,
                          height=self.drawer.height,
                          bbox=self.drawer.coordspace_bbox,
-                         antialias=antialias)
+                         antialias=antialias,
+                         crs=self.crs)
+            layer.render_text(width=self.drawer.width,
+                             height=self.drawer.height,
+                             bbox=self.drawer.coordspace_bbox,
+                             crs=self.crs)
             self.update_draworder()
 
     def render_all(self, antialias=False):
@@ -536,11 +573,13 @@ class Map:
                 layer.render(width=self.drawer.width,
                              height=self.drawer.height,
                              bbox=self.drawer.coordspace_bbox,
-                             antialias=antialias)
+                             antialias=antialias,
+                             crs=self.crs)
                 
                 layer.render_text(width=self.drawer.width,
                                  height=self.drawer.height,
-                                 bbox=self.drawer.coordspace_bbox)
+                                 bbox=self.drawer.coordspace_bbox,
+                                 crs=self.crs)
 
         for layer in self.foregroundgroup:
             layer.render()
@@ -1161,73 +1200,62 @@ class VectorLayer:
         
         self.effects.append(effect)
 
-    def render(self, width, height, bbox=None, antialias=False):
-
-        # parallel experiment
-##        import time
-##        t=time.time()
-##        
-##        import multiprocessing
-##        #sharedData = dict(data=self)
-##        pool = multiprocessing.Pool(multiprocessing.cpu_count())#, initSharedData, (sharedData,))
-##
-##        drawer = pyagg.Canvas(width, height, background=None)
-##        drawer.custom_space(*bbox, lock_ratio=True)
-##
-##        tasks = []
-##        bbox = drawer.coordspace_bbox
-##        w,h = abs(bbox[2]-bbox[0]), abs(bbox[3]-bbox[1])
-##        tw,th = w/(3), h/(3) # 9 tiles in total
-##        nw,nh = width/3, height/3
-##        print bbox,w,h,tw,th
-##        for ix in range(3):
-##            x = bbox[0]+tw*ix
-##            for iy in range(3):
-##                y = bbox[3]+th*iy
-##                tbox = x, y, x+tw, y+th
-##                features = [(f.row,f.geometry) for f in self.features(bbox=tbox)]
-##                styleoptions = self.styleoptions
-##                print repr((nw,nh,tbox,styleoptions,features))[:300]
-##                #print map(type,(features,width,height,bbox,))
-##                # UN/PICKLING THE FEATURES IS SUPER SLOW, NEED ANOTHER WAY W/O DATA TRANSFER
-##                task = pool.apply_async(parallel_vecrend, args=(features,nw,nh,tbox,styleoptions))
-##                tasks.append(task)
-##
-##        for task in tasks:
-##            resdc = task.get()
-##            print 'finished',task
-##
-##        print 'all processed finished',time.time()-t
-##        fdasf
+    def render(self, width, height, bbox=None, antialias=False, crs=None):
 
         # normal way
         if self.has_geometry():
             import time
             t=time.time()
 
+            # determine on-the-fly projection
+            _transform = get_crs_transformer(self.data.crs, crs)
+
+            # setup
             if not bbox:
                 bbox = self.bbox
+
+            # determine map space by projecting data bounds
+            if _transform:
+                x1,y1,x2,y2 = bbox
+                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
+                corners = _transform(corners)
+                xs,ys = zip(*corners)
+                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+                targetbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
+                #print 'bbox transform',bbox,targetbox
+            else:
+                targetbox = bbox
             
             drawer = pyagg.Canvas(width, height, background=None)
-            drawer.custom_space(*bbox, lock_ratio=True)
-            
-            features = self.features(bbox=bbox)
+            drawer.custom_space(*targetbox, lock_ratio=True)
+
+            if not antialias:
+                drawer.drawer.setantialias(False)
+
+            # get features inside map extent
+            targetbox = drawer.coordspace_bbox
+            if _transform:
+                # transform from projected map space back to data coordinates
+                _itransform = get_crs_transformer(crs, self.data.crs)
+                p1,p2 = targetbox[0:2],targetbox[2:4]
+                p1,p2 = _itransform([p1,p2])
+                targetbox = p1 + p2
+            features = self.features(bbox=targetbox)
 
             # custom draworder (sortorder is only used with sortkey)
             if "sortkey" in self.styleoptions:
                 features = sorted(features, key=self.styleoptions["sortkey"],
                                   reverse=self.styleoptions["sortorder"].lower() == "decr")
-
-            # prep PIL if non-antialias polygon
-            if not antialias and "Polygon" in self.data.type:
-                #print "preint",time.time()-t
-                import time
-                t=time.time()
-                img = PIL.Image.new("RGBA", (width,height), None)
-                PIL_drawer = PIL.ImageDraw.Draw(img)   #self.PIL_drawer
-
+    
             # for each
             for feat in features:
+
+                # reproject
+                if _transform:
+                    #print 'text pre fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
+                    feat = feat.copy()
+                    feat.transform(_transform)
+                    #print 'text post fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                 
                 # get symbols
                 rendict = dict()
@@ -1248,54 +1276,11 @@ class VectorLayer:
                             rendict[key] = val
 
                 # draw
-
-                # fast PIL Approach for non-antialias polygons
-                if not antialias and "Polygon" in feat.geometry["type"]:
-
-                    if "Multi" in feat.geometry["type"]:
-                        geoms = feat.geometry["coordinates"]
-                    else:
-                        geoms = [feat.geometry["coordinates"]]
-
-                    fill = tuple((int(c) for c in rendict["fillcolor"])) if rendict.get("fillcolor") else None
-                    outline = tuple((int(c) for c in rendict["outlinecolor"])) if rendict.get("outlinecolor") else None
-                    
-                    for poly in geoms:
-                        coords = poly[0]
-                        if len(poly) > 1:
-                            holes = poly[1:0]
-                        else:
-                            holes = []
-
-                        # first exterior
-                        path = PIL.ImagePath.Path([tuple(p) for p in coords])
-                        path.transform(drawer.coordspace_transform)
-                        #print "draw",str(path.tolist())[:300]
-                        path.compact(1)
-                        #print "draw",str(path.tolist())[:100]
-                        if len(path) > 1:
-                            PIL_drawer.polygon(path, fill, None)
-                            PIL_drawer.line(path, outline, 1)
-
-                        # then holes
-                        for hole in holes:
-                            path = PIL.ImagePath.Path([tuple(p) for p in hole])
-                            path.transform(drawer.coordspace_transform)
-                            path.compact(1)
-                            if len(path) > 1:
-                                PIL_drawer.polygon(path, (0,0,0,0), None)
-                                PIL_drawer.line(path, outline, 1)
-
-                else:
-                    # high qual geojson
-                    drawer.draw_geojson(feat.geometry, **rendict)
+                drawer.draw_geojson(feat.geometry, **rendict)
 
             # flush
             print "internal",time.time()-t
-            if not antialias and "Polygon" in self.data.type:
-                self.img = img
-            else:
-                self.img = drawer.get_image()
+            self.img = drawer.get_image()
 
             # transparency
             if self.transparency:
@@ -1314,19 +1299,42 @@ class VectorLayer:
         else:
             self.img = None
 
-    def render_text(self, width, height, bbox=None):
+    def render_text(self, width, height, bbox=None, crs=None):
         if self.has_geometry() and self.styleoptions.get("text"):
 
             textkey = self.styleoptions["text"]
             
+            # determine on-the-fly projection
+            _transform = get_crs_transformer(self.data.crs, crs)
+
+            # setup
             if not bbox:
                 bbox = self.bbox
+
+            # determine map space by projecting data bounds
+            if _transform:
+                x1,y1,x2,y2 = bbox
+                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
+                corners = _transform(corners)
+                xs,ys = zip(*corners)
+                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+                targetbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
+                #print 'bbox transform',bbox,targetbox
+            else:
+                targetbox = bbox
             
             drawer = pyagg.Canvas(width, height, background=None)
-            drawer.custom_space(*bbox, lock_ratio=True)
+            drawer.custom_space(*targetbox, lock_ratio=True)
 
-            
-            features = self.features(bbox=bbox)
+            # get features inside map extent
+            targetbox = drawer.coordspace_bbox
+            if _transform:
+                # transform from projected map space back to data coordinates
+                _itransform = get_crs_transformer(crs, self.data.crs)
+                p1,p2 = targetbox[0:2],targetbox[2:4]
+                p1,p2 = _itransform([p1,p2])
+                targetbox = p1 + p2
+            features = self.features(bbox=targetbox)
 
             # custom draworder (sortorder is only used with sortkey)
             if "sortkey" in self.styleoptions:
@@ -1338,6 +1346,14 @@ class VectorLayer:
                 text = textkey(feat)
                 
                 if text is not None:
+
+                    # reproject
+                    # FIND WAY TO REUSE THE TRANSFORM FROM THE render(), CURRENTLY TRANSFORMS TWICE
+                    if _transform:
+                        #print 'text pre fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
+                        feat = feat.copy()
+                        feat.transform(_transform)
+                        #print 'text post fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                 
                     # get symbols
                     rendict = dict()

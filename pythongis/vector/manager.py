@@ -7,6 +7,8 @@ import shapely, shapely.ops, shapely.geometry
 from shapely.geometry import asShape as geojson2shapely
 from shapely.prepared import prep as supershapely
 
+import pycrs
+
 from ._helpers import geodetic_buffer
 
 
@@ -816,13 +818,20 @@ def reproject(data, tocrs):
     """Reprojects from one crs to another"""
     import pyproj
 
+    # get pycrs objs
     fromcrs = data.crs
+    if isinstance(tocrs, basestring):
+        tocrs = pycrs.parse.from_unknown_text(tocrs)
+
+    # create pyproj objs
+    fromcrs = pyproj.Proj(fromcrs.to_proj4())
+    tocrs = pyproj.Proj(tocrs.to_proj4())
 
     def _project(points):
         xs,ys = itertools.izip(*points)
-        xs,ys = pyproj.transform(pyproj.Proj(fromcrs),
-                                    pyproj.Proj(tocrs),
-                                    xs, ys)
+        xs,ys = pyproj.transform(fromcrs,
+                                 tocrs,
+                                 xs, ys)
         newpoints = list(itertools.izip(xs, ys))
         return newpoints
 

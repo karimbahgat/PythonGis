@@ -12,6 +12,9 @@ import datetime
 import shapely
 from shapely.geometry import asShape as geojson2shapely
 
+# import pycrs
+import pycrs
+
 # import rtree for spatial indexing
 import rtree
 
@@ -461,6 +464,12 @@ class VectorData:
         ids_rows_geoms = itertools.izip(self._id_generator,rows,geometries)
         featureobjs = (Feature(self,row,geom,id=id) for id,row,geom in ids_rows_geoms )
         self.features = OrderedDict([ (feat.id,feat) for feat in featureobjs ])
+
+        try:
+            crs = pycrs.parse.from_unknown_text(crs)
+        except:
+            warnings.warn('Failed to parse the given crs format, falling back to unprojected lat/long WGS84: \n {}'.format(crs))
+            crs = pycrs.parse.from_proj4("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
         self.crs = crs
 
     def __repr__(self):
