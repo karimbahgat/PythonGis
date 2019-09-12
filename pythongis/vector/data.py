@@ -6,6 +6,7 @@ Module containing the data structures and interfaces for operating with vector d
 import sys, os, itertools, operator, math
 from collections import OrderedDict
 import datetime
+import warnings
 
 # import shapely geometry compatibility functions
 # ...and rename them for clarity
