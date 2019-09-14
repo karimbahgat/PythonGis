@@ -16,12 +16,10 @@ from shapely.geometry import asShape as geojson2shapely
 # import pycrs
 import pycrs
 
-# import rtree for spatial indexing
-import rtree
-
 # import internal modules
 from . import loader
 from . import saver
+from . import spindex
 
 
 
@@ -1149,11 +1147,11 @@ class VectorData:
 
     ###### SPATIAL INDEXING #######
 
-    def create_spatial_index(self):
+    def create_spatial_index(self, type=None):
         """Creates spatial index to allow quick overlap search methods.
         If features are changed, added, or dropped, the index must be created again.
         """
-        self.spindex = rtree.index.Index()
+        self.spindex = spindex.Spindex(type=type)
         for feat in self:
             if feat.geometry:
                 self.spindex.insert(feat.id, feat.bbox)

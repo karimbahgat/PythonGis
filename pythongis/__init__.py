@@ -10,6 +10,7 @@ try:
     from . import app
 except:
     warnings.warn("Error importing the 'app' module, only available on systems with Tkinter and tk2 installed")
+    
 from . import raster
 from . import vector
 from . import renderer
