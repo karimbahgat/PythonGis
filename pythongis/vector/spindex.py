@@ -7,14 +7,20 @@
 class Spindex(object):
     
     def __init__(self, type=None):
-        if type.lower() == 'rtree':
+        type = type.lower() if type else type
+
+        # set default
+        if not type:
+            type = 'rtree'
+
+        # create specified index
+        if type == 'rtree':
             try:
-                fdsfsd
                 self.index = Rtree()
             except:
                 self.index = PyrTree()
 
-        elif type.lower() == 'quadtree':
+        elif type == 'quadtree':
             self.index = PyqTree()
 
     def insert(self, id, bbox):
