@@ -541,7 +541,7 @@ class Map:
 
     # Drawing
 
-    def render_one(self, layer, antialias=False):
+    def render_one(self, layer, antialias=True):
         if not self.drawer: self._create_drawer()
         
         if layer.visible:
@@ -556,7 +556,7 @@ class Map:
                              crs=self.crs)
             self.update_draworder()
 
-    def render_all(self, antialias=False):
+    def render_all(self, antialias=True):
         #import time
         #t=time.time()
         if not self.drawer: self._create_drawer()
@@ -779,7 +779,7 @@ def initSharedData(datadict):
     global sharedData
     sharedData = datadict
 
-def parallel_vecrend(features, width, height, bbox, styleoptions, antialias=False):
+def parallel_vecrend(features, width, height, bbox, styleoptions, antialias=True):
 
     import time
     t=time.time()
@@ -1200,7 +1200,7 @@ class VectorLayer:
         
         self.effects.append(effect)
 
-    def render(self, width, height, bbox=None, antialias=False, crs=None):
+    def render(self, width, height, bbox=None, antialias=True, crs=None):
 
         # normal way
         if self.has_geometry():
@@ -1552,7 +1552,7 @@ class RasterLayer:
     def is_empty(self):
         return False # for now
 
-    def render(self, resampling="nearest", antialias=None, **georef):
+    def render(self, resampling="nearest", antialias=True, **georef):
         # position in space
         # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
         # LIKELY DUE TO HALF CELL CENTER VS CORNER

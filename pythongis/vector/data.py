@@ -1147,11 +1147,11 @@ class VectorData:
 
     ###### SPATIAL INDEXING #######
 
-    def create_spatial_index(self, type=None):
+    def create_spatial_index(self, type=None, **kwargs):
         """Creates spatial index to allow quick overlap search methods.
         If features are changed, added, or dropped, the index must be created again.
         """
-        self.spindex = spindex.Spindex(type=type)
+        self.spindex = spindex.Spindex(type=type, **kwargs)
         for feat in self:
             if feat.geometry:
                 self.spindex.insert(feat.id, feat.bbox)
