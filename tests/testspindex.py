@@ -24,6 +24,7 @@ def test_matches(spindex, matchbox):
 ################
 
 d = pg.VectorData('data/ne_10m_admin_0_countries.shp')
+matchbox = [1,1,20,20]
 
 d.create_spatial_index()
 print('default',d.spindex)
@@ -31,16 +32,20 @@ print('default',d.spindex)
 pg.vector.data.DEFAULT_SPATIAL_INDEX = 'rtree'
 d.create_spatial_index()
 print('default rtree',d.spindex)
+print(len(list(d.quick_overlap(matchbox))))
 
 pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 d.create_spatial_index()
 print('default quadtree',d.spindex)
+print(len(list(d.quick_overlap(matchbox))))
 
 d.create_spatial_index('rtree')
 print('specify rtree',d.spindex)
+print(len(list(d.quick_overlap(matchbox))))
 
 d.create_spatial_index('quadtree')
 print('specify quadtree',d.spindex)
+print(len(list(d.quick_overlap(matchbox))))
 
 ################
 
