@@ -1,46 +1,52 @@
 
-# various spatial indexes
-
-
-# main interface
-
-# MAYBE DROP Spindex CLASS, INSTEAD JUST DIRECTLY USE THE SPECIFIC TYPE INDEX CLASS? 
-
-class Spindex(object):
-    
-    def __init__(self, type=None, **kwargs):
-        type = type.lower() if type else type
-
-        # set default
-        if not type:
-            type = 'rtree'
-
-        # create specified index
-        if type == 'rtree':
-            try:
-                self._index = Rtree(**kwargs)
-            except:
-                self._index = PyrTree(**kwargs)
-
-        elif type == 'quadtree':
-            self._index = PyqTree(**kwargs)
-
-    def insert(self, id, bbox):
-        self._index.insert(id, bbox)
-
-    def intersection(self, bbox):
-        return self._index.intersection(bbox)
-
-    def disjoint(self, bbox):
-        raise NotImplemented()
-
-    def nearest(self, bbox, **kwargs):
-        return self._index.nearest(bbox, **kwargs)
-
-
-# specific index interfaces
+# various spatial index classes
 
 class Rtree(object):
+
+    def __init__(self, **kwargs):
+        backend = kwargs.pop('backend', None)
+        if backend is None:
+            try:
+                self._backend = _RtreeBackend(**kwargs)
+            except ImportError:
+                self._backend = _PyrTreeBackend(**kwargs)
+        elif backend == 'rtree':
+            self._backend = _RtreeBackend(**kwargs)
+        elif backend == 'pyrtree':
+            self._backend = _PyrTreeBackend(**kwargs)
+        else:
+            raise Exception('No such Rtree backend: {}'.format(backend))
+
+    def insert(self, id, bbox):
+        self._backend.insert(id, bbox)
+
+    def intersects(self, bbox):
+        return self._backend.intersects(bbox)
+
+    def nearest(self, bbox, **kwargs):
+        return self._backend.nearest(bbox, **kwargs)
+
+class QuadTree(object):
+
+    def __init__(self, **kwargs):
+        backend = kwargs.pop('backend', None)
+        if backend is None or backend == 'pyqtree':
+            self._backend = _PyqTreeBackend(**kwargs)
+        else:
+            raise Exception('No such QuadTree backend: {}'.format(backend))
+
+    def insert(self, id, bbox):
+        self._backend.insert(id, bbox)
+
+    def intersects(self, bbox):
+        return self._backend.intersects(bbox)
+
+    def nearest(self, bbox, **kwargs):
+        return self._backend.nearest(bbox, **kwargs)
+
+# backends
+
+class _RtreeBackend(object):
 
     def __init__(self, **kwargs):
         import rtree
@@ -49,13 +55,13 @@ class Rtree(object):
     def insert(self, id, bbox):
         self._backend.insert(id, bbox)
 
-    def intersection(self, bbox):
+    def intersects(self, bbox):
         return self._backend.intersection(bbox)
 
     def nearest(self, bbox, **kwargs):
         return self._backend.nearest(bbox, **kwargs)
 
-class PyrTree(object):
+class _PyrTreeBackend(object):
 
     def __init__(self, **kwargs):
         import pyrtree
@@ -66,7 +72,7 @@ class PyrTree(object):
         rect = self._new_rect(*bbox)
         self._backend.insert(id, rect)
 
-    def intersection(self, bbox):
+    def intersects(self, bbox):
         rect = self._new_rect(*bbox)
         
         res = (node.leaf_obj() for node in self._backend.query_rect(rect)
@@ -74,9 +80,9 @@ class PyrTree(object):
         return res
 
     def nearest(self, bbox, **kwargs):
-        raise NotImplemented()
+        raise NotImplemented
 
-class PyqTree(object):
+class _PyqTreeBackend(object):
 
     def __init__(self, **kwargs):
         import pyqtree
@@ -85,7 +91,7 @@ class PyqTree(object):
     def insert(self, id, bbox):
         self._backend.insert(id, bbox)
 
-    def intersection(self, bbox):
+    def intersects(self, bbox):
         return self._backend.intersect(bbox)
 
     def nearest(self, bbox, **kwargs):

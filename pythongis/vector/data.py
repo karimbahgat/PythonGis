@@ -23,6 +23,7 @@ from . import spindex
 
 
 
+DEFAULT_SPATIAL_INDEX = 'rtree'
 
 
 
@@ -1147,11 +1148,18 @@ class VectorData:
 
     ###### SPATIAL INDEXING #######
 
-    def create_spatial_index(self, type=None, **kwargs):
+    def create_spatial_index(self, type=None, backend=None, **kwargs):
         """Creates spatial index to allow quick overlap search methods.
         If features are changed, added, or dropped, the index must be created again.
         """
-        self.spindex = spindex.Spindex(type=type, **kwargs)
+        type = type or DEFAULT_SPATIAL_INDEX
+        if type == 'rtree':
+            self.spindex = spindex.Rtree(backend=backend, **kwargs)
+        elif type == 'quadtree':
+            self.spindex = spindex.QuadTree(backend=backend, bbox=self.bbox, **kwargs)
+        else:
+            raise Exception('No such spatial index type: {}'.format(type))
+            
         for feat in self:
             if feat.geometry:
                 self.spindex.insert(feat.id, feat.bbox)

@@ -942,9 +942,6 @@ class VectorLayer:
         self.update()
 
     def update(self):
-        # reset spatial index
-        self.data.create_spatial_index()
-        
         # set up symbol classifiers
         features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
         for key,val in self.styleoptions.copy().items():
