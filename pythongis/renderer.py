@@ -260,7 +260,7 @@ class Layout:
 
 
 class Map:
-    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, ppi=None, crs=None, *args, **kwargs):
+    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, textoptions=None, ppi=None, crs=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -282,7 +282,7 @@ class Map:
         self.ppi = ppi
         self.drawer = None
         self.crs = crs or '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
-        #self.zooms = []
+        self.textoptions = textoptions or dict()
 
         # foreground layergroup for non-map decorations
         self.foregroundgroup = ForegroundLayerGroup()
@@ -327,6 +327,7 @@ class Map:
             
         # factor in zooms (zoombbx should somehow be crop, so alters overall img dims...)
         self.drawer = pyagg.Canvas(self.width, self.height, None, ppi=self.ppi)
+        self.drawer.textoptions.update(self.textoptions)
         self.drawer.geographic_space()
         #for zoom in self.zooms:
         #    zoom()
@@ -344,7 +345,8 @@ class Map:
 
     def copy(self):
         dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy(),
-                   title=self.title, titleoptions=self.titleoptions, ppi=self.ppi, crs=self.crs)
+                   title=self.title, titleoptions=self.titleoptions, textoptions=self.textoptions,
+                   ppi=self.ppi, crs=self.crs)
         dupl.backgroundgroup = self.backgroundgroup.copy()
         if self.drawer: dupl.drawer = self.drawer.copy()
         dupl.foregroundgroup = self.foregroundgroup.copy()
@@ -553,7 +555,8 @@ class Map:
             layer.render_text(width=self.drawer.width,
                              height=self.drawer.height,
                              bbox=self.drawer.coordspace_bbox,
-                             crs=self.crs)
+                             crs=self.crs,
+                             default_textoptions=self.textoptions)
             self.update_draworder()
 
     def render_all(self, antialias=True):
@@ -579,7 +582,8 @@ class Map:
                 layer.render_text(width=self.drawer.width,
                                  height=self.drawer.height,
                                  bbox=self.drawer.coordspace_bbox,
-                                 crs=self.crs)
+                                 crs=self.crs,
+                                 default_textoptions=self.textoptions)
 
         for layer in self.foregroundgroup:
             layer.render()
@@ -1296,7 +1300,7 @@ class VectorLayer:
         else:
             self.img = None
 
-    def render_text(self, width, height, bbox=None, crs=None):
+    def render_text(self, width, height, bbox=None, crs=None, default_textoptions=None):
         if self.has_geometry() and self.styleoptions.get("text"):
 
             textkey = self.styleoptions["text"]
@@ -1321,6 +1325,7 @@ class VectorLayer:
                 targetbox = bbox
             
             drawer = pyagg.Canvas(width, height, background=None)
+            drawer.textoptions.update(default_textoptions)
             drawer.custom_space(*targetbox, lock_ratio=True)
 
             # get features inside map extent
