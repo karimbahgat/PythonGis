@@ -1,10 +1,14 @@
 
+# builtins
+import os
+
 # import PIL as the saver
 import PIL
 import PIL.TiffImagePlugin
 import PIL.TiffTags
 
-def to_file(bands, meta, filepath):
+def to_file(bands, meta, filepath, **kwargs):
+    
     def combine_bands(bands):
         # saving in image-like format, so combine and prep final image
         if len(bands) == 1:
@@ -25,14 +29,18 @@ def to_file(bands, meta, filepath):
         else:
             # raise error if more than 4 bands, because PIL cannot save such images
             raise Exception("Cannot save more than 4 bands to one file; split and save each band separately")
+
     def create_world_file(savepath, geotrans):
         dir, filename_and_ext = os.path.split(savepath)
         filename, extension = os.path.splitext(filename_and_ext)
         world_file_path = os.path.join(dir, filename) + ".wld"
         with open(world_file_path, "w") as writer:
-            # rearrange transform coefficients and write
+            # note that the params are arranged slightly differently
+            # ...in the world file from the usual affine a,b,c,d,e,f
+            # ...so rearranging their sequence
             xscale,xskew,xoff,yskew,yscale,yoff = geotrans
-            writer.writelines([xscale,yskew,xskew,yscale,xoff,yoff])
+            string = '\n'.join((bytes(val) for val in [xscale,yskew,xskew,yscale,xoff,yoff]))
+            writer.write( string )
 
     if filepath.endswith((".ascii",".asc")):
         # create header
@@ -111,7 +119,9 @@ def to_file(bands, meta, filepath):
     elif filepath.endswith((".jpg",".jpeg",".png",".bmp",".gif")):
         # save
         img = combine_bands(bands)
-        img.save(filepath)
+        if not filepath.endswith((".png",".gif")):
+            img = img.convert('RGB') # only png and gif support alpha band
+        img.save(filepath, **kwargs)
         # write world file
         create_world_file(filepath, meta["affine"])
 

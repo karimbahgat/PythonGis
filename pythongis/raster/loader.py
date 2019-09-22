@@ -74,6 +74,7 @@ def from_file(filepath, **georef):
                 # ...in the world file from the usual affine a,b,c,d,e,f
                 # ...so remember to rearrange their sequence later
                 xscale,yskew,xskew,yscale,xoff,yoff = worldfile.read().split()
+                xscale,yskew,xskew,yscale,xoff,yoff = map(float, [xscale,yskew,xskew,yscale,xoff,yoff])
             return [xscale,yskew,xskew,yscale,xoff,yoff]
 
     if filetype == "ASCII":
@@ -495,7 +496,12 @@ def from_image(image, nodataval=-9999.0, crs=None, **georef):
     if "affine" in georef:
         pass
     else:
-        georef["affine"] = compute_affine(**georef)
+        try:
+            georef["affine"] = compute_affine(**georef)
+        
+        except:
+            georef["affine"] = [1, 0, 0, 0, 1, 0]
+            warnings.warn("Manual georef options needed to position the image in space")
 
     if not crs:
         crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"

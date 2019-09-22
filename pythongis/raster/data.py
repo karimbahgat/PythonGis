@@ -1272,9 +1272,9 @@ class RasterData(object):
             band.convert(mode)
         self.mode = mode
 
-    def save(self, filepath):
+    def save(self, filepath, **kwargs):
         """Saves the raster data as a geographic file."""
-        saver.to_file(self.bands, self.meta, filepath)
+        saver.to_file(self.bands, self.meta, filepath, **kwargs)
 
 
     ### ACCESS TO ADVANCED METHODS FROM INTERNAL MODULES ###
