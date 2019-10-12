@@ -84,7 +84,7 @@ class Geography(object):
                     
                 area = abs(ringarea(ext))
                 for hole in holes:
-                    area -= abs(ringarea(hole.coords))
+                    area -= abs(ringarea(hole))
                 return area
 
             if self.type == 'Polygon':

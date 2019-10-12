@@ -454,18 +454,33 @@ def align(raster, **rasterdef):
         raise Exception('Aligning is only for adjusting the offsets of two rasters with the same x/yscale - these do not.')
 
     # convert into reference coordsys by subtraction, align to scale tickmarks, convert back to original
-    def nearest_multiple(x, base):
-        return int(base * round(float(x)/base))
-    #print xoffset, xoffset_ref, xoffset-xoffset_ref, xscale_ref
-    xoffset = nearest_multiple(xoffset-xoffset_ref, xscale_ref) + xoffset_ref
-    #print yoffset, yoffset_ref, yoffset-yoffset_ref, yscale_ref
-    yoffset = nearest_multiple(yoffset-yoffset_ref, yscale_ref) + yoffset_ref
+##    def nearest_multiple(x, base):
+##        import math
+##        return math.floor(base * round(float(x)/base))
+##    print '-->', ref.meta["affine"]
+##    print xoffset, xoffset_ref, xoffset-xoffset_ref, xscale_ref
+##    xoffset = nearest_multiple(xoffset-xoffset_ref, xscale_ref) + xoffset_ref
+##    print xoffset
+##    print yoffset, yoffset_ref, yoffset-yoffset_ref, yscale_ref
+##    yoffset = nearest_multiple(yoffset-yoffset_ref, yscale_ref) + yoffset_ref
+##    print yoffset
+    
+    #print 'from: ', raster.meta["affine"]
+    #print 'to: ', ref.meta["affine"]
+    x,y = raster.cell_to_geo(0, 0)
+    #print x,y
+    px,py = ref.geo_to_cell(x, y, True)
+    #print px,py
+    xoffset,yoffset = ref.cell_to_geo(px, py)
+    #print xoffset,yoffset
     
     resampledef = {"width":raster.width,
                    "height":raster.height,
                    "affine":[xscale,xskew,xoffset,yskew,yscale,yoffset]}
-    #print raster.meta["affine"], resampledef, resampledef
+    #print raster.meta["affine"], resampledef, rasterdef
+    #print raster.meta["affine"], raster.bbox
     aligned = resample(raster, **resampledef)
+    #print aligned.meta['affine'], aligned.bbox
     return aligned
 
 def upscale(raster, stat="sum", **rasterdef):

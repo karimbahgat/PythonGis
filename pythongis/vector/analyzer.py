@@ -117,7 +117,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=
         from .. import raster
 
         for f in groupfeats:
-            print f
+            #print f
             try:
                 cropped = raster.manager.crop(valuedata, f.bbox)
             except:
@@ -138,7 +138,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=
 
             del fdata
             del cropped
-            gc.collect()
+            #gc.collect()
             
             row = f.row + [None for _ in fieldmapping]
             outfeat = out.add_feature(row, f.geometry)
@@ -147,7 +147,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=
                 outfeat[statfield] = stat
 
             del clipped
-            gc.collect()
+            #gc.collect()
 
     return out
 

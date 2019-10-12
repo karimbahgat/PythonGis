@@ -95,86 +95,23 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
     
     # shapefile
     if filepath.endswith(".shp"):
-        shapewriter = pyshp.Writer()
+        shapewriter = pyshp.Writer(filepath, encoding='utf8')
 
         fieldtypes = detect_fieldtypes(fields,rows)
         
         # set fields with correct fieldtype
         for fieldname,(fieldtype,func,fieldlen,decimals) in itertools.izip(fields, fieldtypes):
             fieldname = fieldname.replace(" ","_")[:10]
-            shapewriter.field(fieldname.encode(encoding), fieldtype, fieldlen, decimals)
-
-        # convert geojson to shape
-        def geoj2shape(geoj):
-            # create empty pyshp shape
-            shape = pyshp._Shape()
-            # set shapetype
-            geojtype = geoj["type"] if geoj else "Null"
-            if geojtype == "Null":
-                pyshptype = pyshp.NULL
-            elif geojtype == "Point":
-                pyshptype = pyshp.POINT
-            elif geojtype == "LineString":
-                pyshptype = pyshp.POLYLINE
-            elif geojtype == "Polygon":
-                pyshptype = pyshp.POLYGON
-            elif geojtype == "MultiPoint":
-                pyshptype = pyshp.MULTIPOINT
-            elif geojtype == "MultiLineString":
-                pyshptype = pyshp.POLYLINE
-            elif geojtype == "MultiPolygon":
-                pyshptype = pyshp.POLYGON
-            shape.shapeType = pyshptype
-            
-            # set points and parts
-            if geojtype == "Point":
-                shape.points = [ geoj["coordinates"] ]
-                shape.parts = [0]
-            elif geojtype in ("MultiPoint","LineString"):
-                shape.points = geoj["coordinates"]
-                shape.parts = [0]
-            elif geojtype in ("Polygon"):
-                points = []
-                parts = []
-                index = 0
-                for ext_or_hole in geoj["coordinates"]:
-                    points.extend(ext_or_hole)
-                    parts.append(index)
-                    index += len(ext_or_hole)
-                shape.points = points
-                shape.parts = parts
-            elif geojtype in ("MultiLineString"):
-                points = []
-                parts = []
-                index = 0
-                for linestring in geoj["coordinates"]:
-                    points.extend(linestring)
-                    parts.append(index)
-                    index += len(linestring)
-                shape.points = points
-                shape.parts = parts
-            elif geojtype in ("MultiPolygon"):
-                points = []
-                parts = []
-                index = 0
-                for polygon in geoj["coordinates"]:
-                    for ext_or_hole in polygon:
-                        points.extend(ext_or_hole)
-                        parts.append(index)
-                        index += len(ext_or_hole)
-                shape.points = points
-                shape.parts = parts
-            return shape
+            shapewriter.field(fieldname, fieldtype, fieldlen, decimals)
         
         # iterate through original shapes
-        for row,geom in itertools.izip(rows, geometries):
-            shape = geoj2shape(geom)
-            shapewriter._shapes.append(shape)
-            row = [encode(func(value)) for (typ,func,length,deci),value in zip(fieldtypes,row)]
+        for row,geoj in itertools.izip(rows, geometries):
+            shapewriter.shape(geoj)
+            row = [func(value) for (typ,func,length,deci),value in zip(fieldtypes,row)]
             shapewriter.record(*row)
             
         # save
-        shapewriter.save(filepath)
+        shapewriter.close()
 
     # geojson file
     elif filepath.endswith((".geojson",".json")):
