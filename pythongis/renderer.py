@@ -6,6 +6,8 @@ import pyagg, pyagg.legend
 import PIL, PIL.Image, PIL.ImageChops, PIL.ImageMath, PIL.ImageDraw, PIL.ImagePath
 import colour
 
+import shapely, shapely.geometry
+
 import classypie as cp
 
 import pycrs
@@ -1238,9 +1240,12 @@ class VectorLayer:
             if _transform:
                 # transform from projected map space back to data coordinates
                 _itransform = get_crs_transformer(crs, self.data.crs)
-                p1,p2 = targetbox[0:2],targetbox[2:4]
-                p1,p2 = _itransform([p1,p2])
-                targetbox = p1 + p2
+                x1,y1,x2,y2 = targetbox
+                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
+                corners = _itransform(corners)
+                xs,ys = zip(*corners)
+                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+                targetbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
             features = self.features(bbox=targetbox)
 
             # custom draworder (sortorder is only used with sortkey)
@@ -1333,17 +1338,26 @@ class VectorLayer:
             if _transform:
                 # transform from projected map space back to data coordinates
                 _itransform = get_crs_transformer(crs, self.data.crs)
-                p1,p2 = targetbox[0:2],targetbox[2:4]
-                p1,p2 = _itransform([p1,p2])
-                targetbox = p1 + p2
-            features = self.features(bbox=targetbox)
+                x1,y1,x2,y2 = targetbox
+                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
+                corners = _itransform(corners)
+                xs,ys = zip(*corners)
+                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+                bbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
+            features = self.features(bbox=bbox)
 
             # custom draworder (sortorder is only used with sortkey)
             if "sortkey" in self.styleoptions:
                 features = sorted(features, key=self.styleoptions["sortkey"],
                                   reverse=self.styleoptions["sortorder"].lower() == "decr")
 
-            # draw each as text
+            # get map bbox shp, to crop to map window for text placement
+            mx1,my1,mx2,my2 = targetbox
+            mxmin,mymin = min(mx1,mx2), min(my1,my2)
+            mxmax,mymax = max(mx1,mx2), max(my1,my2)
+            mapshp = shapely.geometry.box(mxmin,mymin,mxmax,mymax)
+
+            # draw each as text 
             for feat in features:
                 text = textkey(feat)
                 
@@ -1383,7 +1397,28 @@ class VectorLayer:
                         # default to xy being centroid
                         rendict["xy"] = rendict.get("xy", "centroid")
                         if rendict["xy"] == "centroid":
-                            rendict["xy"] = feat.get_shapely().centroid.coords[0]
+                            shp = feat.get_shapely()
+                            # TODO: CROPPING TO MAP WINDOW NOT WORKING YET
+                            #print 77,shp.bounds, mapshp.bounds
+                            #xy = shp.intersection(mapshp).centroid.coords[0]
+                            try:
+                                xy = shp.intersection(mapshp).centroid.coords[0]
+                            except:
+                                xy = shp.centroid.coords[0]
+                            rendict["xy"] = xy
+
+                        elif rendict["xy"] == "midpoint":
+                            # midpoint of bbox
+                            # crop to map window by taking intersection of bboxes
+                            # TODO: Only consider single geom bboxes
+                            xmin,ymin,xmax,ymax = feat.bbox
+                            xmin,ymin = max(xmin,mxmin), max(ymin,mymin)
+                            xmax,ymax = min(xmax,mxmax), min(ymax,mymax)
+                            rendict["xy"] = (xmin+xmax)/2.0, (ymin+ymax)/2.0
+
+                        elif hasattr(rendict["xy"], '__call__'):
+                            rendict["xy"] = rendict["xy"](feat)
+                                
                     drawer.draw_text(text, **rendict)
                 
             self.img_text = drawer.get_image()
