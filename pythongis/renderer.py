@@ -291,8 +291,7 @@ class Map:
 
         # title (these properties affect the actual rendered title after init)
         self.title = title
-        self.titleoptions = dict(textsize="6%w")
-        if titleoptions: self.titleoptions.update(titleoptions)
+        self.titleoptions = titleoptions or {}
         self.foregroundgroup.add_layer(Title(self))
 
         self.dimensions = dict()
@@ -1939,10 +1938,15 @@ class Title:
             # since title is rendered on separate img then pasted,
             # some titleoptions needs to be passed to pasteoptions
             # instead of the rendering method
-            titleoptions = self.layout.titleoptions.copy()
+            titleoptions = dict(textsize="3%w", padding=0.32)
+            titleoptions.update(self.layout.titleoptions.copy())
             titleoptions.pop("xy", None)
             titleoptions.pop("anchor", None)
-            rendered = pyagg.legend.Label(self.layout.title, refcanvas=self.layout.drawer, **titleoptions).render() # pyagg label indeed implements a render method()
+            boxoptions = dict(fillcolor=titleoptions.pop('fillcolor','white'),
+                              outlinecolor=titleoptions.pop('outlinecolor','black'),
+                              outlinewidth=titleoptions.pop('outlinewidth','5%min'),
+                              )
+            rendered = pyagg.legend.BaseGroup(refcanvas=self.layout.drawer, title=self.layout.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
             self.img = rendered.get_image()
 
 
