@@ -926,13 +926,14 @@ class VectorLayer:
 
         self.effects = []
 
-        self.legendoptions = legendoptions or dict()
+        self.legendoptions = legendoptions or dict(title='Vector Layer')
         self.legend = legend
         self.datafilter = datafilter
         
         # by default, set random style color
         randomcolor = rgb("random")
         self.styleoptions = {"fillcolor": randomcolor,
+                             "outlinewidth": 0.13,
                              "sortorder": "incr"}
         if 'Line' in self.data.type:
             self.styleoptions['outlinecolor'] = None
@@ -1454,7 +1455,7 @@ class RasterLayer:
 
         self.effects = []
 
-        self.legendoptions = legendoptions or dict()
+        self.legendoptions = legendoptions or dict(title='Raster Layer')
         self.legend = legend
 
         # by default, set random style color
