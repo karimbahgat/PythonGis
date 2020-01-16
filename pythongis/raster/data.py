@@ -468,7 +468,7 @@ class Band(object):
             if condition:
                 self.img.paste(result, (0,0), condition)
             else:
-                self.img = result
+                self.img.paste(result, (0,0))
         
         except MemoryError:
             

@@ -262,7 +262,7 @@ class Layout:
 
 
 class Map:
-    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, textoptions=None, ppi=None, crs=None, *args, **kwargs):
+    def __init__(self, width=None, height=None, background=None, layers=None, title="", titleoptions=None, textoptions=None, ppi=300, crs=None, *args, **kwargs):
 
         # remember and be remembered by the layergroup
         if not layers:
@@ -383,6 +383,10 @@ class Map:
         self.img = self.drawer.get_image()
 
     # Zooming
+
+    @property
+    def bbox(self):
+        return list(self.drawer.coordspace_bbox)
 
     def zoom_auto(self):
         if not self.drawer: self._create_drawer()
@@ -1306,7 +1310,10 @@ class VectorLayer:
             self.img = None
 
     def render_text(self, width, height, bbox=None, crs=None, default_textoptions=None):
-        if self.has_geometry() and self.styleoptions.get("text"):
+        
+        if self.styleoptions.get("text") and self.has_geometry():
+            import time
+            t=time.time()
 
             textkey = self.styleoptions["text"]
             
@@ -1420,7 +1427,9 @@ class VectorLayer:
                             rendict["xy"] = rendict["xy"](feat)
                                 
                     drawer.draw_text(text, **rendict)
-                
+
+            # flush
+            print "internal text",time.time()-t
             self.img_text = drawer.get_image()
 
             # transparency

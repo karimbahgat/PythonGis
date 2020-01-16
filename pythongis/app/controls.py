@@ -230,14 +230,35 @@ class NavigateControl(tk2.basics.Label):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
         self.zoomglob = tk2.basics.Button(self)
-        self.zoomglob["command"] = lambda: self.mapview.zoom_global()
+        self.zoomglob["command"] = lambda: self.mapview.zoom_global(log=True)
         self.zoomglob.set_icon(icons.iconpath("zoom_global.png"), width=40, height=40)
         self.zoomglob.pack(side="left")
 
         self.zoomrect = tk2.basics.Button(self)
-        self.zoomrect["command"] = lambda: self.mapview.zoom_rect()
+        def zoom_rect():
+            self.mapview.zoom_global()
+            for c in self.mapview.controls:
+                if isinstance(c, ZoomHistoryControl):
+                    bbox = [1,2,3,4]
+                    c.log_zoom_action(bbox)
+        self.zoomrect["command"] = lambda: self.mapview.zoom_rect() # log is true by default
         self.zoomrect.set_icon(icons.iconpath("zoom_rect.png"), width=40, height=40)
         self.zoomrect.pack(side="left")
+
+class ZoomHistoryControl(tk2.basics.Label):
+    # not finished yet
+    def __init__(self, master, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.prevbut = tk2.basics.Button(self, text='<')
+        self.prevbut["command"] = lambda: self.mapview.zoom_previous()
+        self.prevbut.set_icon(icons.iconpath("arrow_left.png"), width=40, height=40)
+        self.prevbut.pack(side="left")
+
+        self.nextbut = tk2.basics.Button(self, text='>')
+        self.nextbut["command"] = lambda: self.mapview.zoom_next()
+        self.nextbut.set_icon(icons.iconpath("arrow_right.png"), width=40, height=40)
+        self.nextbut.pack(side="right")
 
 class ZoomControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):

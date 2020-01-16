@@ -13,9 +13,74 @@ class TableGUI(tk2.Tk):
         self.browser.pack(fill="both", expand=1)
 
         self.state('zoomed')
+
+class SimpleMapViewerGUI(tk2.Tk):
+    # new experimental version
+    def __init__(self, mapp, time=False, *args, **kwargs):
+        tk2.basics.Tk.__init__(self, *args, **kwargs)
+
+        ###
+        mapview = self.mapview = pg.app.map.MapView(self, mapp)
+        mapview.pack(fill="both", expand=1)
+
+        bottombar = tk2.Label(self) #, background='red')
+        bottombar.pack(fill='x', expand=0)
+
+##        layerscontrol = pg.app.controls.LayersControl(mapview)
+##        layerscontrol.layers = mapp.layers
+##        layerscontrol.place(relx=0.99, rely=0.02, anchor="ne")
+##        mapview.add_control(layerscontrol)
+
+        navigcontrol = pg.app.controls.NavigateControl(bottombar)
+        navigcontrol.pack(side='left')
+        mapview.add_control(navigcontrol)
+
+        identcontrol = pg.app.controls.IdentifyControl(navigcontrol)
+        identcontrol.pack(fill='y', expand=1, side="right") #place(relx=0.98, rely=0.11, anchor="ne")
+        mapview.add_control(identcontrol)
+
+        zoomhistcontrol = pg.app.controls.ZoomHistoryControl(navigcontrol)
+        zoomhistcontrol.pack(fill='y', expand=1, side="right") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
+        mapview.add_control(zoomhistcontrol)
+
+        #zoomcontrol = pg.app.controls.ZoomControl(navigcontrol)
+        #zoomcontrol.pack(fill='y', expand=1, side="right") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
+        #mapview.add_control(zoomcontrol)
         
+        progbar = tk2.progbar.NativeProgressbar(self)
+        progbar.pack(side="left", padx=4, pady=4)
+
+        def startprog():
+            progbar.start()
+        def stopprog():
+            progbar.stop()
+        mapview.onstart = startprog
+        mapview.onfinish = stopprog
+
+        coords = tk2.Label(self)
+        coords.pack(side="right", padx=4, pady=4)
+
+        def showcoords(event):
+            x,y = mapview.mouse2coords(event.x, event.y)
+            coords["text"] = "%s, %s" % (x,y)
+        self.winfo_toplevel().bind("<Motion>", showcoords, "+")
+
+        if False:#time:
+            # must be dict
+            timecontrol = pg.app.controls.TimeControl(mapview)#, **time)
+            timecontrol.place(relx=0.5, rely=0.98, anchor="s")
+            mapview.add_control(timecontrol)
+
+        def dndfunc(event):
+            for filepath in event.data:
+                layerscontrol.add_layer(filepath)
+        self.winfo_toplevel().bind_dnddrop(dndfunc, "Files", event='<Drop>')
+
+        # done
+        self.state('zoomed')
 
 class MultiLayerGUI(tk2.Tk):
+    # old working version
     def __init__(self, mapp, time=False, *args, **kwargs):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 

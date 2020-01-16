@@ -33,6 +33,9 @@ class MapView(tk.Canvas):
         self.zoomdir = None
         self.last_zoomed = None
 
+        self.zoom_history = [self.renderer.bbox]
+        self.zoom_cur = 0
+
         # Setup
         # link to self
         self.renderer.mapview = self
@@ -69,7 +72,7 @@ class MapView(tk.Canvas):
             # record zoom time
             self.last_zoomed = time.time()
             # schedule to check if finished zooming after x millisecs
-            self.after(300, self.zoom_if_finished)
+            self.after(300, lambda: self.zoom_if_finished(log=True))
 
         def doubleright(event):
             self.zoomfactor += 1
@@ -79,7 +82,7 @@ class MapView(tk.Canvas):
             # record zoom time
             self.last_zoomed = time.time()
             # schedule to check if finished zooming after x millisecs
-            self.after(300, self.zoom_if_finished)
+            self.after(300, lambda: self.zoom_if_finished(log=True))
 
         def mousewheel(event):
             # FIX: since we bind to all, event coordinates are captured by root
@@ -159,6 +162,8 @@ class MapView(tk.Canvas):
                 if xmoved or ymoved:
                     # offset image rendering
                     self.renderer.offset(xmoved, ymoved)
+                    # log it
+                    self.log_zoom(self.renderer.bbox)
                     # since threaded rendering will update the offset image, reanchor the dragged canvas image
                     self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
                     # render
@@ -176,7 +181,7 @@ class MapView(tk.Canvas):
                 curx,cury = self.renderer.drawer.pixel2coord(curx,cury)
                 bbox = [startx, starty, curx, cury]
                 #self.rough_zoom_bbox(bbox)
-                self.zoom_bbox(bbox)
+                self.zoom_bbox(bbox, log=True)
 
         self.zoomicon_tk = icons.get("zoom_rect.png", width=30, height=30)
         def mouseenter(event):
@@ -210,12 +215,36 @@ class MapView(tk.Canvas):
         control.mapview = self
         self.controls.append(control)
 
-    def zoom_global(self):
+    def log_zoom(self, bbox):
+        if self.zoom_cur < len(self.zoom_history)-1:
+            # branch off (forget all next ones)
+            self.zoom_history = self.zoom_history[:self.zoom_cur+1]
+        self.zoom_history.append(bbox)
+        self.zoom_cur += 1
+        print 'logging zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
+
+    def zoom_previous(self):
+        if self.zoom_cur > 0:
+            self.zoom_cur -= 1
+            bbox = self.zoom_history[self.zoom_cur]
+            print 'previous zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
+            self.zoom_bbox(bbox)
+
+    def zoom_next(self):
+        if self.zoom_cur < len(self.zoom_history)-1:
+            self.zoom_cur += 1
+            bbox = self.zoom_history[self.zoom_cur]
+            print 'next zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
+            self.zoom_bbox(bbox)
+
+    def zoom_global(self, log=False):
         # get new bbox
         layerbboxes = (layer.bbox for layer in self.renderer.layers)
         xmins,ymins,xmaxs,ymaxs = zip(*layerbboxes)
         globalbbox = [min(xmins), min(ymins), max(xmaxs), max(ymaxs)]
         self.renderer.zoom_bbox(*globalbbox)
+        if log:
+            self.log_zoom(globalbbox)
         # render fresh
         self.threaded_rendering()
 
@@ -223,9 +252,11 @@ class MapView(tk.Canvas):
         self.mouse_mode = "zoom"
         self.event_generate("<Enter>")
 
-    def zoom_bbox(self, bbox):
+    def zoom_bbox(self, bbox, log=False):
         # get new bbox from zoom
         self.renderer.zoom_bbox(*bbox)
+        if log:
+            self.log_zoom(bbox)
         # fresh render
         self.threaded_rendering()
 
@@ -286,7 +317,7 @@ class MapView(tk.Canvas):
                 
                 self.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
                 self.update_image()
-                # display zoom scale
+                # custom funcs
                 if self.onsuccess:
                     self.onsuccess()
             # stop progbar
@@ -333,31 +364,34 @@ class MapView(tk.Canvas):
         print "-tkfresh",time.time()-tt
         self.itemconfig(self.image_on_canvas, image=self.tkimg )
 
-    def zoom_in(self):
+    def zoom_in(self, log=False):
         self.zoomfactor += 1
         self.zoomcenter = None
         self.zoomdir = "in"
         # record zoom time
         self.last_zoomed = time.time()
         # schedule to check if finished zooming after x millisecs
-        self.after(300, self.zoom_if_finished)
+        self.after(300, lambda log=log: self.zoom_if_finished(log=log))
 
-    def zoom_out(self):
+    def zoom_out(self, log=False):
         self.zoomfactor += 1
         self.zoomcenter = None
         self.zoomdir = "out"
         # record zoom time
         self.last_zoomed = time.time()
         # schedule to check if finished zooming after x millisecs
-        self.after(300, self.zoom_if_finished)
+        self.after(300, lambda log=log: self.zoom_if_finished(log=log))
 
-    def zoom_if_finished(self):
+    def zoom_if_finished(self, log=False):
         if time.time() - self.last_zoomed >= 0.3:
             # get new bbox from zoom
             if self.zoomdir == "out":
                 self.renderer.zoom_out(self.zoomfactor, center=self.zoomcenter)
             else:
                 self.renderer.zoom_in(self.zoomfactor, center=self.zoomcenter)
+
+            if log:
+                self.log_zoom(list(self.renderer.drawer.coordspace_bbox))
 
             # render fresh
             self.threaded_rendering()
