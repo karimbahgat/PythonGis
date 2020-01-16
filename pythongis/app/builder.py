@@ -44,12 +44,12 @@ class SimpleMapViewerGUI(tk2.Tk):
         def ask_save():
             filepath = tk2.filedialog.asksaveasfilename()
             mapview.renderer.img.save(filepath)
-        savebut = tk2.Button(navigcontrol, command=ask_save)
+        savebut = tk2.Button(bottombar, command=ask_save)
         savebut.set_icon(icons.iconpath("save.png"), width=40, height=40)
         savebut.pack(side="right") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
 
-        identcontrol = pg.app.controls.IdentifyControl(navigcontrol)
-        identcontrol.pack(fill='y', expand=1, side="right") #place(relx=0.98, rely=0.11, anchor="ne")
+        identcontrol = pg.app.controls.IdentifyControl(bottombar)
+        identcontrol.pack(side="right") #place(relx=0.98, rely=0.11, anchor="ne")
         mapview.add_control(identcontrol)
 
         zoomhistcontrol = pg.app.controls.ZoomHistoryControl(navigcontrol)

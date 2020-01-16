@@ -285,7 +285,7 @@ class StaticLayersControl(tk2.basics.Label):
         widget.pack(fill="x", expand=1)
 
         frame = tk2.Frame(widget)
-        frame.pack()
+        frame.pack(fill='both', expand=1)
 
         # top name part
         nameframe = tk2.Label(frame)
@@ -458,8 +458,8 @@ class IdentifyControl(tk2.basics.Label):
         title = tk2.Label(infowin, text="Hits for coordinates: %s, %s" % (x, y))
         title.pack(fill="x")#, expand=1)
         
-        infoframe = tk2.Frame(infowin)
-        infoframe.pack(fill="both", expand=1)
+        ribbon = tk2.Ribbon(infowin)
+        ribbon.pack(fill="both", expand=1)
 
         # find coord distance for approx 5 pixel uncertainty
         pixelbuff = 10
@@ -473,16 +473,20 @@ class IdentifyControl(tk2.basics.Label):
         
         anyhits = None
         for layer in self.mapview.renderer.layers:
+            if not layer.visible:
+                continue
             print layer
             if isinstance(layer.data, pg.VectorData):
                 feats = [feat for feat in layer.data.quick_overlap(p.bounds) if feat.get_shapely().intersects(p)]
                 
                 if feats:
                     anyhits = True
-                    layerframe = tk2.Frame(infoframe, label=layer.data.name)
-                    layerframe.pack(fill="both", expand=1)
+                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
+                    _tab = ribbon.add_tab(shortname)
+                    _frame = tk2.Frame(_tab, label=layer.data.name)
+                    _frame.pack(fill='both', expand=1)
                     
-                    browser = builder.TableBrowser(layerframe)
+                    browser = builder.TableBrowser(_frame)
                     browser.pack(fill="both", expand=1)
                     browser.table.populate(fields=layer.data.fields, rows=[f.row for f in feats])
                     
@@ -490,18 +494,20 @@ class IdentifyControl(tk2.basics.Label):
                 values = [layer.data.get(x, y, band).value for band in layer.data.bands]
                 if any(values):
                     anyhits = True
-                    layerframe = tk2.Frame(infoframe, label=layer.data.name)
-                    layerframe.pack(fill="both", expand=1)
+                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
+                    _tab = ribbon.add_tab(shortname)
+                    _frame = tk2.Frame(_tab, label=layer.data.name)
+                    _frame.pack(fill='both', expand=1)
                     
                     col,row = layer.data.geo_to_cell(x, y)
-                    cellcol = tk2.Label(layerframe, text="Column: %s" % col )
+                    cellcol = tk2.Label(_frame, text="Column: %s" % col )
                     cellcol.pack(fill="x", expand=1)
-                    cellrow = tk2.Label(layerframe, text="Row: %s" % row )
+                    cellrow = tk2.Label(_frame, text="Row: %s" % row )
                     cellrow.pack(fill="x", expand=1)
 
                     for bandnum,val in enumerate(values):
                         text = "Band %i: \n\t%s" % (bandnum, val)
-                        valuelabel = tk2.Label(layerframe, text=text)
+                        valuelabel = tk2.Label(_frame, text=text)
                         valuelabel.pack(fill="both", expand=1)
 
         if not anyhits:
