@@ -221,20 +221,20 @@ class MapView(tk.Canvas):
             self.zoom_history = self.zoom_history[:self.zoom_cur+1]
         self.zoom_history.append(bbox)
         self.zoom_cur += 1
-        print 'logging zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
+        #print 'logging zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
 
     def zoom_previous(self):
         if self.zoom_cur > 0:
             self.zoom_cur -= 1
             bbox = self.zoom_history[self.zoom_cur]
-            print 'previous zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
+            #print 'previous zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
             self.zoom_bbox(bbox)
 
     def zoom_next(self):
         if self.zoom_cur < len(self.zoom_history)-1:
             self.zoom_cur += 1
             bbox = self.zoom_history[self.zoom_cur]
-            print 'next zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
+            #print 'next zoom', self.zoom_cur, bbox, len(self.zoom_history), self.zoom_history
             self.zoom_bbox(bbox)
 
     def zoom_global(self, log=False):

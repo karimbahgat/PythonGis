@@ -225,6 +225,139 @@ class LayersControl(tk2.basics.Label):
     def move_layer(self):
         pass
 
+class StaticLayersControl(tk2.basics.Label):
+    def __init__(self, master, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.layers = []
+
+        self.layerslist = tk2.scrollwidgets.OrderedList(self, title="Map Layers:")
+        self.layerslist.pack(fill='both', expand=1)
+
+    def set_layers(self, layers):
+        self.layers = layers
+        self.update_layers()
+        
+##        def keep_updating():
+##            # TODO: NOT IDEAL, ALOT OF WASTE, BETTER TO LISTEN FOR CHANGES? 
+##            self.update_layers()
+##            self.after(1000, keep_updating)
+##        self.after(1000, keep_updating)
+
+    def add_layer(self, filepath):
+        # TODO: maybe open another dialogue where can set encoding, filtering, etc, before adding
+        datawin = dialogs.LoadDataDialog(filepath=filepath)
+        def onsuccess(data):
+            # TODO: should prob be threaded...
+            lyr = self.mapview.renderer.add_layer(data)
+            self.mapview.renderer.render_one(lyr)
+            self.mapview.renderer.update_draworder()
+            self.mapview.update_image()
+            self.update_layers()
+        datawin.onsuccess = onsuccess
+
+    def move_layer(self, layer):
+        pass
+
+    def remove_layer(self, layer):
+        self.layers.remove_layer(self.layers.get_position(layer))
+        self.update_layers()
+
+    def update_layers(self):
+        for w in self.layerslist.items:
+            w.destroy()
+        for lyr in reversed(self.layers):
+            self.layerslist.add_item(lyr, self.layer_decor)
+
+        def ask_layer():
+            filepath = tk2.filedialog.askopenfilename()
+            self.add_layer(filepath)
+        def buttondecor(w):
+            but = tk2.Button(w, text="Add Layer", command=ask_layer)
+            but.pack()
+        self.layerslist.add_item(None, buttondecor)
+
+    def layer_decor(self, widget):
+        """
+        Default way to decorate each layer with extra widgets
+        Override method to customize. 
+        """
+        widget.pack(fill="x", expand=1)
+
+        frame = tk2.Frame(widget)
+        frame.pack()
+
+        # top name part
+        nameframe = tk2.Label(frame)
+        nameframe.pack(side="top")
+
+        # middle image part
+        imframe = tk2.Label(frame)
+        imframe.pack(side="top")
+        #tkim = pg.app.icons.get('zoom_global.png', width=200, height=200)
+        import PIL, PIL.Image, PIL.ImageTk
+        lyr = widget.item
+        #lyr.render(width=300, height=150, bbox=[lyr.bbox[0],lyr.bbox[3],lyr.bbox[2],lyr.bbox[1]])
+        w,h = self.mapview.renderer.width, self.mapview.renderer.height
+        w,h = w//6, h//6
+        if lyr.img:
+            im = lyr.img.resize((w,h), resample=PIL.Image.BILINEAR) #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
+            tkim = PIL.ImageTk.PhotoImage(im)
+        else:
+            tkim = icons.get('zoom_global.png', width=w, height=h)
+        thumb = tk2.basics.Label(imframe, image=tkim)
+        thumb.tkim = tkim
+        thumb.pack(side="bottom")
+
+        i = len(self.mapview.renderer.layers) - self.mapview.renderer.layers.get_position(lyr)
+        laynum = tk2.Label(nameframe, text=i)
+        laynum.pack(side="left")
+    
+        visib = tk2.basics.Checkbutton(nameframe)
+        visib.select()
+        def toggle():
+            lyr = widget.item
+            lyr.visible = not lyr.visible
+            if lyr.visible:
+                self.mapview.renderer.render_one(lyr)
+            self.mapview.renderer.update_draworder()
+            self.mapview.update_image()
+        visib["command"] = toggle
+        visib.pack(side="left")
+        
+        text = widget.item.data.name
+        text = text.replace('\\','/').split('/')[-1] # in case of path
+        name = tk2.basics.Label(nameframe, text=text)
+        name.pack(side="left", fill="x", expand=1)
+        confbut = tk2.basics.Button(nameframe)
+        confbut.set_icon(icons.iconpath("config2.png"), width=15, height=15)
+        confbut.pack(side='left')
+        def delete():
+            self.remove_layer(lyr)
+        dropbut = tk2.basics.Button(nameframe, command=delete)
+        dropbut.set_icon(icons.iconpath("delete.png"), width=15, height=15)
+        dropbut.pack(side='left')
+
+        transpframe = tk2.Label(frame)
+        transpframe.pack(side="top")
+        #transplabel = tk2.Label(transpframe, text="Transparency")
+        #transplabel.pack(side="left")
+        
+        def update_transp(value):
+            value = float(value) / 5.0
+            lyr = widget.item
+            lyr.transparency = value
+            if lyr.visible:
+                self.mapview.renderer.render_one(lyr)
+            self.mapview.renderer.update_draworder()
+            self.mapview.update_image()
+            
+        transp = tk2.Slider(transpframe, from_=0, to=5,
+                            value=widget.item.transparency,
+                            command=update_transp)
+        transp.pack(side="right")
+        
+
 class NavigateControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)

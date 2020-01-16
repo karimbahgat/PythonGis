@@ -20,20 +20,33 @@ class SimpleMapViewerGUI(tk2.Tk):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 
         ###
-        mapview = self.mapview = pg.app.map.MapView(self, mapp)
+        mapframe = tk2.Frame(self)
+        mapframe.pack(side='left', fill='both', expand=1)
+
+        layersframe = tk2.Frame(self)
+        layersframe.pack(side='right', fill='y', expand=0)
+        
+        mapview = self.mapview = pg.app.map.MapView(mapframe, mapp)
         mapview.pack(fill="both", expand=1)
 
-        bottombar = tk2.Label(self) #, background='red')
+        bottombar = tk2.Label(mapframe) #, background='red')
         bottombar.pack(fill='x', expand=0)
 
-##        layerscontrol = pg.app.controls.LayersControl(mapview)
-##        layerscontrol.layers = mapp.layers
-##        layerscontrol.place(relx=0.99, rely=0.02, anchor="ne")
-##        mapview.add_control(layerscontrol)
+        layerscontrol = pg.app.controls.StaticLayersControl(layersframe)
+        layerscontrol.pack(fill='y', expand=1) #place(relx=0.99, rely=0.02, anchor="ne")
+        mapview.add_control(layerscontrol)
+        layerscontrol.set_layers(mapp.layers)
 
         navigcontrol = pg.app.controls.NavigateControl(bottombar)
         navigcontrol.pack(side='left')
         mapview.add_control(navigcontrol)
+
+        def ask_save():
+            filepath = tk2.filedialog.asksaveasfilename()
+            mapview.renderer.img.save(filepath)
+        savebut = tk2.Button(navigcontrol, command=ask_save)
+        savebut.set_icon(icons.iconpath("save.png"), width=40, height=40)
+        savebut.pack(side="right") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
 
         identcontrol = pg.app.controls.IdentifyControl(navigcontrol)
         identcontrol.pack(fill='y', expand=1, side="right") #place(relx=0.98, rely=0.11, anchor="ne")
@@ -46,8 +59,10 @@ class SimpleMapViewerGUI(tk2.Tk):
         #zoomcontrol = pg.app.controls.ZoomControl(navigcontrol)
         #zoomcontrol.pack(fill='y', expand=1, side="right") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
         #mapview.add_control(zoomcontrol)
+
+        ###########
         
-        progbar = tk2.progbar.NativeProgressbar(self)
+        progbar = tk2.progbar.NativeProgressbar(mapframe)
         progbar.pack(side="left", padx=4, pady=4)
 
         def startprog():
@@ -57,7 +72,7 @@ class SimpleMapViewerGUI(tk2.Tk):
         mapview.onstart = startprog
         mapview.onfinish = stopprog
 
-        coords = tk2.Label(self)
+        coords = tk2.Label(mapframe)
         coords.pack(side="right", padx=4, pady=4)
 
         def showcoords(event):
