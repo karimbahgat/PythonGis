@@ -234,6 +234,8 @@ class StaticLayersControl(tk2.basics.Label):
         self.layerslist = tk2.scrollwidgets.OrderedList(self, title="Map Layers:")
         self.layerslist.pack(fill='both', expand=1)
 
+        self.clickbind = self.winfo_toplevel().bind('<Button-1>', self.begin_drag, '+')
+
     def set_layers(self, layers):
         self.layers = layers
         self.update_layers()
@@ -256,8 +258,11 @@ class StaticLayersControl(tk2.basics.Label):
             self.update_layers()
         datawin.onsuccess = onsuccess
 
-    def move_layer(self, layer):
-        pass
+    def move_layer(self, layer, i):
+        fromi = self.layers.get_position(layer)
+        if fromi != i:
+            self.layers.move_layer(fromi, i)
+            self.update_layers()
 
     def remove_layer(self, layer):
         self.layers.remove_layer(self.layers.get_position(layer))
@@ -266,6 +271,7 @@ class StaticLayersControl(tk2.basics.Label):
     def update_layers(self):
         for w in self.layerslist.items:
             w.destroy()
+        self.layerslist.items = []
         for lyr in reversed(self.layers):
             self.layerslist.add_item(lyr, self.layer_decor)
 
@@ -277,6 +283,48 @@ class StaticLayersControl(tk2.basics.Label):
             but.pack()
         self.layerslist.add_item(None, buttondecor)
 
+    def begin_drag(self, event):
+        #print 'begin drag',event
+        rootx,rooty = self.winfo_pointerxy()
+        #print rootx,rooty
+        for w in self.layerslist.items[:-1]:
+            x1,y1 = w.winfo_rootx(), w.winfo_rooty()
+            width,height = w.winfo_width(), w.winfo_height()
+            x2,y2 = x1+width, y1+height
+            #print x1,y1,x2,y2
+            if x1 <= rootx <= x2 and y1 <= rooty <= y2:
+                # this is the layer widget that was clicked
+                #print 'found'
+                self.clickwidget = w
+                #self.followbind = self.winfo_toplevel().bind('<Motion>', self.follow_mouse, '+')
+                self.releasebind = self.winfo_toplevel().bind('<ButtonRelease-1>', self.stop_drag, '+')
+                break
+
+    def follow_mouse(self, event):
+        # gets called for entire app, so check to see if directly on canvas widget
+        rootx,rooty = self.winfo_pointerxy()
+        widgetx,widgety = self.layerslist.winfo_rootx(), self.layerslist.winfo_rooty()
+        x,y = rootx-widgetx, rooty-widgety
+        #print 'following',y
+        #self.clickwidget.place(y=y)
+        
+    def stop_drag(self, event):
+        rootx,rooty = self.winfo_pointerxy()
+        #print 'stop drag',rooty
+        i = 0
+        for i,w in enumerate(self.layerslist.items[:-1]):
+            widgetbottom = w.winfo_rooty() + w.winfo_height()
+            #print rooty, widgetbottom, '-->', i
+            if rooty < widgetbottom:
+                #print 'found'
+                break
+        lyr = self.clickwidget.item
+        i = len(self.layers) - 1 - i
+        #print 'oldi',self.layers.get_position(lyr),'newi', i
+        #self.winfo_toplevel().unbind('<Motion>', self.followbind)
+        self.winfo_toplevel().unbind('<ButtonRelease-1>', self.releasebind)
+        self.move_layer(lyr, i)
+
     def layer_decor(self, widget):
         """
         Default way to decorate each layer with extra widgets
@@ -286,6 +334,40 @@ class StaticLayersControl(tk2.basics.Label):
 
         frame = tk2.Frame(widget)
         frame.pack(fill='both', expand=1)
+
+##        def begin_drag(event):
+##            print 'begin drag',event
+##            widget.followbind = frame.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
+##            widget.releasebind = frame.winfo_toplevel().bind('<ButtonRelease-1>', stop_drag, '+')
+##        def follow_mouse(event):
+##            # gets called for entire app, so check to see if directly on canvas widget
+##            root = widget.winfo_toplevel()
+##            rootx,rooty = root.winfo_pointerxy()
+##            widgetx,widgety = frame.winfo_rootx(), frame.winfo_rooty()
+##            x,y = rootx-widgetx, rooty-widgety
+##            print 'following',y
+##            #frame.place(y=y)
+##        def stop_drag(event):
+##            rootx,rooty = widget.winfo_pointerxy()
+##            print 'stop drag',rooty
+##            i = 0
+##            for i,w in enumerate(self.layerslist.items[:-1]):
+##                halfwidgety = (w.winfo_rooty() + w.winfo_height()//2)
+##                print rooty, halfwidgety, '-->', i
+##                if rooty > halfwidgety:
+##                    print 'found'
+##                    break
+##            lyr = widget.item
+##            i = len(self.layers) - i
+##            print 'newi', i
+##            self.winfo_toplevel().unbind('<Motion>', widget.followbind)
+##            self.winfo_toplevel().unbind('<Button-1>', widget.clickbind)
+##            self.winfo_toplevel().unbind('<ButtonRelease-1>', widget.releasebind)
+##            self.move_layer(lyr, i)
+##        widget.begin_drag = begin_drag
+##        widget.follow_mouse = follow_mouse
+##        widget.stop_drag = stop_drag
+##        widget.clickbind = frame.winfo_toplevel().bind('<Button-1>', begin_drag, '+')
 
         # top name part
         nameframe = tk2.Label(frame)
@@ -327,7 +409,7 @@ class StaticLayersControl(tk2.basics.Label):
         
         text = widget.item.data.name
         text = text.replace('\\','/').split('/')[-1] # in case of path
-        name = tk2.basics.Label(nameframe, text=text)
+        name = tk2.basics.Label(nameframe, text=text, width=30, wraplength=170)
         name.pack(side="left", fill="x", expand=1)
         confbut = tk2.basics.Button(nameframe)
         confbut.set_icon(icons.iconpath("config2.png"), width=15, height=15)
@@ -368,12 +450,6 @@ class NavigateControl(tk2.basics.Label):
         self.zoomglob.pack(side="left")
 
         self.zoomrect = tk2.basics.Button(self)
-        def zoom_rect():
-            self.mapview.zoom_global()
-            for c in self.mapview.controls:
-                if isinstance(c, ZoomHistoryControl):
-                    bbox = [1,2,3,4]
-                    c.log_zoom_action(bbox)
         self.zoomrect["command"] = lambda: self.mapview.zoom_rect() # log is true by default
         self.zoomrect.set_icon(icons.iconpath("zoom_rect.png"), width=40, height=40)
         self.zoomrect.pack(side="left")
