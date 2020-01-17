@@ -662,7 +662,7 @@ class Map:
         mapp = self.copy() # ???
         # make gui
         from . import app
-        win = app.builder.MultiLayerGUI(mapp)
+        win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
     def save(self, savepath):

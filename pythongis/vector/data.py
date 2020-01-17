@@ -332,7 +332,7 @@ class Feature:
         from .. import app
         mapp = self.map(None, None, bbox, title=title, background=background, **styleoptions)
         # make gui
-        win = app.builder.MultiLayerGUI(mapp)
+        win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
 
@@ -1314,7 +1314,7 @@ class VectorData:
         from .. import app
         mapp = self.map(None, None, bbox, title=title, background=background, **styleoptions)
         # make gui
-        win = app.builder.MultiLayerGUI(mapp)
+        win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
 

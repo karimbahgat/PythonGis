@@ -386,7 +386,7 @@ class StaticLayersControl(tk2.basics.Label):
             im = lyr.img.resize((w,h), resample=PIL.Image.BILINEAR) #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
             tkim = PIL.ImageTk.PhotoImage(im)
         else:
-            tkim = icons.get('zoom_global.png', width=w, height=h)
+            tkim = icons.get('zoom_global.png', width=h, height=h)
         thumb = tk2.basics.Label(imframe, image=tkim)
         thumb.tkim = tkim
         thumb.pack(side="bottom")
@@ -409,7 +409,7 @@ class StaticLayersControl(tk2.basics.Label):
         
         text = widget.item.data.name
         text = text.replace('\\','/').split('/')[-1] # in case of path
-        name = tk2.basics.Label(nameframe, text=text, width=30, wraplength=170)
+        name = tk2.basics.Label(nameframe, text=text, width=20, wraplength=115)
         name.pack(side="left", fill="x", expand=1)
         confbut = tk2.basics.Button(nameframe)
         confbut.set_icon(icons.iconpath("config2.png"), width=15, height=15)

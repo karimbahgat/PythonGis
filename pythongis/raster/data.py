@@ -907,7 +907,7 @@ class Band(object):
         from .. import app
         mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
         # make gui
-        win = app.builder.MultiLayerGUI(mapp)
+        win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
     def save(self, filepath):
@@ -1330,7 +1330,7 @@ class RasterData(object):
         from .. import app
         mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
         # make gui
-        win = app.builder.MultiLayerGUI(mapp)
+        win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
 
