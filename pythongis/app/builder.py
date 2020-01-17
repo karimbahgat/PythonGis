@@ -72,13 +72,13 @@ class SimpleMapViewerGUI(tk2.Tk):
         mapview.onstart = startprog
         mapview.onfinish = stopprog
 
-        coords = tk2.Label(mapframe)
+        coords = tk2.Entry(mapframe, width=30, state='readonly')
         coords.pack(side="right", padx=4, pady=4)
 
         def showcoords(event):
             x,y = mapview.mouse2coords(event.x, event.y)
-            coords["text"] = "%s, %s" % (x,y)
-        self.winfo_toplevel().bind("<Motion>", showcoords, "+")
+            coords.set( "%s, %s" % (x,y) )
+        self.mapview.bind("<Motion>", showcoords, "+")
 
         if False:#time:
             # must be dict
