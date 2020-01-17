@@ -335,40 +335,6 @@ class StaticLayersControl(tk2.basics.Label):
         frame = tk2.Frame(widget)
         frame.pack(fill='both', expand=1)
 
-##        def begin_drag(event):
-##            print 'begin drag',event
-##            widget.followbind = frame.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
-##            widget.releasebind = frame.winfo_toplevel().bind('<ButtonRelease-1>', stop_drag, '+')
-##        def follow_mouse(event):
-##            # gets called for entire app, so check to see if directly on canvas widget
-##            root = widget.winfo_toplevel()
-##            rootx,rooty = root.winfo_pointerxy()
-##            widgetx,widgety = frame.winfo_rootx(), frame.winfo_rooty()
-##            x,y = rootx-widgetx, rooty-widgety
-##            print 'following',y
-##            #frame.place(y=y)
-##        def stop_drag(event):
-##            rootx,rooty = widget.winfo_pointerxy()
-##            print 'stop drag',rooty
-##            i = 0
-##            for i,w in enumerate(self.layerslist.items[:-1]):
-##                halfwidgety = (w.winfo_rooty() + w.winfo_height()//2)
-##                print rooty, halfwidgety, '-->', i
-##                if rooty > halfwidgety:
-##                    print 'found'
-##                    break
-##            lyr = widget.item
-##            i = len(self.layers) - i
-##            print 'newi', i
-##            self.winfo_toplevel().unbind('<Motion>', widget.followbind)
-##            self.winfo_toplevel().unbind('<Button-1>', widget.clickbind)
-##            self.winfo_toplevel().unbind('<ButtonRelease-1>', widget.releasebind)
-##            self.move_layer(lyr, i)
-##        widget.begin_drag = begin_drag
-##        widget.follow_mouse = follow_mouse
-##        widget.stop_drag = stop_drag
-##        widget.clickbind = frame.winfo_toplevel().bind('<Button-1>', begin_drag, '+')
-
         # top name part
         nameframe = tk2.Label(frame)
         nameframe.pack(side="top")
@@ -411,6 +377,9 @@ class StaticLayersControl(tk2.basics.Label):
         text = text.replace('\\','/').split('/')[-1] # in case of path
         name = tk2.basics.Label(nameframe, text=text, width=20, wraplength=115)
         name.pack(side="left", fill="x", expand=1)
+        zoombut = tk2.basics.Button(nameframe, command=lambda: self.mapview.zoom_bbox(lyr.bbox, log=True))
+        zoombut.set_icon(icons.iconpath("zoom_rect.png"), width=15, height=15)
+        zoombut.pack(side='left')
         confbut = tk2.basics.Button(nameframe)
         confbut.set_icon(icons.iconpath("config2.png"), width=15, height=15)
         confbut.pack(side='left')

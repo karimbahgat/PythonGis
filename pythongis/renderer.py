@@ -1605,7 +1605,12 @@ class RasterLayer:
         if "bbox" not in georef:
             georef["bbox"] = self.data.bbox
 
-        rendered = self.data.resample(method=resampling, **georef)
+        try:
+            rendered = self.data.resample(method=resampling, **georef)
+        except:
+            # out of bounds
+            self.img = None
+            return
 
         # TODO: binary 1bit rasters dont show correctly
         # ...
