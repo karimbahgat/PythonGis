@@ -454,6 +454,103 @@ class ZoomControl(tk2.basics.Label):
         self.zoomout["text"] = u"\u2796" #"-"
         self.zoomout.pack(fill='y', expand=1, side='bottom')
 
+class MeasureControl(tk2.basics.Label):
+    def __init__(self, master, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.measurebut = tk2.basics.Button(self, command=self.activate_measure)
+        self.measurebut.set_icon(icons.iconpath("measure.png"), width=40, height=40)
+        self.measurebut.pack()
+
+        self.mouseicon_tk = icons.get("measure.png", width=30, height=30)
+
+        self.measure_from = None
+        self.measure_to = None
+
+    def activate_measure(self):
+        print "begin measure..."
+        # replace mouse with identicon
+        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
+        #self.mapview.config(cursor="none")
+        def follow_mouse(event):
+            curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
+            self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
+        self.followbind = self.mapview.bind('<Motion>', follow_mouse, '+')
+        # identify once clicked
+        def callmeasure(event):
+            # find
+            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            self.measure_start(curx, cury)
+        self.clickbind = self.winfo_toplevel().bind("<ButtonRelease-1>", callmeasure, "+")
+        # cancel with esc button
+        def cancel(event=None):
+            self.mapview.unbind('<Motion>', self.followbind)
+            self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
+            self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+            #self.mapview.config(cursor="arrow")
+            self.mapview.delete(self.mouseicon_on_canvas)
+        self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
+
+    def measure_start(self, x, y):
+        print "measure start: ",x, y
+        self.measure_from = (x,y)
+        self.line = self.mapview.create_line(x, y, x, y, fill='black', width=2)
+
+        # draw line from start to mouse
+        def update_line(event):
+            # gets called for entire app, so check to see if directly on canvas widget
+            startx,starty = self.measure_from
+            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            self.mapview.coords(self.line, startx, starty, curx, cury)
+        self.followbind = self.mapview.bind('<Motion>', update_line, '+')
+        def stopmeasure(event):
+            # find
+            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            self.measure_end(curx, cury)
+        self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
+        self.clickbind = self.winfo_toplevel().bind("<ButtonRelease-1>", stopmeasure, "+")
+
+    def measure_end(self, x, y):
+        print 'measure stop', x, y
+        self.measure_to = (x,y)
+
+        # update final line
+        startx,starty = self.measure_from
+        stopx,stopy = self.measure_to
+        self.mapview.coords(self.line, startx, starty, stopx, stopy)
+
+        # get as map coords
+        _from = self.mapview.mouse2coords(startx, starty)
+        _to = self.mapview.mouse2coords(stopx, stopy)
+
+        # convert to latlon
+        # for now assume already is...
+        # ...
+
+        # calc distance
+        fromgeo = pg.vector.geography.Geography({'type':'Point', 'coordinates':_from})
+        togeo = pg.vector.geography.Geography({'type':'Point', 'coordinates':_to})
+        km = fromgeo.distance(togeo)
+
+        def cancel(event=None):
+            self.mapview.unbind('<Motion>', self.followbind)
+            self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
+            self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+            #self.mapview.config(cursor="arrow")
+            self.mapview.delete(self.mouseicon_on_canvas)
+            self.mapview.delete(self.line)
+
+        cancel()
+
+        # report back
+        msg = '''
+From point: {}
+To point: {}
+Distance: {} km.'''.format(_from, _to, km)
+        print msg
+        tk2.messagebox.showinfo(title='Distance Measurement',
+                                message=msg)
+
 class IdentifyControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)

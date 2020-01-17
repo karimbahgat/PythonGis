@@ -103,7 +103,7 @@ class Geography(object):
 
     def distance(self, other):
         if self.type == "Point" and other.type == "Point":
-            return vincenty_distance(self.coordinates, other.coordinates)
+            return _vincenty_distance(self.coordinates, other.coordinates)
 
         else:
             raise NotImplementedError("Geodetic distance only implemented between two single point geometries")
