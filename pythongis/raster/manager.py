@@ -212,15 +212,16 @@ def reproject(raster, crs, method="nearest", **rasterdef):
 ##            xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
 ##            # ...
 
-        bbox = [xmin,ymin,xmax,ymax]
+        bbox = [xmin,ymax,xmax,ymin]
+        ratio = (xmax-xmin)/(ymax-ymin)
         #print bbox
-        rasterdef = dict(width=raster.width,
+        rasterdef = dict(width=int(raster.width*ratio),
                          height=raster.height,
                          bbox=bbox)
         targetrast = data.RasterData(mode=raster.mode, **rasterdef)        
             
     for band in raster:
-        targetrast.add_band(img=band.img)
+        targetrast.add_band()
 
     # reproject coords using pyproj
     if method == 'nearest':
@@ -236,10 +237,16 @@ def reproject(raster, crs, method="nearest", **rasterdef):
         for targetpos,nx,ny in newcoords:
             tcol,trow = targetpos
             sourcepos = raster.geo_to_cell(nx,ny)
+            if not (0 <= sourcepos[0] < raster.width):
+                continue
+            if not (0 <= sourcepos[1] < raster.height):
+                continue
             for i,band in enumerate(raster):
-                sourcecell = band.get(*sourcepos)
-                try:targetrast.bands[i].set(tcol,trow,sourcecell.value)
-                except IndexError:pass
+                try:
+                    sourcecell = band.get(*sourcepos)
+                    targetrast.bands[i].set(tcol,trow,sourcecell.value)
+                except:
+                    pass
 
 ##        # get target coordinates
 ##        xs = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])

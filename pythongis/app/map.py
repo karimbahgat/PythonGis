@@ -15,7 +15,7 @@ from . import icons
 class MapView(tk.Canvas):
     def __init__(self, master, renderer, **kwargs):        
         # Make this class a subclass of tk.Canvas and add to it
-        kwargs["bg"] = kwargs.get("bg", "#%02x%02x%02x" % (111,111,111))
+        kwargs["bg"] = kwargs.get("bg", "#%02x%02x%02x" % (255,255,255)) #(111,111,111))
         tk.Canvas.__init__(self, master, **kwargs)
         self.renderer = renderer
         self.controls = []

@@ -3,7 +3,7 @@
 # The API
 
 class Geography(object):
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj=None, **kwargs):
         # stored internally as geoj
         if isinstance(obj, dict):
             self._geoj = obj

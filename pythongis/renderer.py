@@ -25,13 +25,37 @@ from .raster.loader import detect_filetype as raster_filetype
 
 DEFAULTSTYLE = None
 
-COLORSTYLES = dict([("strong", dict( [("intensity",1), ("brightness",0.5)]) ),
-                    ("dark", dict( [("intensity",0.8), ("brightness",0.3)]) ),
-                    ("matte", dict( [("intensity",0.4), ("brightness",0.5)]) ),
-                    ("bright", dict( [("intensity",0.8), ("brightness",0.7)] ) ),
-                    ("weak", dict( [("intensity",0.3), ("brightness",0.5)] ) ),
-                    ("pastelle", dict( [("intensity",0.5), ("brightness",0.6)] ) )
+COLORSTYLES = dict([("strong", dict( [("intensity",1.5), ("brightness",1.0)]) ),
+                    ("weak", dict( [("intensity",0.3), ("brightness",0.8)] ) ),
+                    ("dark", dict( [("intensity",1.2), ("brightness",0.5)]) ),
+                    ("bright", dict( [("intensity",1.2), ("brightness",1.5)] ) ),
+                    ("matte", dict( [("intensity",0.8), ("brightness",0.95)]) ),
+                    ("pastelle", dict( [("intensity",0.7), ("brightness",1.4)] ) )
                     ])
+
+class ColorPalette(object):
+    def __init__(self, name):
+        self.name = name
+        self.colors = {'dynamic-qual': ['dodgerblue','darkorange','limegreen','crimson','slateblue','saddlebrown','hotpink','gray','yellowgreen','turquoise'],
+                       'dynamic-seq': ["lightblue","dodgerblue","midnightblue"], #['thistle','crimson','darkred'],
+                       'dynamic-div': [],
+                       'dynamic-cycl': [],
+                       }[name]
+        self.cur = 0
+
+    def __call__(self, *args, **kwargs):
+        if self.cur >= len(self.colors):
+            self.cur = 0
+        i = self.cur
+        self.cur += 1
+        return self.colors[i]
+
+    def get(self, i):
+        # TODO: should probably figure way to interpolate and get gradient...
+        # ...
+        return self.colors[i]
+
+COLORGEN = ColorPalette('dynamic-qual')
 
 def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
     """
@@ -79,12 +103,12 @@ def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
         else:
             if intensity == "random":
                 intensity = random.randrange(20,80)/100.0
-            elif intensity is None:
-                intensity = 0.7
+            #elif intensity is None:
+            #    intensity = 0.7
             if brightness == "random":
                 brightness = random.randrange(20,80)/100.0
-            elif brightness is None:
-                brightness = 0.5
+            #elif brightness is None:
+            #    brightness = 0.5
     #then assign colors
     if basecolor in ("black","white","gray"):
         #graymode
@@ -99,20 +123,34 @@ def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
         #random colormode
         basecolor = tuple([random.uniform(0,1), random.uniform(0,1), random.uniform(0,1)])
         col = colour.Color(rgb=basecolor)
-        col.saturation = intensity
-        col.luminance = brightness
+        if intensity != None:
+            intensity = min(1, col.saturation * intensity)
+            col.saturation = intensity
+        if brightness != None:
+            brightness = min(1, col.luminance * brightness)
+            col.luminance = brightness
         rgb = col.rgb
     elif isinstance(basecolor, (str,unicode)):
         #color text name
+        replacenames = {'blue':'dodgerblue','orange':'darkorange','green':'limegreen','red':'crimson','purple':'slateblue','brown':'saddlebrown','pink':'hotpink'}
+        basecolor = replacenames.get(basecolor, basecolor)
         col = colour.Color(basecolor)
-        col.saturation = intensity
-        col.luminance = brightness
+        if intensity != None:
+            intensity = min(1, col.saturation * intensity)
+            col.saturation = intensity
+        if brightness != None:
+            brightness = min(1, col.luminance * brightness)
+            col.luminance = brightness
         rgb = col.rgb
     else:
         #custom made color
         col = colour.Color(rgb=basecolor)
-        col.saturation = intensity
-        col.luminance = brightness
+        if intensity != None:
+            intensity = min(1, col.saturation * intensity)
+            col.saturation = intensity
+        if brightness != None:
+            brightness = min(1, col.luminance * brightness)
+            col.luminance = brightness
         rgb = col.rgb
 
     rgba = [int(round(v * 255)) for v in rgb] + [opacity or 255]
@@ -933,9 +971,9 @@ class VectorLayer:
         self.legend = legend
         self.datafilter = datafilter
         
-        # by default, set random style color
-        randomcolor = rgb("random")
-        self.styleoptions = {"fillcolor": randomcolor,
+        # by default, get next color from color generator
+        col = COLORGEN()
+        self.styleoptions = {"fillcolor": col,
                              "outlinewidth": 0.13,
                              "sortorder": "incr"}
         if 'Line' in self.data.type:
@@ -957,12 +995,18 @@ class VectorLayer:
         for key,val in self.styleoptions.copy().items():
             if key in "fillcolor fillsize outlinecolor outlinewidth".split():
                 if isinstance(val, dict):
+                    # natural breaks if not specified
+                    if "breaks" not in val:
+                        val['breaks'] = 'natural'
+                        
                     # random colors if not specified
                     if "color" in key and "colors" not in val:
                         if val["breaks"] == "unique":
-                            val["colors"] = [rgb("random") for _ in range(20)]
+                            colgen = ColorPalette('dynamic-qual')
+                            val["colors"] = [colgen() for _ in range(10)]
                         else:
-                            val["colors"] = [rgb("random"),rgb("random")]
+                            colgen = ColorPalette('dynamic-seq')
+                            val["colors"] = [colgen.get(0), colgen.get(1), colgen.get(2)]
 
                     # remove args that are not part of classypie
                     val = dict(val)

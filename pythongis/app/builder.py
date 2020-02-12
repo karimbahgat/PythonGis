@@ -20,16 +20,22 @@ class SimpleMapViewerGUI(tk2.Tk):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 
         ###
-        mapframe = tk2.Frame(self)
-        mapframe.pack(side='left', fill='both', expand=1)
+        
+        mainframe = tk2.Frame(self)
+        mainframe.pack(side='left', fill='both', expand=1)
 
         layersframe = tk2.Frame(self)
         layersframe.pack(side='right', fill='y', expand=0)
-        
+
+        ###
+
+        mapframe = tk2.Frame(mainframe) #bd=10, relief='flat') #, background='black')
+        mapframe.pack(fill='both', expand=1)
+
         mapview = self.mapview = pg.app.map.MapView(mapframe, mapp)
         mapview.pack(fill="both", expand=1)
 
-        bottombar = tk2.Label(mapframe) #, background='red')
+        bottombar = tk2.Label(mainframe) #, background='red')
         bottombar.pack(fill='x', expand=0)
 
         layerscontrol = pg.app.controls.StaticLayersControl(layersframe)
@@ -66,7 +72,7 @@ class SimpleMapViewerGUI(tk2.Tk):
 
         ###########
         
-        progbar = tk2.progbar.NativeProgressbar(mapframe)
+        progbar = tk2.progbar.NativeProgressbar(mainframe)
         progbar.pack(side="left", padx=4, pady=4)
 
         def startprog():
@@ -76,7 +82,7 @@ class SimpleMapViewerGUI(tk2.Tk):
         mapview.onstart = startprog
         mapview.onfinish = stopprog
 
-        coords = tk2.Entry(mapframe, width=30, state='readonly')
+        coords = tk2.Entry(mainframe, width=30, state='readonly')
         coords.pack(side="right", padx=4, pady=4)
 
         def showcoords(event):
