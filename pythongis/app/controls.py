@@ -595,6 +595,7 @@ class IdentifyControl(tk2.basics.Label):
     def identify(self, x, y):
         print "identify: ",x, y
         infowin = tk2.Window()
+        infowin.wm_geometry("500x300")
         #infowin.state('zoomed')
 
         title = tk2.Label(infowin, text="Hits for coordinates: %s, %s" % (x, y))

@@ -204,6 +204,10 @@ def _vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245,
     >>> vincenty(boston, newyork, miles=True)
     185.414657
     """
+
+    # algorithm below expects lat-lon, switch from x-y input
+    point1 = point1[1],point1[0]
+    point2 = point2[1],point2[0]
  
     # short-circuit coincident points
     if point1[0] == point2[0] and point1[1] == point2[1]:
@@ -252,7 +256,7 @@ def _vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245,
                  (-3 + 4 * sinSigma ** 2) * (-3 + 4 * cos2SigmaM ** 2)))
     s = b * A * (sigma - deltaSigma)
  
-    s /= 1000  # meters to kilometers
+    s /= 1000.0  # meters to kilometers
     if miles:
         s *= MILES_PER_KILOMETER  # kilometers to miles
  
