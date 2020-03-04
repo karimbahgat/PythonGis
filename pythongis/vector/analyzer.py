@@ -55,7 +55,7 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=
             
             geom = groupfeat.get_shapely()
             supergeom = supershapely(geom)
-            print groupfeat
+            #print groupfeat
             valuefeats = ((valfeat,valfeat.get_shapely()) for valfeat in valuedata.quick_overlap(groupfeat.bbox))
 
             # aggregate

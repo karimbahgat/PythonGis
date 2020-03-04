@@ -993,13 +993,13 @@ class VectorLayer:
         # set up symbol classifiers
         features = list(self.data) # classifications should be based on all features and not be affected by datafilter, thus enabling keeping the same classification across subsamples
         for key,val in self.styleoptions.copy().items():
-            if key in "fillcolor fillsize outlinecolor outlinewidth".split():
+            if key in "fillcolor fillopacity fillsize outlinecolor outlinewidth".split():
                 if isinstance(val, dict):
                     # natural breaks if not specified
                     if "breaks" not in val:
                         val['breaks'] = 'natural'
                         
-                    # random colors if not specified
+                    # default colors if not specified
                     if "color" in key and "colors" not in val:
                         if val["breaks"] == "unique":
                             colgen = ColorPalette('dynamic-qual')
@@ -1015,8 +1015,10 @@ class VectorLayer:
                         val["key"] = lambda f,fn=fieldname: f[fn] # turn field name into callable
                     if "color" in key:
                         val["classvalues"] = val.pop("colors")
-                    else:
+                    elif "size" in key:
                         val["classvalues"] = val.pop("sizes")
+                    elif "opacity" in key:
+                        val["classvalues"] = val.pop("opacities")
 
                     notclassified = val.pop("notclassified", None if "color" in key else 0) # this means symbol defaults to None ie transparent for colors and 0 for sizes if feature had a missing/null value, which should be correct
                     if "color" in key and notclassified != None:
@@ -1060,7 +1062,7 @@ class VectorLayer:
                     # convert any color names to pure numeric so can be handled by classypie
                     if "color" in key:
                         val = rgb(val)
-                    else:
+                    elif "size" in key:
                         #pass #val = Unit(val)
                         # convert from area to radius for more correct visual comparisons
                         # TODO: now only circles, test and calc for other shapes too
@@ -1068,6 +1070,8 @@ class VectorLayer:
                             shp = self.styleoptions.get('shape')
                             if shp is None or shp == 'circle':
                                 val = math.sqrt(val/math.pi)
+                    elif "opacity" in key:
+                        val = val
 
                     self.styleoptions[key] = val
 
@@ -1314,7 +1318,7 @@ class VectorLayer:
                 # get symbols
                 rendict = dict()
                 if "shape" in self.styleoptions: rendict["shape"] = self.styleoptions["shape"]
-                for key in "fillcolor fillsize outlinecolor outlinewidth".split():
+                for key in "fillcolor fillopacity fillsize outlinecolor outlinewidth".split():
                     if key in self.styleoptions:
                         val = self.styleoptions[key]
                         if isinstance(val, dict):
@@ -1328,6 +1332,13 @@ class VectorLayer:
                             rendict[key] = val(feat)
                         else:
                             rendict[key] = val
+
+                # set fillcolor opacity
+                fillopacity = rendict.get('fillopacity', None)
+                fillcolor = rendict.get('fillcolor', None)
+                if fillopacity != None and fillcolor != None:
+                    fillcolor = tuple(fillcolor[:3]) + (fillopacity*255,)
+                    rendict['fillcolor'] = fillcolor
 
                 # draw
                 drawer.draw_geojson(feat.geometry, **rendict)
