@@ -327,6 +327,8 @@ def from_file(filepath, **georef):
         
         # pure image, so needs either manual georef args, or a world file
         main_img = PIL.Image.open(filepath)
+        if main_img.mode == 'P':
+            main_img = main_img.convert('RGB')
         try:
             georef["affine"] = compute_affine(**georef)
         

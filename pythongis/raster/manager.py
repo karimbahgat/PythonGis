@@ -1103,6 +1103,10 @@ def crop(raster, bbox, worldcoords=True):
             img = img.crop((pxmin,pymin,pxmax,pymax))
         outrast.add_band(img=img, nodataval=band.nodataval)
 
+    # add dataset level mask
+    mask = raster.mask.crop((pxmin,pymin,pxmax,pymax))
+    outrast.mask = mask
+
     # update output affine offset based on new upperleft corner
     x1,y1 = raster.cell_to_geo(pxmin,pymin)
     outrast.set_geotransform(xoffset=x1, yoffset=y1)
