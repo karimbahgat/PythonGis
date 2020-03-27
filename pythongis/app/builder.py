@@ -35,7 +35,7 @@ class SimpleMapViewerGUI(tk2.Tk):
         mapview = self.mapview = pg.app.map.MapView(mapframe, mapp)
         mapview.pack(fill="both", expand=1)
 
-        bottombar = tk2.Label(mainframe) #, background='red')
+        bottombar = self.bottombar = tk2.Label(mainframe) #, background='red')
         bottombar.pack(fill='x', expand=0)
 
         layerscontrol = pg.app.controls.StaticLayersControl(layersframe)

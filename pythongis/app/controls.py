@@ -656,6 +656,149 @@ class IdentifyControl(tk2.basics.Label):
         if not anyhits:
             infowin.destroy()
 
+class DrawPolyControl(tk2.basics.Label):
+    def __init__(self, master, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.drawbut = tk2.basics.Button(self, command=self.activate_draw)
+        self.drawbut.set_icon(icons.iconpath("draw.png"), width=40, height=40)
+        self.drawbut.pack()
+
+        self.okbut = tk2.basics.Button(self, command=self.accept)
+        self.okbut.set_icon(icons.iconpath("accept.png"), width=40, height=40)
+
+        self.cancelbut = tk2.basics.Button(self, command=self.cancel)
+        self.cancelbut.set_icon(icons.iconpath("delete.png"), width=40, height=40)
+
+        self.mouseicon_tk = icons.get("draw.png", width=30, height=30)
+
+        self.draw_geoj = {'type':'MultiPolygon', 'coordinates':[]}
+        self.draw_ids = []
+
+    def activate_draw(self):
+        print "begin draw poly..."
+        # replace mouse with identicon
+        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
+        def follow_mouse(event):
+            curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
+            self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
+        self.followbind = self.mapview.bind('<Motion>', follow_mouse, '+')
+
+        # hide draw button and show accept/cancel button
+        self.drawbut.pack_forget()
+        self.okbut.pack(side='right')
+        self.cancelbut.pack(side='right')
+        
+        # update geom
+        def update_geom(event):
+            # gets called for entire app, so check to see if directly on canvas widget
+            if not self.draw_ids or len(self.draw_ids) != len(self.draw_geoj['coordinates']):
+                return
+            for drawid,poly in zip(self.draw_ids, self.draw_geoj['coordinates'][:len(self.draw_ids)]):
+                coords = list(poly[0]) # exterior only
+                # at least 3 vertices
+                while len(coords) < 3:
+                    coords.append(coords[-1])
+                # convert to canvas coords
+                coords = [self.mapview.renderer.drawer.coord2pixel(*p) for p in coords]
+                # add current mouse pos if last shape
+                if drawid == self.draw_ids[-1]:
+                    curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+                    coords.append((curx,cury))
+                # update
+                coords_flat = [x_or_y for p in coords for x_or_y in p]
+                self.mapview.coords(drawid, *coords_flat)
+        self.followbind = self.mapview.bind('<Motion>', update_geom, '+')
+        
+        # draw once clicked
+        def calldraw(event):
+            # find
+            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            curx,cury = self.mapview.renderer.pixel2coord(curx, cury)
+            self.draw_vertice(curx, cury)
+        self.clickbind = self.winfo_toplevel().bind("<ButtonRelease-1>", calldraw, "+")
+        
+        # finish with right click
+        def callfinish(event):
+            # find
+            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            curx,cury = self.mapview.renderer.pixel2coord(curx, cury)
+            self.draw_vertice(curx, cury)
+            self.draw_finish()
+        self.finishbind = self.winfo_toplevel().bind("<ButtonRelease-3>", callfinish, "+")
+        
+        # cancel with esc button
+        def cancel(event=None):
+            if self.draw_ids:
+                self.mapview.delete(self.draw_ids.pop(-1)) # delete current canvas polygon
+                self.draw_geoj['coordinates'][-1] = [] # empty out the current geoj
+        self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
+
+    def draw_vertice(self, x, y):
+        print "draw_vertice: ",x, y
+        if not self.draw_geoj['coordinates']:
+            self.draw_geoj['coordinates'].append([[]]) # add empty exterior
+            
+        curpoly = self.draw_geoj['coordinates'][-1]
+        curpoly[0].append((x,y)) # add to exterior
+        
+        if len(curpoly[0]) == 1:
+            # first vertice
+            coords = list(curpoly[0]) # exterior
+            while len(coords) < 3:
+                coords.append(coords[-1])
+            # convert to canvas coords
+            coords = [self.mapview.renderer.drawer.coord2pixel(*p) for p in coords]
+            # create drawid
+            print 'create', coords
+            coords_flat = [x_or_y for p in coords for x_or_y in p]
+            drawid = self.mapview.create_polygon(*coords_flat, fill='blue', outline='black', stipple='gray50')
+            self.draw_ids.append(drawid)
+
+    def draw_finish(self):
+        # complete the polygon (exterior)
+        curpoly = self.draw_geoj['coordinates'][-1]
+        curpoly[0].append(curpoly[0][0])
+        print 'finish',curpoly[0]
+        # add new empty polygon
+        self.draw_geoj['coordinates'].append([[]])
+
+    def accept(self):
+        # check geoj
+        geoj = self.draw_geoj
+        geoj['coordinates'].pop(-1) # drop the latest one, either empty or unfinished
+        if geoj['coordinates']:
+            # make vectordata
+            d = pg.VectorData()
+            d.add_feature([], geoj)
+            # add to renderer
+            self.mapview.renderer.add_layer(d)
+            for cntr in self.mapview.controls:
+                if isinstance(cntr, StaticLayersControl):
+                    cntr.update_layers()
+        # exit draw mode
+        self.cancel()
+
+    def cancel(self):
+        # hide accept/cancel button and show draw button
+        self.okbut.pack_forget()
+        self.cancelbut.pack_forget()
+        self.drawbut.pack(side='right')
+
+        # unbind events
+        self.mapview.unbind('<Motion>', self.followbind)
+        self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
+        self.winfo_toplevel().unbind('<ButtonRelease-3>', self.finishbind)
+        self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+        #self.mapview.config(cursor="arrow")
+
+        # delete stuff
+        self.mapview.delete(self.mouseicon_on_canvas)
+        for drawid in self.draw_ids:
+            self.mapview.delete(drawid) # delete canvas polygon
+        self.draw_geoj['coordinates'] = []
+        self.draw_ids = []
+
 class LayerFilterControl(tk2.basics.Label):
     def __init__(self, master, layer, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
