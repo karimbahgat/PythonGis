@@ -173,18 +173,41 @@ def get_crs_transformer(fromcrs, tocrs):
         import pyproj
         fromcrs = pyproj.Proj(fromcrs)
         tocrs = pyproj.Proj(tocrs)
+        def _isvalid(p):
+            x,y = p
+            return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
         def _project(points):
             xs,ys = itertools.izip(*points)
             xs,ys = pyproj.transform(fromcrs,
                                      tocrs,
                                      xs, ys)
             newpoints = list(itertools.izip(xs, ys))
+            newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
             return newpoints
     else:
         _project = None
 
     return _project
-    
+
+def reproject_bbox(bbox, transformer, sampling_freq=20):
+    x1,y1,x2,y2 = bbox
+    w,h = x2-x1, y2-y1
+    sampling_freq = int(sampling_freq)
+    dx,dy = w/float(sampling_freq), h/float(sampling_freq)
+    gridsamples = [(x1+dx*ix,y1+dy*iy)
+                   for iy in range(sampling_freq+1)
+                   for ix in range(sampling_freq+1)]
+    gridsamples = transformer(gridsamples)
+    if not gridsamples:
+        return None
+    xs,ys = zip(*gridsamples)
+    xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+    bbox = [xmin,ymin,xmax,ymax] 
+    #print 'bbox transform',bbox
+    return bbox
+
+
+###########
 
 class Layout:
     def __init__(self, width, height, background="white", title="", titleoptions=None, *args, **kwargs):
@@ -321,8 +344,12 @@ class Map:
         self.height = height or None
         self.ppi = ppi
         self.drawer = None
-        self.crs = crs or '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
         self.textoptions = textoptions or dict()
+
+        crs = crs or '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
+        if isinstance(crs, basestring):
+            crs = pycrs.parse.from_unknown_text(crs)
+        self.crs = crs
 
         # foreground layergroup for non-map decorations
         self.foregroundgroup = ForegroundLayerGroup()
@@ -349,7 +376,7 @@ class Map:
             self.height = 500 # default min height
             self.width = 1000 # default min width
         else:
-            bbox = self.layers.bbox
+            bbox = self.layers.bbox(self.crs)
             w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
             aspect = w/float(h)
             if not self.width and not self.height:
@@ -364,23 +391,23 @@ class Map:
             elif self.height:
                 self.width = int(self.height * aspect)
             
-        # factor in zooms (zoombbx should somehow be crop, so alters overall img dims...)
+        # create drawer
         self.drawer = pyagg.Canvas(self.width, self.height, None, ppi=self.ppi)
         self.drawer.textoptions.update(self.textoptions)
-        self.drawer.geographic_space()
-        #for zoom in self.zooms:
-        #    zoom()
-        # determine drawer pixel size based on zoom area
-        # WARNING: when i changed this, it led to some funky misalignments...
-##        if autosize:
-##            bbox = self.drawer.coordspace_bbox
-##            w,h = abs(bbox[0]-bbox[2]), abs(bbox[1]-bbox[3])
-##            aspect = w/float(h)
-##            if aspect < 1:
-##                self.width = int(self.height * aspect)
-##            else:
-##                self.height = int(self.width / float(aspect))
-##            self.drawer.resize(self.width, self.height, lock_ratio=False)
+
+        # by default zoom to full world
+        xmin,ymax,xmax,ymin = -180,90,180,-90
+        
+        # transform if necessary
+        fromcrs = pycrs.parse.from_proj4('+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef')
+        _transform = get_crs_transformer(fromcrs, self.crs)
+        if _transform:
+            bbox = reproject_bbox([xmin,ymin,xmax,ymax], _transform)
+            if not bbox:
+                raise Exception('Could not determine global bbox of the given map crs, all coordinates were out of bounds in the target crs (inf or nan)')
+            xmin,ymin,xmax,ymax = bbox
+
+        self.drawer.custom_space(xmin, ymax, xmax, ymin, lock_ratio=True) # assume inverted y axis.....
 
     def copy(self):
         dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy(),
@@ -397,8 +424,10 @@ class Map:
 
     # Map canvas alterations
 
-    def offset(self, xmove, ymove):
+    def offset(self, xmove, ymove, geographic=False):
         if not self.drawer: self._create_drawer()
+        if geographic:
+            raise NotImplementedError('Offsetting map by geographic coords not yet implemented')
         self.drawer.move(xmove, ymove)
         #self.zooms.append(func)
         self.changed = True
@@ -412,8 +441,10 @@ class Map:
         self.drawer.resize(width, height, lock_ratio=True)
         self.img = self.drawer.get_image()
 
-    def crop(self, xmin, ymin, xmax, ymax):
+    def crop(self, xmin, ymin, xmax, ymax, geographic=False):
         if not self.drawer: self._create_drawer()
+        if geographic:
+            raise NotImplementedError('Cropping map by geographic coords not yet implemented')
         self.changed = True
         self.drawer.crop(xmin,ymin,xmax,ymax)
         self.width = self.drawer.width
@@ -428,20 +459,36 @@ class Map:
 
     def zoom_auto(self):
         if not self.drawer: self._create_drawer()
-        bbox = self.layers.bbox
+        bbox = self.layers.bbox(self.crs)
         self.zoom_bbox(*bbox)
         #self.zooms.append(func)
         self.changed = True
         self.img = self.drawer.get_image()
 
-    def zoom_bbox(self, xmin, ymin, xmax, ymax):
+    def zoom_bbox(self, xmin, ymin, xmax, ymax, geographic=False):
         if not self.drawer: self._create_drawer()
+        #print 'zoom bbox', xmin, ymin, xmax, ymax
+
+        if geographic:
+            # bbox is in geographic coords, transform to map crs bbox
+            fromcrs = pycrs.parse.from_proj4('+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef')
+            _transform = get_crs_transformer(fromcrs, self.crs)
+            if _transform:
+                bbox = reproject_bbox([xmin,ymin,xmax,ymax], _transform)
+                if not bbox:
+                    raise Exception('Geographic bbox could not be reprojected to target crs, all coordinates were out of bounds (inf or nan)')
+                xmin,ymin,xmax,ymax = bbox
+
+        #print 'zoom bbox', xmin, ymin, xmax, ymax
+
+        # perform zoom
         if self.width and self.height:
             # predetermined map size will honor the aspect ratio
             self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=True)
         else:
             # otherwise snap zoom to edges so can determine map size from coordspace
             self.drawer.zoom_bbox(xmin, ymin, xmax, ymax, lock_ratio=False)
+            
         #self.zooms.append(func)
         self.changed = True
         self.img = self.drawer.get_image()
@@ -462,14 +509,24 @@ class Map:
         self.changed = True
         self.img = self.drawer.get_image()
 
-    def zoom_units(self, units, center=None, geodetic=False):
+    def zoom_units(self, units, center=None, geographic=False):
         if not self.drawer: self._create_drawer()
-        if geodetic:
+        if geographic:
             from .vector._helpers import _vincenty_distance
             desired_km = units
-            unit_width = self.drawer.coordspace_width
             x1,y1,x2,y2 = self.drawer.coordspace_bbox
-            cur_km = _vincenty_distance((y1,x1), (y1,x1+unit_width))
+            xs = [x1,x2]
+            ys = [y1,y2]
+            xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+            # transform to geographic coord bbox
+            tocrs = pycrs.parse.from_proj4('+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef')
+            _transform = get_crs_transformer(self.crs, tocrs)
+            if _transform:
+                bbox = reproject_bbox([xmin,ymin,xmax,ymax], _transform)
+                if not bbox:
+                    raise Exception('Could not reproject map crs bbox to geographic bbox, all coordinates were out of bounds (inf or nan)')
+                xmin,ymin,xmax,ymax = bbox
+            cur_km = _vincenty_distance((ymin,xmin), (ymin,xmax))
             ratio = desired_km/cur_km
             if ratio < 1: ratio = -1/ratio
             ratio = -ratio
@@ -586,10 +643,10 @@ class Map:
 
     # Drawing
 
-    def render_one(self, layer, antialias=True):
+    def render_one(self, layer, antialias=True, update_draworder=True):
         if not self.drawer: self._create_drawer()
         
-        if layer.visible:
+        if layer.visible:            
             layer.render(width=self.drawer.width,
                          height=self.drawer.height,
                          bbox=self.drawer.coordspace_bbox,
@@ -600,7 +657,8 @@ class Map:
                              bbox=self.drawer.coordspace_bbox,
                              crs=self.crs,
                              default_textoptions=self.textoptions)
-            self.update_draworder()
+            if update_draworder:
+                self.update_draworder()
 
     def render_all(self, antialias=True):
         #import time
@@ -615,18 +673,7 @@ class Map:
             layer.render()
         
         for layer in self.layers:
-            if layer.visible:
-                layer.render(width=self.drawer.width,
-                             height=self.drawer.height,
-                             bbox=self.drawer.coordspace_bbox,
-                             antialias=antialias,
-                             crs=self.crs)
-                
-                layer.render_text(width=self.drawer.width,
-                                 height=self.drawer.height,
-                                 bbox=self.drawer.coordspace_bbox,
-                                 crs=self.crs,
-                                 default_textoptions=self.textoptions)
+            self.render_one(layer, antialias=antialias, update_draworder=False)
 
         for layer in self.foregroundgroup:
             layer.render()
@@ -734,10 +781,28 @@ class LayerGroup:
     def is_empty(self):
         return all((lyr.is_empty() for lyr in self))
 
-    @property
-    def bbox(self):
+    def bbox(self, crs=None):
+        '''
+        - crs: if specified, bboxes from layers with different crs will be converted to a single common crs. 
+        '''
         if not self.is_empty():
-            xmins,ymins,xmaxs,ymaxs = zip(*(lyr.bbox for lyr in self._layers if not lyr.is_empty() ))
+            #xmins,ymins,xmaxs,ymaxs = zip(*(lyr.bbox for lyr in self._layers if not lyr.is_empty() ))
+            bboxes = []
+            for lyr in self._layers:
+                if not lyr.is_empty():
+                    bbox = lyr.data.bbox
+
+                    # transform bbox to common crs
+                    _transform = get_crs_transformer(lyr.data.crs, crs)
+                    if _transform:
+                        bbox = reproject_bbox(bbox, _transform)
+                        if not bbox:
+                            # out of bounds, simply ignore
+                            continue
+
+                    bboxes.append(bbox)
+
+            xmins,ymins,xmaxs,ymaxs = zip(*bboxes)
             bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
             return bbox
 
@@ -1190,8 +1255,10 @@ class VectorLayer:
 
                 def effect(lyr):
                     import PIL, PIL.ImageMorph
-                    
-                    binary = lyr.img.point(lambda v: 255 if v > 0 else 0).convert("L")
+
+                    _,a = lyr.img.convert('LA').split()
+                    binary = a.point(lambda v: 255 if v > 0 else 0)
+                    #binary.show()
                     
                     color = kwargs.get("color")
                     if isinstance(color, list):
@@ -1205,14 +1272,14 @@ class VectorLayer:
                             if len(col) == 4:
                                 edge = edge.point(lambda v: col[3] if v == 255 else 0)
                             newimg.paste(col[:3], (0,0), mask=edge)
-                        newimg.paste(lyr.img, (0,0), lyr.img)
+                        newimg.paste(lyr.img, (0,0), mask=lyr.img)
                     else:
                         # entire area same color
                         for _ in range(kwargs.get("size")):
                             _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
                         newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        newimg.paste(color, (0,0), lyr.img)
-                        newimg.paste(lyr.img, (0,0), binary)
+                        newimg.paste(color, (0,0), mask=binary)
+                        newimg.paste(lyr.img, (0,0), mask=lyr.img)
                         
                     return newimg
                 
@@ -1222,11 +1289,15 @@ class VectorLayer:
                 # OR: effect for entire layer, and separate for each feature via styleoptions...?
                 # TODO: canvas edge should not be counted...
                 # TODO: transp gradient not working, sees through even original layer...
+
+                # WARNING: DOESNT REALLY WORK CORRECTLY...
                     
                 def effect(lyr):
                     import PIL, PIL.ImageMorph
                     
-                    binary = lyr.img.point(lambda v: 255 if v > 0 else 0).convert("L")
+                    _,a = lyr.img.convert('LA').split()
+                    binary = a.point(lambda v: 255 if v > 0 else 0)
+                    #binary.show()
                     
                     color = kwargs.get("color")
                     if isinstance(color, list):
@@ -1245,8 +1316,8 @@ class VectorLayer:
                         for _ in range(kwargs.get("size")):
                             _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
                         newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        newimg.paste(color, (0,0), lyr.img)
-                        newimg.paste(lyr.img, (0,0), binary)
+                        newimg.paste(color, (0,0), mask=lyr.img)
+                        newimg.paste(lyr.img, (0,0), mask=binary)
                         
                     return newimg
                 
@@ -1255,50 +1326,58 @@ class VectorLayer:
         
         self.effects.append(effect)
 
+    def add_text_effect(self, effect, **kwargs):
+        raise NotImplementedError
+
     def render(self, width, height, bbox=None, antialias=True, crs=None):
+        '''
+        - bbox: bounding box of the coordsys to be rendered (defaults to data bbox). 
+        - crs: if specified, determines the coordsys to be renderered (defaults to data crs). 
+        '''
 
         # normal way
         if self.has_geometry():
             import time
             t=time.time()
 
-            # determine on-the-fly projection
+            # get on-the-fly projection transformer (only if specified and different)
+            if isinstance(crs, basestring):
+                crs = pycrs.parse.from_unknown_text(crs)
             _transform = get_crs_transformer(self.data.crs, crs)
 
-            # setup
+            # unless specified, bbox is taken from the data and converted to the crs if necessary
             if not bbox:
                 bbox = self.bbox
 
-            # determine map space by projecting data bounds
-            if _transform:
-                x1,y1,x2,y2 = bbox
-                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
-                corners = _transform(corners)
-                xs,ys = zip(*corners)
-                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
-                targetbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
-                #print 'bbox transform',bbox,targetbox
-            else:
-                targetbox = bbox
-            
+                # determine map space by projecting data bounds
+                if _transform:
+                    bbox = reproject_bbox(bbox, _transform)
+                    if not bbox:
+                        # data extent is out of bounds for map crs, exit early
+                        self.img = None
+                        return
+
+            # create the drawer within the bbox coordsys
             drawer = pyagg.Canvas(width, height, background=None)
-            drawer.custom_space(*targetbox, lock_ratio=True)
+            drawer.custom_space(*bbox, lock_ratio=True)
 
             if not antialias:
                 drawer.drawer.setantialias(False)
 
+            # update the bbox to the calculated drawer bbox (slightly different due to the aspect ratio of the canvas size)
+            bbox = drawer.coordspace_bbox
+
             # get features inside map extent
-            targetbox = drawer.coordspace_bbox
             if _transform:
                 # transform from projected map space back to data coordinates
                 _itransform = get_crs_transformer(crs, self.data.crs)
-                x1,y1,x2,y2 = targetbox
-                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
-                corners = _itransform(corners)
-                xs,ys = zip(*corners)
-                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
-                targetbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
-            features = self.features(bbox=targetbox)
+                bbox = reproject_bbox(bbox, _itransform)
+                if not bbox:
+                    # map extent is out of bounds for data crs, exit early
+                    self.img = None
+                    return
+                    
+            features = self.features(bbox=bbox)
 
             # custom draworder (sortorder is only used with sortkey)
             if "sortkey" in self.styleoptions:
@@ -1313,6 +1392,8 @@ class VectorLayer:
                     #print 'text pre fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                     feat = feat.copy()
                     feat.transform(_transform)
+                    if not feat.geometry:
+                        continue
                     #print 'text post fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                 
                 # get symbols
@@ -1371,41 +1452,44 @@ class VectorLayer:
             t=time.time()
 
             textkey = self.styleoptions["text"]
-            
-            # determine on-the-fly projection
+
+            # get on-the-fly projection transformer (only if specified and different)
+            if isinstance(crs, basestring):
+                crs = pycrs.parse.from_unknown_text(crs)
             _transform = get_crs_transformer(self.data.crs, crs)
 
-            # setup
+            # unless specified, bbox is taken from the data and converted to the crs if necessary
             if not bbox:
                 bbox = self.bbox
 
-            # determine map space by projecting data bounds
-            if _transform:
-                x1,y1,x2,y2 = bbox
-                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
-                corners = _transform(corners)
-                xs,ys = zip(*corners)
-                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
-                targetbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
-                #print 'bbox transform',bbox,targetbox
-            else:
-                targetbox = bbox
-            
+                # determine map space by projecting data bounds
+                if _transform:
+                    bbox = reproject_bbox(bbox, _transform)
+                    if not bbox:
+                        # data extent is out of bounds for map crs, exit early
+                        self.img_text = None
+                        return
+
+            # create the drawer within the bbox coordsys
             drawer = pyagg.Canvas(width, height, background=None)
             drawer.textoptions.update(default_textoptions)
-            drawer.custom_space(*targetbox, lock_ratio=True)
+            drawer.custom_space(*bbox, lock_ratio=True)
+
+            if not antialias:
+                drawer.drawer.setantialias(False)
+
+            # update the bbox to the calculated drawer bbox (slightly different due to the aspect ratio of the canvas size)
+            bbox = drawer.coordspace_bbox
 
             # get features inside map extent
-            targetbox = drawer.coordspace_bbox
             if _transform:
                 # transform from projected map space back to data coordinates
                 _itransform = get_crs_transformer(crs, self.data.crs)
-                x1,y1,x2,y2 = targetbox
-                corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
-                corners = _itransform(corners)
-                xs,ys = zip(*corners)
-                xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
-                bbox = [xmin,ymax,xmax,ymin] # ARBITRARY ASSUMPTION OF INVERTED Y...
+                bbox = reproject_bbox(bbox, _itransform)
+                if not bbox:
+                    # map extent is out of bounds for data crs, exit early
+                    self.img_text = None
+                    return
             features = self.features(bbox=bbox)
 
             # custom draworder (sortorder is only used with sortkey)
@@ -1414,7 +1498,7 @@ class VectorLayer:
                                   reverse=self.styleoptions["sortorder"].lower() == "decr")
 
             # get map bbox shp, to crop to map window for text placement
-            mx1,my1,mx2,my2 = targetbox
+            mx1,my1,mx2,my2 = drawer.coordspace_bbox
             mxmin,mymin = min(mx1,mx2), min(my1,my2)
             mxmax,mymax = max(mx1,mx2), max(my1,my2)
             mapshp = shapely.geometry.box(mxmin,mymin,mxmax,mymax)
@@ -1431,6 +1515,8 @@ class VectorLayer:
                         #print 'text pre fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                         feat = feat.copy()
                         feat.transform(_transform)
+                        if not feat.geometry:
+                            continue
                         #print 'text post fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                 
                     # get symbols
@@ -1515,6 +1601,9 @@ class RasterLayer:
         self.visible = True
         self.transparency = transparency
         self.img = None
+        self.img_text = None
+
+        # TODO: allow setting the crs...
 
         self.effects = []
 
@@ -1653,8 +1742,12 @@ class RasterLayer:
     def is_empty(self):
         return False # for now
 
-    def render(self, resampling="nearest", antialias=True, **georef):
+    def render(self, resampling="nearest", antialias=True, crs=None, **georef):
         # position in space
+
+        # TODO: on-the-fly reproject to given crs...
+        # ... 
+        
         # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
         # LIKELY DUE TO HALF CELL CENTER VS CORNER
         if "bbox" not in georef:
@@ -1777,7 +1870,7 @@ class RasterLayer:
             self.img.putalpha(a)
             #self.img = PIL.Image.merge('RGBA', [r,g,b,a])
 
-    def render_text(self, resampling="nearest", **georef):
+    def render_text(self, resampling="nearest", crs=None, **georef):
         self.img_text = None
 
 

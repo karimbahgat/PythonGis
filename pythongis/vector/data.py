@@ -254,21 +254,50 @@ class Feature:
 
         geotype = geoj["type"]
         coords = geoj["coordinates"]
+
+        def wrapfunc(coords):
+            # transform coords using func
+            coords = func(coords)
+            # only keep points that are not inf or nan
+            def isvalid(p):
+                x,y = p
+                return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
+            coords = [p for p in coords if isvalid(p)]
+            return coords
         
         if geotype == "Point":
-            geoj["coordinates"] = func([coords])[0]
+            coords = wrapfunc([coords])
+            if coords:
+                geoj["coordinates"] = coords[0]
+            else:
+                self.geometry = None
         elif geotype in ("MultiPoint","LineString"):
-            geoj["coordinates"] = func(coords)
+            geoj["coordinates"] = wrapfunc(coords)
+            if not geoj["coordinates"]:
+                self.geometry = None
         elif geotype == "MultiLineString":
-            geoj["coordinates"] = [func(line)
-                                   for line in coords]
+            coords = [wrapfunc(line)
+                     for line in coords]
+            geoj["coordinates"] = [line for line in coords if line]
+            if not any(geoj["coordinates"]):
+                self.geometry = None
         elif geotype == "Polygon":
-            geoj["coordinates"] = [func(ext_or_hole)
-                                   for ext_or_hole in coords]
+            coords = [wrapfunc(ext_or_hole)
+                     for ext_or_hole in coords]
+            geoj["coordinates"] = [ext_or_hole for ext_or_hole in coords if ext_or_hole]
+            if not any(geoj["coordinates"]):
+                self.geometry = None
         elif geotype == "MultiPolygon":
-            geoj["coordinates"] = [[func(ext_or_hole)
-                                    for ext_or_hole in poly]
-                                   for poly in coords]
+            coords = [[wrapfunc(ext_or_hole)
+                        for ext_or_hole in poly]
+                       for poly in coords]
+            coords = [[ext_or_hole
+                        for ext_or_hole in poly if ext_or_hole]
+                       for poly in coords]
+            geoj["coordinates"] = [poly
+                                   for poly in coords if poly]
+            if not any(geoj["coordinates"]):
+                self.geometry = None
             
         self._cached_bbox = None
         
@@ -1259,13 +1288,15 @@ class VectorData:
 
     def copy(self):
         new = VectorData()
+        new.type = self.type
         new.fields = [field for field in self.fields]
         featureobjs = (Feature(new, feat.row, feat.geometry) for feat in self )
         new.features = OrderedDict([ (feat.id,feat) for feat in featureobjs ])
         #if hasattr(self, "spindex"): new.spindex = self.spindex.copy() # NO SUCH METHOD
+        new.crs = pycrs.parse.from_proj4(self.crs.to_proj4()) # separate copy
         return new
     
-    def map(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+    def map(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
         """Shortcut for easily creating a Map instance containing this dataset as a layer.
         
         Args:
@@ -1276,13 +1307,13 @@ class VectorData:
             **styleoptions (optional): How to style the feature geometry, as documented in "renderer.VectorLayer".
         """
         from .. import renderer
-        mapp = renderer.Map(width, height, title=title, background=background)
+        crs = crs or self.crs
+        mapp = renderer.Map(width, height, title=title, background=background, crs=crs)
         mapp.add_layer(self, **styleoptions)
         if bbox:
             mapp.zoom_bbox(*bbox)
         else:
-            if self.has_geometry():
-                mapp.zoom_bbox(*mapp.layers.bbox)
+            mapp.zoom_auto()
         return mapp
 
     def browse(self, limit=None):
@@ -1306,13 +1337,13 @@ class VectorData:
         win.browser.table.populate(self.fields, rows())
         win.mainloop()
 
-    def view(self, bbox=None, title="", background=None, **styleoptions):
+    def view(self, bbox=None, title="", background=None, crs=None, **styleoptions):
         """Opens a Tkinter window for viewing and interacting with the dataset on a map.
         
         Args are same as for "map()".
         """
         from .. import app
-        mapp = self.map(None, None, bbox, title=title, background=background, **styleoptions)
+        mapp = self.map(None, None, bbox, title=title, background=background, crs=crs, **styleoptions)
         # make gui
         win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()

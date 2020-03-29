@@ -158,10 +158,13 @@ class MapView(tk.Canvas):
                 curx,cury = self.canvasx(event.x), self.canvasy(event.y)
                 xmoved = int(curx - startx)
                 ymoved = int(cury - starty)
-                print startx,starty,curx,cury,xmoved,ymoved
+                #print startx,starty,curx,cury,xmoved,ymoved
+                #print 'pre move',self.renderer.bbox
+                #print 'offset',xmoved,ymoved
                 if xmoved or ymoved:
                     # offset image rendering
                     self.renderer.offset(xmoved, ymoved)
+                    #print 'post move',self.renderer.bbox
                     # log it
                     self.log_zoom(self.renderer.bbox)
                     # since threaded rendering will update the offset image, reanchor the dragged canvas image
@@ -239,9 +242,7 @@ class MapView(tk.Canvas):
 
     def zoom_global(self, log=False):
         # get new bbox
-        layerbboxes = (layer.bbox for layer in self.renderer.layers)
-        xmins,ymins,xmaxs,ymaxs = zip(*layerbboxes)
-        globalbbox = [min(xmins), min(ymins), max(xmaxs), max(ymaxs)]
+        globalbbox = self.renderer.layers.bbox(self.renderer.crs)
         self.renderer.zoom_bbox(*globalbbox)
         if log:
             self.log_zoom(globalbbox)

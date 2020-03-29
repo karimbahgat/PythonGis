@@ -824,18 +824,19 @@ def reproject(data, tocrs):
         tocrs = pycrs.parse.from_unknown_text(tocrs)
 
     # create pyproj objs
-    fromcrs = pyproj.Proj(fromcrs.to_proj4())
-    tocrs = pyproj.Proj(tocrs.to_proj4())
+    fromproj = pyproj.Proj(fromcrs.to_proj4())
+    toproj = pyproj.Proj(tocrs.to_proj4())
 
     def _project(points):
         xs,ys = itertools.izip(*points)
-        xs,ys = pyproj.transform(fromcrs,
-                                 tocrs,
+        xs,ys = pyproj.transform(fromproj,
+                                 toproj,
                                  xs, ys)
         newpoints = list(itertools.izip(xs, ys))
         return newpoints
 
     out = data.copy()
+    out.crs = pycrs.parse.from_proj4(tocrs.to_proj4()) # separate copy
     
     for feat in out:
         feat.transform(_project)

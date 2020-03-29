@@ -895,7 +895,7 @@ class Band(object):
         if bbox:
             mapp.zoom_bbox(*bbox)
         else:
-            mapp.zoom_bbox(*mapp.layers.bbox)
+            mapp.zoom_auto()
         mapp.render_all()
         return mapp
 
@@ -1299,7 +1299,7 @@ class RasterData(object):
     ##############################
     # Rendering
 
-    def render(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+    def render(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
         """Shortcut for easily rendering and returning the raster data on a Map instance.
 
         TODO: Check that works correctly. Have experienced that adding additional layers on top
@@ -1313,22 +1313,23 @@ class RasterData(object):
             **styleoptions (optional): How to style the raster values, as documented in "renderer.RasterLayer".
         """
         from .. import renderer
-        mapp = renderer.Map(width, height, title=title, background=background)
+        #crs = crs or self.crs
+        mapp = renderer.Map(width, height, title=title, background=background, crs=crs)
         mapp.add_layer(self, **styleoptions)
         if bbox:
             mapp.zoom_bbox(*bbox)
         else:
-            mapp.zoom_bbox(*mapp.layers.bbox)
+            mapp.zoom_auto()
         mapp.render_all()
         return mapp
 
-    def view(self, width=None, height=None, bbox=None, title="", background=None, **styleoptions):
+    def view(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
         """Renders and opens a Tkinter window for viewing and interacting with the map.
 
         Args are same as for "render()".
         """
         from .. import app
-        mapp = self.render(width, height, bbox, title=title, background=background, **styleoptions)
+        mapp = self.render(width, height, bbox, title=title, background=background, crs=crs, **styleoptions)
         # make gui
         win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
