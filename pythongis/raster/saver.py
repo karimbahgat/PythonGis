@@ -42,6 +42,12 @@ def to_file(bands, meta, filepath, **kwargs):
             string = '\n'.join((bytes(val) for val in [xscale,yskew,xskew,yscale,xoff,yoff]))
             writer.write( string )
 
+    def create_prj_file(filepath, crs):
+        root,ext = os.path.splitext(filepath)
+        with open('{}.prj'.format(root), 'w') as writer:
+            wkt = crs.to_esri_wkt()
+            writer.write(wkt)
+
     if filepath.endswith((".ascii",".asc")):
         # create header
         width, height = img.size()
@@ -72,8 +78,12 @@ def to_file(bands, meta, filepath, **kwargs):
                 for y in xrange(height):
                     row = " ".join((str(cells[x,y]) for x in xrange(width)))+"\n"
                     tempfile.write(row)
-            # finally create world file for the geotransform
-            create_world_file(newpath, meta["affine"])
+                    
+        # finally create world file for the geotransform
+        create_world_file(newpath, meta["affine"])
+
+        # create the prj file for the crs
+        create_prj_file(filepath, meta["crs"])
 
     elif filepath.endswith((".tif", ".tiff", ".geotiff")):        
         # write directly to tag meta
@@ -116,14 +126,22 @@ def to_file(bands, meta, filepath, **kwargs):
         img = combine_bands(bands)
         img.save(filepath, tiffinfo=tags)
 
+        # crs should be saved as part of the geotiff tags, but not yet implemented
+        # for now create a separate prj file for the crs
+        create_prj_file(filepath, meta["crs"])
+
     elif filepath.endswith((".jpg",".jpeg",".png",".bmp",".gif")):
         # save
         img = combine_bands(bands)
         if not filepath.endswith((".png",".gif")):
             img = img.convert('RGB') # only png and gif support alpha band
         img.save(filepath, **kwargs)
+        
         # write world file
         create_world_file(filepath, meta["affine"])
+
+        # create the prj file for the crs
+        create_prj_file(filepath, meta["crs"])
 
     elif filepath.lower().endswith(".txt"):
         # cell by cell table format
@@ -160,6 +178,9 @@ def to_file(bands, meta, filepath, **kwargs):
             
         # write world file
         create_world_file(filepath, meta["affine"])
+
+        # create the prj file for the crs
+        create_prj_file(filepath, meta["crs"])
 
     else:
 

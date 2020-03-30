@@ -3,7 +3,7 @@ Module containing the data structures and interfaces for operating with raster d
 """
 
 # import builtins
-import sys, os, itertools, operator, math
+import sys, os, itertools, operator, math, warnings
 
 # import internals
 from . import loader
@@ -11,6 +11,9 @@ from . import saver
 
 # import PIL as the data container
 import PIL.Image, PIL.ImageMath, PIL.ImageStat
+
+# import other
+import pycrs
 
 # TODO:
 # not sure if setting mask should paste nodatavals, or if only as a temporary overlay so that underlying values be kept (and only changed via compute etc)...
@@ -939,6 +942,7 @@ class RasterData(object):
                  data=None,
                  image=None,
                  mode=None, tilesize=None, tiles=None,
+                 crs=None,
                  **kwargs):
         """To load from a file simply supply the filepath, and all metadata such as crs and
         affine transform is loaded directly from the file.
@@ -1033,13 +1037,13 @@ class RasterData(object):
 
         # load
         if filepath:
-            georef, nodataval, bands, crs = loader.from_file(filepath, **kwargs)
+            georef, nodataval, bands, crs = loader.from_file(filepath, crs=crs, **kwargs)
         elif data:
-            georef, nodataval, bands, crs = loader.from_lists(data, **kwargs)
+            georef, nodataval, bands, crs = loader.from_lists(data, crs=crs, **kwargs)
         elif image:
-            georef, nodataval, bands, crs = loader.from_image(image, **kwargs)
+            georef, nodataval, bands, crs = loader.from_image(image, crs=crs, **kwargs)
         else:
-            georef, nodataval, bands, crs = loader.new(**kwargs)
+            georef, nodataval, bands, crs = loader.new(crs=crs, **kwargs)
 
         # determine dimensions
         if any((filepath,data,image)):
@@ -1091,8 +1095,18 @@ class RasterData(object):
             b._rast = self
 
         # set metadata
-        self.crs = crs
         self.set_geotransform(**georef)
+
+        # crs
+        defaultcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        crs = crs or defaultcrs
+        if isinstance(crs, basestring):
+            try:
+                crs = pycrs.parse.from_unknown_text(crs)
+            except:
+                warnings.warn('Failed to parse the given crs format, falling back to unprojected lat/long WGS84: \n {}'.format(crs))
+                crs = pycrs.parse.from_proj4(defaultcrs)
+        self.crs = crs
 
     def __len__(self):
         return len(self.bands)
@@ -1113,15 +1127,19 @@ class RasterData(object):
                         mode=self.mode,
                         width=self.width,
                         height=self.height,
+                        bbox=self.bbox,
                         affine=self.affine,
-                        bbox=self.bbox)
+                        crs=self.crs,
+                        )
         return metadict
 
     @property
     def rasterdef(self):
         metadict = dict(width=self.width,
                         height=self.height,
-                        affine=self.affine)
+                        affine=self.affine,
+                        #crs=self.crs # needed?
+                        )
         return metadict
 
     @property
@@ -1313,7 +1331,7 @@ class RasterData(object):
             **styleoptions (optional): How to style the raster values, as documented in "renderer.RasterLayer".
         """
         from .. import renderer
-        #crs = crs or self.crs
+        crs = crs or self.crs
         mapp = renderer.Map(width, height, title=title, background=background, crs=crs)
         mapp.add_layer(self, **styleoptions)
         if bbox:

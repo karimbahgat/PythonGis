@@ -77,6 +77,14 @@ def from_file(filepath, **georef):
                 xscale,yskew,xskew,yscale,xoff,yoff = map(float, [xscale,yskew,xskew,yscale,xoff,yoff])
             return [xscale,yskew,xskew,yscale,xoff,yoff]
 
+    def check_prj_file(filepath):
+        file_root, extension = os.path.splitext(filepath)
+        prjfilepath = file_root + ".prj"
+        if os.path.lexists(prjfilepath):
+            with open(prjfilepath) as fobj:
+                crsstring = fobj.read()
+            return crsstring
+
     if filetype == "ASCII":
         georef_orig = georef.copy()
         
@@ -207,8 +215,14 @@ def from_file(filepath, **georef):
                         warnings.warn("Couldn't find the manual georef options, world file, or file georef parameters needed to position the image in space")
 
         # Read coordinate ref system
-        # esri ascii doesnt have any crs so assume default
-        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        # esri ascii doesnt have any builtin crs
+        for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+                        lambda: check_prj_file(filepath), # look for external prj file
+                        lambda: None, # no crs found
+                        ]:
+            crs = crsfunc()
+            if crs:
+                break
 
         # Nodata value
         nodataval = nodata
@@ -319,7 +333,15 @@ def from_file(filepath, **georef):
             #    bands.append(bandim)
 
         # read coordinate ref system
-        crs = read_crs(raw_tags)
+        #crs = read_crs(raw_tags) # havent enabled geotiff crs tag parsing yet
+        for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+                        #lambda: read_crs(raw_tags), # geotiff crs tags (not supported by pycrs yet)
+                        lambda: check_prj_file(filepath), # look for external prj file
+                        lambda: None, # no crs found
+                        ]:
+            crs = crsfunc()
+            if crs:
+                break
 
         return georef, nodataval, bands, crs
 
@@ -349,8 +371,14 @@ def from_file(filepath, **georef):
         nodataval = None
 
         # read crs
-        # normal images have no crs, so just assume default crs
-        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        # normal images have no crs
+        for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+                            lambda: check_prj_file(filepath), # look for external prj file
+                            lambda: None, # no crs found
+                            ]:
+            crs = crsfunc()
+            if crs:
+                break
 
         return georef, nodataval, bands, crs
 
@@ -379,20 +407,26 @@ def from_file(filepath, **georef):
         # grid = array.fromfile(fileobj, chunksize)
         # return memoryview(grid)
         # ...
-        pass 
+        raise NotImplementedError
 
     elif filetype == "BIL":
-        raise Exception("Not yet implemented")
+        raise NotImplementedError
 
     elif filetype == "Arc/INFO":
         # arcinfo raster: http://support.esri.com/en/knowledgebase/techarticles/detail/30616
-        raise Exception("Not yet implemented")
+        raise NotImplementedError
 
     elif filetype == "Cell-Table":
         # cell by cell table format
         with open(filepath) as reader:
             nodataval = georef.pop("nodataval", None)
-            crs = georef.pop("crs", None)
+            for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+                            lambda: check_prj_file(filepath), # look for external prj file
+                            lambda: None, # no crs found
+                            ]:
+                crs = crsfunc()
+                if crs:
+                    break
             
             fields = georef.pop("fields", None)
             if not fields:
@@ -489,7 +523,7 @@ def from_file(filepath, **georef):
         raise UnknownFileError("Could not create a raster from the given filepath: the filetype extension is either missing or not supported")
 
 
-def from_lists(data, nodataval=-9999.0, cell_anchor="center", **geoargs):
+def from_lists(data, nodataval=-9999.0, crs=None, cell_anchor="center", **geoargs):
     raise Exception("Not yet implemented")
 
 
@@ -506,7 +540,7 @@ def from_image(image, nodataval=-9999.0, crs=None, **georef):
             warnings.warn("Manual georef options needed to position the image in space")
 
     if not crs:
-        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        crs = None
 
     bands = [im for im in image.split()]
     
@@ -520,7 +554,7 @@ def new(nodataval=-9999.0, crs=None, **georef):
         georef["affine"] = compute_affine(**georef)
 
     if not crs:
-        crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        crs = None
     
     bands = []
         

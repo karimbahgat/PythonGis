@@ -1,4 +1,5 @@
 
+import os
 import math
 import random
 import itertools
@@ -750,9 +751,16 @@ class Map:
         win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
-    def save(self, savepath):
+    def save(self, savepath, meta=False):
         self.render_all(antialias=True) # antialias
-        self.drawer.save(savepath)
+        if meta:
+            # save image + affine file + prj file if necessary (as if a georeferenced raster)
+            r = RasterData(image=self.img, crs=self.crs) 
+            r.set_geotransform(affine=self.drawer.coordspace_invtransform) # inverse bc the drawer actually goes from coords -> pixels, we need pixels -> coords
+            r.save(savepath)
+        else:
+            # save image only
+            self.drawer.save(savepath)
 
         
 

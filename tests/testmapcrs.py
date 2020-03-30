@@ -42,6 +42,7 @@ rivers.crs = tocrs
 lyr = m.add_layer(rivers, fillcolor='blue', fillsize='0.3px', outlinecolor=None)
 
 m.zoom_auto()
+#m.save('C:/Users/kimok/Desktop/testmap.png', meta=True)
 m.view()
 
 

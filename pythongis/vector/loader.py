@@ -34,7 +34,7 @@ def detect_filetype(filepath):
 
 
 
-def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
+def from_file(filepath, encoding="utf8", encoding_errors="strict", crs=None, **kwargs):
 
     # TODO: for geoj and delimited should detect and force consistent field types in similar manner as when saving
 
@@ -64,9 +64,10 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
         rowgeoms = itertools.izip(rows, geometries)
         
         # load projection string from .prj file if exists
-        if os.path.lexists(filepath[:-4] + ".prj"):
-            crs = open(filepath[:-4] + ".prj", "r").read()
-        else: crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        if not crs:
+            if os.path.lexists(filepath[:-4] + ".prj"):
+                crs = open(filepath[:-4] + ".prj", "r").read()
+            else: crs = None
 
     # geojson file
     elif filetype == "GeoJSON":
@@ -79,7 +80,8 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", **kwargs):
         rowgeoms = itertools.izip(rows, geometries)
 
         # load crs
-        crs = geojfile.crs
+        if not crs:
+            crs = geojfile.crs
 
     # table files without geometry
     elif filetype in ("Text-Delimited","CSV","Excel 97","Excel","Stata"):
