@@ -62,6 +62,10 @@ class SimpleMapViewerGUI(tk2.Tk):
         measurecontrol.pack(side="right") #place(relx=0.98, rely=0.11, anchor="ne")
         mapview.add_control(measurecontrol)
 
+        projcontrol = pg.app.controls.MapProjectionControl(bottombar)
+        projcontrol.pack(side="right") #place(relx=0.98, rely=0.11, anchor="ne")
+        mapview.add_control(projcontrol)
+
         zoomhistcontrol = pg.app.controls.ZoomHistoryControl(navigcontrol)
         zoomhistcontrol.pack(fill='y', expand=1, side="right") #pack(fill='y', expand=1, side="right") #place(relx=0.02, rely=0.02, anchor="nw")
         mapview.add_control(zoomhistcontrol)

@@ -799,6 +799,128 @@ class DrawPolyControl(tk2.basics.Label):
         self.draw_geoj['coordinates'] = []
         self.draw_ids = []
 
+class MapProjectionControl(tk2.basics.Label):
+    def __init__(self, master, *args, **kwargs):
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.projbut = tk2.basics.Button(self)
+        self.projbut["command"] = self.toggle_projections
+        self.projbut.set_icon(icons.iconpath("projections.png"), width=40, height=40)
+        self.projbut.pack()
+
+        import pycrs
+##        self.projections = [pycrs.parse.from_epsg_code(4326), # wgs84
+##                            pycrs.parse.from_proj4(next(pycrs.utils.search_name('robinson'))['proj4']),
+##                            pycrs.parse.from_proj4(next(pycrs.utils.search_name('mercator'))['proj4']),
+##                            pycrs.parse.from_proj4(next(pycrs.utils.search_name('mollweide'))['proj4']),
+##                            pycrs.parse.from_proj4(next(pycrs.utils.search_name('van der grinten'))['proj4']),
+##                            pycrs.parse.from_proj4(next(pycrs.utils.search_name('eckert II'))['proj4']),
+##                            pycrs.parse.from_proj4(next(pycrs.utils.search_name('eckert IV'))['proj4']),
+##                            pycrs.parse.from_sr_code(6980), # space
+##                            ]
+        self.projections = ['+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef',
+                            '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs',
+                            '+proj=merc +a=6370997 +b=6370997 +pm=0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k_0=1.0 +lat_ts=0.0 +units=m +axis=enu +no_defs',
+                            '+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs',
+                            '+proj=vandg +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs',
+                            '+proj=eck4 +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs',
+                            '+proj=ortho +a=6370997 +b=6370997 +pm=0 +lon_0=-72.53333333339999 +x_0=0 +y_0=0 +lat_0=42.5333333333 +units=m +axis=enu +no_defs',
+                           ]
+        self.projections = [pycrs.parse.from_proj4(proj4) for proj4 in self.projections]
+
+
+        self.chosen = tk2.StringVar(self, value='')
+
+        w = self
+        while w.master:
+            w = w.master
+        self._root = w
+        self.projlist = tk2.scrollwidgets.OrderedList(self._root, title="Map Projections:")
+
+    def toggle_projections(self):
+        if self.projlist.winfo_ismapped():
+            self.hide_projections()
+        else:
+            self.show_projections()
+
+    def show_projections(self):
+        for w in self.projlist.items:
+            w.destroy()
+        self.projlist.items = []
+
+        cur = self.mapview.renderer.crs
+        self.chosen.set(cur)
+        self.projlist.add_item(cur, self.proj_decor)
+        curproj4 = cur.to_proj4()
+        for proj in self.projections:
+            if proj.to_proj4() == curproj4:
+                continue
+            self.projlist.add_item(proj, self.proj_decor)
+        
+        screenx,screeny = self.projbut.winfo_rootx(),self.projbut.winfo_rooty()
+        x,y = screenx - self._root.winfo_rootx(), screeny - self._root.winfo_rooty()
+        self.projlist.place(anchor="sw", x=x, y=y, relheight=0.75) #, relwidth=0.9)
+
+    def hide_projections(self):
+        self.projlist.place_forget()
+
+    def proj_decor(self, widget):
+        """
+        Default way to decorate each layer with extra widgets
+        Override method to customize. 
+        """
+        widget.pack(fill="x", expand=1)
+
+        frame = tk2.Frame(widget)
+        frame.pack(fill='both', expand=1)
+
+        # top name part
+        nameframe = tk2.Label(frame)
+        nameframe.pack(side="top")
+
+        # middle image part
+        imframe = tk2.Label(frame)
+        imframe.pack(side="top")
+        #tkim = pg.app.icons.get('zoom_global.png', width=200, height=200)
+        import PIL, PIL.Image, PIL.ImageTk
+        lyr = widget.item
+        #lyr.render(width=300, height=150, bbox=[lyr.bbox[0],lyr.bbox[3],lyr.bbox[2],lyr.bbox[1]])
+        w,h = self.mapview.renderer.width, self.mapview.renderer.height
+        w,h = w//6, h//6
+        if self.mapview.renderer.img:
+            im = self.mapview.renderer.img.resize((w,h), resample=PIL.Image.BILINEAR) #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
+            tkim = PIL.ImageTk.PhotoImage(im)
+        else:
+            tkim = icons.get('zoom_global.png', width=h, height=h)
+        thumb = tk2.basics.Label(imframe, image=tkim)
+        thumb.tkim = tkim
+        thumb.pack(side="bottom")
+    
+        selector = tk2.basics.Radiobutton(nameframe, variable=self.chosen, value=widget.item)
+        def choose():
+            crs = widget.item
+            self.chosen.set(crs) # update the var
+            self.mapview.renderer.crs = crs
+            self.mapview.renderer.zoom_auto()
+            self.mapview.threaded_rendering()
+            self.hide_projections()
+        selector["command"] = choose
+        selector.pack(side="left")
+        imframe.bind('<Button-1>', lambda e: choose(), '+')
+        thumb.bind('<Button-1>', lambda e: choose(), '+')
+
+        if hasattr(widget.item, 'proj'):
+            name = widget.item.proj.name.ogc_wkt
+        else:
+            name = widget.item.datum.name.ogc_wkt
+        text = name
+        text = text.replace('_', ' ')
+        name = tk2.basics.Label(nameframe, text=text, width=20, wraplength=115)
+        name.pack(side="left", fill="x", expand=1)
+        confbut = tk2.basics.Button(nameframe)
+        confbut.set_icon(icons.iconpath("config2.png"), width=15, height=15)
+        confbut.pack(side='left')
+        
 class LayerFilterControl(tk2.basics.Label):
     def __init__(self, master, layer, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)

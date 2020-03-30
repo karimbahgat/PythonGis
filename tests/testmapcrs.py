@@ -7,15 +7,15 @@ pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 data = pg.VectorData(r"C:\Users\kimok\Desktop\BIGDATA\priocountries\priocountries.shp")
 
 #testcrs = '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs'
-#testcrs = pycrs.parse.from_sr_code(6980).to_proj4() # space
+testcrs = pycrs.parse.from_sr_code(6980).to_proj4() # space
 #testcrs = pycrs.parse.from_sr_code(7619).to_proj4() # goode?
-testcrs = next(pycrs.utils.search('van der grinten'))['proj4']
+#testcrs = next(pycrs.utils.search('van der grinten'))['proj4']
 
 #### original crs
-#data.view() 
+#data.view()
 
 #### test crs
-data.view(crs=testcrs) 
+#data.view(crs=testcrs)
 
 #### multiple different crs on same map
 m = pg.renderer.Map(width=1000,height=500,crs=testcrs)
@@ -83,5 +83,30 @@ m.view()
 
 
 
+
+
+#######################
+
+# random create projection icon
+crs = next(pycrs.utils.search('mercator'))['proj4']
+m = pg.renderer.Map(width=500,height=500,crs=crs)
+
+lyr = m.add_layer(data, fillcolor='black')
+
+gridlines = pg.VectorData()
+horiz = [[(x,y) for x in range(-180,180+1,1)] for y in range(-90,90+1,30)]
+vertic = [[(x,y) for y in range(-90,90+1,1)] for x in range(-180,180+1,60)]
+geoj = {'type':'MultiLineString', 'coordinates':horiz+vertic}
+gridlines.add_feature([], geoj)
+lyr = m.add_layer(gridlines, fillcolor='black', fillsize=1, outlinecolor=None)
+
+m.save(r'C:\Users\kimok\OneDrive\Documents\GitHub\PythonGis\pythongis\app\icons\projections.png')
+from PIL import ImageOps
+im = m.img
+im = ImageOps.expand(im, 10, (0,0,0))
+im.show()
+im = ImageOps.expand(im, 50, (255,255,255,0))
+im.save(r'C:\Users\kimok\OneDrive\Documents\GitHub\PythonGis\pythongis\app\icons\projections.png')
+m.view()
 
 
