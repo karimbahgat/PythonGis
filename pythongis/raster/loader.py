@@ -32,7 +32,7 @@ def detect_filetype(filepath):
 
 
 
-def from_file(filepath, **georef):
+def from_file(filepath, crs=None, **georef):
 
     filetype = detect_filetype(filepath)
 
@@ -216,7 +216,7 @@ def from_file(filepath, **georef):
 
         # Read coordinate ref system
         # esri ascii doesnt have any builtin crs
-        for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+        for crsfunc in [lambda: crs, # look for user-specified crs
                         lambda: check_prj_file(filepath), # look for external prj file
                         lambda: None, # no crs found
                         ]:
@@ -334,7 +334,7 @@ def from_file(filepath, **georef):
 
         # read coordinate ref system
         #crs = read_crs(raw_tags) # havent enabled geotiff crs tag parsing yet
-        for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+        for crsfunc in [lambda: crs, # look for user-specified crs
                         #lambda: read_crs(raw_tags), # geotiff crs tags (not supported by pycrs yet)
                         lambda: check_prj_file(filepath), # look for external prj file
                         lambda: None, # no crs found
@@ -372,7 +372,7 @@ def from_file(filepath, **georef):
 
         # read crs
         # normal images have no crs
-        for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+        for crsfunc in [lambda: crs, # look for user-specified crs
                             lambda: check_prj_file(filepath), # look for external prj file
                             lambda: None, # no crs found
                             ]:
@@ -420,7 +420,7 @@ def from_file(filepath, **georef):
         # cell by cell table format
         with open(filepath) as reader:
             nodataval = georef.pop("nodataval", None)
-            for crsfunc in [lambda: georef.pop("crs", None), # look for user-specified crs
+            for crsfunc in [lambda: crs, # look for user-specified crs
                             lambda: check_prj_file(filepath), # look for external prj file
                             lambda: None, # no crs found
                             ]:
@@ -565,7 +565,9 @@ def compute_affine(xy_cell=None, xy_geo=None, cellsize=None,
                    width=None, height=None, bbox=None,
                    xscale=None, yscale=None, xskew=0, yskew=0,
                    xoffset=None, yoffset=None,
-                   cell_anchor="center"):
+                   cell_anchor="center",
+                   **kwargs, # in case receives a larger dict of unrelated args (just ignore them) 
+                   ):
 
     # get scale values
     if not xscale:
