@@ -566,8 +566,7 @@ def compute_affine(xy_cell=None, xy_geo=None, cellsize=None,
                    xscale=None, yscale=None, xskew=0, yskew=0,
                    xoffset=None, yoffset=None,
                    cell_anchor="center",
-                   **kwargs, # in case receives a larger dict of unrelated args (just ignore them) 
-                   ):
+                   **kwargs): # in case receives a larger dict of unrelated args (just ignore them) 
 
     # get scale values
     if not xscale:
