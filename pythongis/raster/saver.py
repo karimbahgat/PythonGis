@@ -124,7 +124,7 @@ def to_file(bands, meta, filepath, **kwargs):
             
         # finally save the file using tiffmeta headers
         img = combine_bands(bands)
-        img.save(filepath, tiffinfo=tags)
+        img.save(filepath, tiffinfo=tags, **kwargs)
 
         # crs should be saved as part of the geotiff tags, but not yet implemented
         # for now create a separate prj file for the crs

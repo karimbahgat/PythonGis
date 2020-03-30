@@ -751,16 +751,19 @@ class Map:
         win = app.builder.SimpleMapViewerGUI(mapp)
         win.mainloop()
 
-    def save(self, savepath, meta=False):
-        self.render_all(antialias=True) # antialias
+    def save(self, savepath, meta=False, **kwargs):
+        if not self.img:
+            self.render_all(antialias=True) # antialias
         if meta:
             # save image + affine file + prj file if necessary (as if a georeferenced raster)
             r = RasterData(image=self.img, crs=self.crs) 
             r.set_geotransform(affine=self.drawer.coordspace_invtransform) # inverse bc the drawer actually goes from coords -> pixels, we need pixels -> coords
-            r.save(savepath)
+            r.save(savepath, **kwargs)
         else:
             # save image only
-            self.drawer.save(savepath)
+            #self.drawer.save(savepath) # kwargs not currently supported in pyagg
+            self.drawer.drawer.flush()
+            self.drawer.img.save(savepath, **kwargs)
 
         
 
@@ -1337,7 +1340,7 @@ class VectorLayer:
     def add_text_effect(self, effect, **kwargs):
         raise NotImplementedError
 
-    def render(self, width, height, bbox=None, antialias=True, crs=None):
+    def render(self, width, height, bbox=None, crs=None, antialias=True):
         '''
         - bbox: bounding box of the coordsys to be rendered (defaults to data bbox). 
         - crs: if specified, determines the coordsys to be renderered (defaults to data crs). 
@@ -1453,7 +1456,7 @@ class VectorLayer:
         else:
             self.img = None
 
-    def render_text(self, width, height, bbox=None, crs=None, default_textoptions=None):
+    def render_text(self, width, height, bbox=None, crs=None, antialias=True, default_textoptions=None):
         
         if self.styleoptions.get("text") and self.has_geometry():
             import time
