@@ -496,7 +496,7 @@ class VectorData:
 
         defaultcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
         crs = crs or defaultcrs
-        if isinstance(crs, basestring):
+        if not isinstance(crs, pycrs.CS):
             try:
                 crs = pycrs.parse.from_unknown_text(crs)
             except:
@@ -1340,16 +1340,17 @@ class VectorData:
         win.browser.table.populate(self.fields, rows())
         win.mainloop()
 
-    def view(self, bbox=None, title="", background=None, crs=None, **styleoptions):
+    def view(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
         """Opens a Tkinter window for viewing and interacting with the dataset on a map.
         
         Args are same as for "map()".
         """
         from .. import app
-        mapp = self.map(None, None, bbox, title=title, background=background, crs=crs, **styleoptions)
+        mapp = self.map(width, height, bbox, title=title, background=background, crs=crs, **styleoptions)
         # make gui
-        win = app.builder.SimpleMapViewerGUI(mapp)
-        win.mainloop()
+        mapp.view()
+        #win = app.builder.SimpleMapViewerGUI(mapp)
+        #win.mainloop()
 
 
 

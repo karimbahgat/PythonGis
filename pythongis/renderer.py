@@ -432,7 +432,8 @@ class Map:
         self.drawer.move(xmove, ymove)
         #self.zooms.append(func)
         self.changed = True
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     def resize(self, width, height):
         self.width = width
@@ -440,7 +441,8 @@ class Map:
         if not self.drawer: self._create_drawer()
         self.changed = True
         self.drawer.resize(width, height, lock_ratio=True)
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     def crop(self, xmin, ymin, xmax, ymax, geographic=False):
         if not self.drawer: self._create_drawer()
@@ -450,12 +452,14 @@ class Map:
         self.drawer.crop(xmin,ymin,xmax,ymax)
         self.width = self.drawer.width
         self.height = self.drawer.height
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     # Zooming
 
     @property
     def bbox(self):
+        if not self.drawer: self._create_drawer()
         return list(self.drawer.coordspace_bbox)
 
     def zoom_auto(self):
@@ -464,7 +468,7 @@ class Map:
         self.zoom_bbox(*bbox)
         #self.zooms.append(func)
         self.changed = True
-        self.img = self.drawer.get_image()
+        # NOTE: no need to update img here, already done in zoom_bbox
 
     def zoom_bbox(self, xmin, ymin, xmax, ymax, geographic=False):
         if not self.drawer: self._create_drawer()
@@ -492,7 +496,8 @@ class Map:
             
         #self.zooms.append(func)
         self.changed = True
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     def zoom_in(self, factor, center=None):
         if not self.drawer: self._create_drawer()
@@ -500,7 +505,8 @@ class Map:
         #func = lambda: self.drawer.zoom_in(factor, center=center)
         #self.zooms.append(func)
         self.changed = True
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     def zoom_out(self, factor, center=None):
         if not self.drawer: self._create_drawer()
@@ -508,7 +514,8 @@ class Map:
         #func = lambda: self.drawer.zoom_out(factor, center=center)
         #self.zooms.append(func)
         self.changed = True
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     def zoom_units(self, units, center=None, geographic=False):
         if not self.drawer: self._create_drawer()
@@ -538,7 +545,8 @@ class Map:
         #print _vincenty_distance((y1,x1), (y1,x1+self.drawer.coordspace_width))
         #self.zooms.append(func)
         self.changed = True
-        self.img = self.drawer.get_image()
+        if self.img:
+            self.img = self.drawer.get_image()
 
     # Layers
 
@@ -647,7 +655,7 @@ class Map:
     def render_one(self, layer, antialias=True, update_draworder=True):
         if not self.drawer: self._create_drawer()
         
-        if layer.visible:            
+        if layer.visible: 
             layer.render(width=self.drawer.width,
                          height=self.drawer.height,
                          bbox=self.drawer.coordspace_bbox,

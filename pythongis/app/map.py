@@ -359,11 +359,12 @@ class MapView(tk.Canvas):
 ##        self.master.process_thread(pending, finish, mslag=1, msinterval=121) # faster checking/update of tk img
 ##        print "-tkfresh2",time.time()-t
 
-        # tkimage update        
-        tt=time.time()
-        self.tkimg = self.renderer.get_tkimage()
-        print "-tkfresh",time.time()-tt
-        self.itemconfig(self.image_on_canvas, image=self.tkimg )
+        # tkimage update
+        if self.renderer.img:
+            tt=time.time()
+            self.tkimg = self.renderer.get_tkimage()
+            print "-tkfresh",time.time()-tt
+            self.itemconfig(self.image_on_canvas, image=self.tkimg )
 
     def zoom_in(self, log=False):
         self.zoomfactor += 1

@@ -1100,7 +1100,7 @@ class RasterData(object):
         # crs
         defaultcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
         crs = crs or defaultcrs
-        if isinstance(crs, basestring):
+        if not isinstance(crs, pycrs.CS):
             try:
                 crs = pycrs.parse.from_unknown_text(crs)
             except:
@@ -1317,8 +1317,8 @@ class RasterData(object):
     ##############################
     # Rendering
 
-    def render(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
-        """Shortcut for easily rendering and returning the raster data on a Map instance.
+    def map(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
+        """Shortcut for easily creating a Map instance containing this dataset as a layer.
 
         TODO: Check that works correctly. Have experienced that adding additional layers on top
         of this results in mismatch and layers jumping around. 
@@ -1338,19 +1338,19 @@ class RasterData(object):
             mapp.zoom_bbox(*bbox)
         else:
             mapp.zoom_auto()
-        mapp.render_all()
         return mapp
 
     def view(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):
-        """Renders and opens a Tkinter window for viewing and interacting with the map.
+        """Opens a Tkinter window for viewing and interacting with the map.
 
-        Args are same as for "render()".
+        Args are same as for "map()".
         """
         from .. import app
-        mapp = self.render(width, height, bbox, title=title, background=background, crs=crs, **styleoptions)
+        mapp = self.map(width, height, bbox, title=title, background=background, crs=crs, **styleoptions)
         # make gui
-        win = app.builder.SimpleMapViewerGUI(mapp)
-        win.mainloop()
+        mapp.view()
+        #win = app.builder.SimpleMapViewerGUI(mapp)
+        #win.mainloop()
 
 
 def pilmode_to_rastmode(mode):
