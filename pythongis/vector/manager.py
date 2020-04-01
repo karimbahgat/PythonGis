@@ -820,7 +820,7 @@ def reproject(data, tocrs):
 
     # get pycrs objs
     fromcrs = data.crs
-    if isinstance(tocrs, basestring):
+    if not isinstance(tocrs, pycrs.CS):
         tocrs = pycrs.parse.from_unknown_text(tocrs)
 
     # create pyproj objs

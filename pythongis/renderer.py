@@ -1764,20 +1764,31 @@ class RasterLayer:
     def render(self, resampling="nearest", antialias=True, crs=None, **georef):
         # position in space
 
-        # TODO: on-the-fly reproject to given crs...
-        # ... 
+        # get projection transformer (only if specified and different)
+        if not isinstance(crs, pycrs.CS):
+            crs = pycrs.parse.from_unknown_text(crs)
+        _transform = get_crs_transformer(self.data.crs, crs)
         
-        # TODO: USING BBOX HERE RESULTS IN SLIGHT OFFSET, SOMEHOW NOT CORRECT FOR RESAMPLE
-        # LIKELY DUE TO HALF CELL CENTER VS CORNER
-        if "bbox" not in georef:
-            georef["bbox"] = self.data.bbox
-
-        try:
-            rendered = self.data.resample(method=resampling, **georef)
-        except:
+        if _transform:
+            # on-the-fly reproject to given crs
+            try:
+                rendered = self.data.manage.reproject(crs, resampling, **georef)
             # out of bounds
-            self.img = None
-            return
+            except:
+                self.img = None
+                return
+        else:
+            # get bbox from data if not specified
+            if "bbox" not in georef:
+                georef["bbox"] = self.data.bbox
+
+            # normal affine resample
+            try:
+                rendered = self.data.resample(method=resampling, **georef)
+            except:
+                # out of bounds
+                self.img = None
+                return
 
         # TODO: binary 1bit rasters dont show correctly
         # ...

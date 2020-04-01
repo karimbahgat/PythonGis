@@ -5,17 +5,32 @@ import pycrs
 pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 
 data = pg.VectorData(r"C:\Users\kimok\Desktop\BIGDATA\priocountries\priocountries.shp")
+rast = pg.RasterData(r"C:\Users\kimok\OneDrive\Documents\GitHub\AutoMap\tests\testmaps\burkina_georeferenced.tif")
 
 #testcrs = '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs'
-testcrs = pycrs.parse.from_sr_code(6980).to_proj4() # space
+#testcrs = pycrs.parse.from_sr_code(6980).to_proj4() # space
 #testcrs = pycrs.parse.from_sr_code(7619).to_proj4() # goode?
 #testcrs = next(pycrs.utils.search('van der grinten'))['proj4']
+testcrs = next(pycrs.utils.search('eckert iv'))['proj4']
+
+
+
 
 #### original crs
 #data.view()
 
-#### test crs
+#### test on-the-fly crs
 #data.view(crs=testcrs)
+
+#### raster crs
+#rast.view()
+rast.manage.reproject(testcrs, resample='nearest').view()
+#rast.manage.reproject(testcrs, resample='bilinear').view()
+
+dsadsads
+
+
+
 
 #### multiple different crs on same map
 m = pg.renderer.Map(width=1000,height=500,crs=testcrs)

@@ -5,8 +5,13 @@ Module containing methods for the management and modification of raster datasets
 from . import data
 from ..vector import sql
 
-import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMath
+import itertools
+import math
 import gc
+
+import pycrs
+
+import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMath
 
 def mosaic(rasters, overlaprule="last", **rasterdef):
     """
@@ -160,13 +165,234 @@ def warp(raster, tiepoints):
     
     raise NotImplementedError
 
-def reproject(raster, crs, method="nearest", **rasterdef):
+def reproject(raster, tocrs, resample="nearest", **rasterdef):
     """
     EXPERIMENTAL
 
     Reprojects the raster from the input crs to a target crs.
-    If given, **rasterdef will override the input raster structure.
+    If given, **rasterdef defines the output dimensions and georeference/bounds (defaults to using the input raster and georef/bounds)
+
+    NOTE: tiles the image and reprojects each tile, faster but sometimes leading to funky results.
+        Look into improving...
     """
+    import pyproj
+
+    # get pycrs objs
+    fromcrs = raster.crs
+    if not isinstance(tocrs, pycrs.CS):
+        tocrs = pycrs.parse.from_unknown_text(tocrs)
+
+    # create pyproj transformer
+    def get_crs_transformer(fromcrs, tocrs):
+        if not (fromcrs and tocrs):
+            return None
+        
+        if isinstance(fromcrs, basestring):
+            fromcrs = pycrs.parse.from_unknown_text(fromcrs)
+
+        if isinstance(tocrs, basestring):
+            tocrs = pycrs.parse.from_unknown_text(tocrs)
+
+        fromcrs = fromcrs.to_proj4()
+        tocrs = tocrs.to_proj4()
+        
+        if fromcrs != tocrs:
+            import pyproj
+            fromcrs = pyproj.Proj(fromcrs)
+            tocrs = pyproj.Proj(tocrs)
+            def _isvalid(p):
+                x,y = p
+                return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
+            def _project(points):
+                xs,ys = itertools.izip(*points)
+                xs,ys = pyproj.transform(fromcrs,
+                                         tocrs,
+                                         xs, ys)
+                newpoints = list(itertools.izip(xs, ys))
+                newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
+                return newpoints
+        else:
+            _project = None
+
+        return _project
+
+    _transform = get_crs_transformer(fromcrs, tocrs)
+    if not _transform:
+        # raster is already in the target crs, just return a copy
+        return raster.copy()
+
+    # determine crs bounds of data bbox
+    def reproject_bbox(bbox, transformer, sampling_freq=20):
+        x1,y1,x2,y2 = bbox
+        w,h = x2-x1, y2-y1
+        sampling_freq = int(sampling_freq)
+        dx,dy = w/float(sampling_freq), h/float(sampling_freq)
+        gridsamples = [(x1+dx*ix,y1+dy*iy)
+                       for iy in range(sampling_freq+1)
+                       for ix in range(sampling_freq+1)]
+        gridsamples = transformer(gridsamples)
+        if not gridsamples:
+            return None
+        xs,ys = zip(*gridsamples)
+        xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+        bbox = [xmin,ymin,xmax,ymax] 
+        #print 'bbox transform',bbox
+        return bbox
+
+    bbox = raster.bbox
+    projbox = reproject_bbox(bbox, _transform)
+    if not projbox:
+        raise Exception('Could not determine global bbox of the given map crs, all coordinates were out of bounds in the target crs (inf or nan)')
+    xmin,ymin,xmax,ymax = projbox
+
+    # unless specified, determine output rasterdef from input raster
+    if not rasterdef:
+        # calc diagonal dist and output dims
+        xw,yh = xmax-xmin, ymax-ymin
+        geodiag = math.hypot(xw, yh)
+        imdiag = math.hypot(raster.width, raster.height)
+        xscale = yscale = geodiag / float(imdiag)
+        w,h = int(xw / xscale), int(yh / yscale)
+        
+        # define affine
+        xoff,yoff = xmin,ymin
+        if projbox[1] > projbox[3]:
+            yoff = ymax
+            yscale *= -1
+        affine = [xscale,0,xoff, 0,yscale,yoff]
+        
+        rasterdef = {'width': w,
+                     'height': h,
+                     'affine': affine}
+
+    # create output raster
+    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+    targetrast.crs = tocrs
+
+    # ALT1: for each target coord, backwards project to sample from source pixel
+    # ...
+
+    # ALT2: loop mesh quads in target grid
+
+    resampcode = {"nearest":PIL.Image.NEAREST,
+                "bilinear":PIL.Image.BILINEAR,
+                "bicubic":PIL.Image.BICUBIC,
+                }[resample.lower()]
+
+    # define pixels of rectangular quad regions from target raster
+    
+    # define targetpixels based on where the raster bbox fits within the targetrast bbox
+    # ...eg, if the data is only a small subsection of the target raster, gets more detail and avoids unnecessary calculations
+    x1,y1,x2,y2 = xmin,ymin,xmax,ymax # data bounds in target crs, calculated previously
+    px1,py1 = targetrast.geo_to_cell(xmin,ymin) 
+    px2,py2 = targetrast.geo_to_cell(xmax,ymax)
+    # switch to min,max order and limit to target rast dims
+    px1,py1,px2,py2 = min(px1,px2),min(py1,py2),max(px1,px2),max(py1,py2)
+    px1,py1 = max(px1,0),max(py1,0)
+    px2,py2 = min(px2,targetrast.width),min(py2,targetrast.height)
+    #px1,py1 = 0,0
+    #px2,py2 = targetrast.width, targetrast.height
+    w,h = px2-px1, py2-py1
+    #print 'dims',(px1,py1,px2,py2),w,h
+    
+    #diag = math.hypot(w, h)
+    #sampsize = diag // 10
+    #sampw = int(w // sampsize) #int(200)
+    #samph = int(h // sampsize) #int(200)
+    sampw = int(100)
+    samph = int(100)
+    sampw,samph = min(w, sampw), min(h, samph)
+    dx,dy = w / float(sampw), h / float(samph)
+    #targetpixels = [(x,y) for y in range(0, h, dy) for x in range(0, w, dx)]
+    targetpixels = [(px1+dx*ix,py1+dy*iy)
+                       for iy in range(samph+1)
+                       for ix in range(sampw+1)]
+
+    # get target coords for quad pixels
+    targetcoords = PIL.ImagePath.Path(targetpixels)
+    targetcoords.transform(targetrast.affine)
+
+    # convert to source crs
+    _itransform = get_crs_transformer(tocrs, fromcrs)
+    sourcecoords = _itransform(targetcoords)
+    #print len(targetcoords), str(list(targetcoords))[:100]
+    #print '-->', len(sourcecoords), str(list(sourcecoords))[:100]
+
+    # then use affine to get source pixels
+    sourcecoords = PIL.ImagePath.Path(sourcecoords)
+    sourcecoords.transform(raster.inv_affine)
+    sourcepixels = list(sourcecoords)
+
+    # create mesh structure
+    meshdata = []
+    _w, _h = int(sampw+1), int(samph+1)
+    for i in range(len(targetpixels)):
+        # ul
+        ul_i = i
+        row = i // _w
+        col = i - (row * _w)
+        #print ul_i,row,col,_w
+        
+        # lr
+        if row >= _h-1 or col >= _w-1:
+            continue
+        row += 1
+        col += 1
+        lr_i = (row * _w) + col
+        #print lr_i,row,col,_w
+        
+        # define target rectangular box
+        tul_x,tul_y = targetpixels[ul_i]
+        tlr_x,tlr_y = targetpixels[lr_i]
+        tul_x, tlr_x = min(tul_x, tlr_x), max(tul_x, tlr_x)
+        tul_y, tlr_y = min(tul_y, tlr_y), max(tul_y, tlr_y)
+        targetbox = (tul_x,tul_y,tlr_x,tlr_y)
+        targetbox = map(int, targetbox)
+        #print 'target', targetbox
+        
+        # define source quad corners
+        # quad: An 8-tuple (x0, y0, x1, y1, x2, y2, x3, y3) which contain the upper left, lower left, lower right, and upper right corner of the source quadrilateral
+        sul_x,sul_y = sourcepixels[ul_i]
+        slr_x,slr_y = sourcepixels[lr_i]
+        #sul_x, slr_x = min(sul_x, slr_x), max(sul_x, slr_x)
+        #sul_y, slr_y = min(sul_y, slr_y), max(sul_y, slr_y)
+        x0,y0 = sul_x,sul_y # upper left
+        x1,y1 = sul_x,slr_y # lower left
+        x2,y2 = slr_x,slr_y # lower right
+        x3,y3 = slr_x,sul_y # upper right
+        sourcequad = (x0, y0, x1, y1, x2, y2, x3, y3)
+        if any((math.isinf(val) or math.isnan(val) for val in [sul_x,slr_x,sul_y,slr_y])):
+            # should maybe just skip this quad? 
+            raise Exception()
+        #print 'source', sourcequad
+        
+        # add to mesh
+        meshdata.append((targetbox, sourcequad))
+    
+    # then apply the mesh transform
+    size = (targetrast.width, targetrast.height)
+
+    # transform each band
+    for band in raster:
+        outim = band.img.transform(size, PIL.Image.MESH, meshdata, resampcode)
+        # add as output band
+        targetrast.add_band(img=outim, nodataval=band.nodataval)
+
+    # transform the mask too
+    # note: if we don't invert the mask, the transform will form a nontransparent outer edge
+    masktrans = PIL.ImageChops.invert(raster.mask.convert("L"))
+    masktrans = masktrans.transform(size, PIL.Image.MESH, meshdata, resampcode)
+    masktrans = PIL.ImageChops.invert(masktrans).convert("1") # invert back
+    targetrast.mask = masktrans
+
+    return targetrast
+
+
+
+
+        
+
+    ####### OLD
 
     # Experimental, some weird results
     # prob due to not creating affine correctly (only based on bbox)
@@ -174,152 +400,150 @@ def reproject(raster, crs, method="nearest", **rasterdef):
     # FIX THIS
     # ...
 
-    import pyproj
-
-    algorithm = method
-    algocode = {"nearest":PIL.Image.NEAREST,
-                "bilinear":PIL.Image.BILINEAR,
-                "bicubic":PIL.Image.BICUBIC,
-                }[algorithm.lower()]
-
-    if crs == raster.crs:   # need pycrs to compare crs in a smarter way
-        raise Exception("The from and to crs are the same, so no need to reproject.")
-
-    fromcrs = pyproj.Proj(raster.crs)
-    tocrs = pyproj.Proj(crs)
-
-    # first, create target raster based on rasterdef
-    projbox = []
-    if rasterdef:
-        targetrast = data.RasterData(mode=raster.mode, **rasterdef)
-    else:
-        # auto detect valid output bbox
-        # TODO: instead of bbox which cannot detect rotation or shear,
-        # ...construct georef from 2 or 3 tiepoints between grid coords and crs coords
-        # ...eg corner col,row and x,y
-        # ...will be implemented in create_affine(), see https://stackoverflow.com/questions/22954239/given-three-points-compute-affine-transformation
-        xs,ys = zip(*(raster.cell_to_geo(col,row) for row in range(raster.height) for col in range(raster.width)))
-        newcoords = zip(*pyproj.transform(fromcrs,tocrs,xs,ys))
-        newcoords = [new for new in newcoords if isinstance(new[0], float) and isinstance(new[1], float)]
-        newx,newy = zip(*newcoords)
-        xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
-        
-##        xmin,ymin,xmax,ymax = 0,0,0,0
-##        for row in range(raster.height):
-##            coords = [raster.cell_to_geo(col,row) for col in range(raster.width)]
-##            newcoords = [new for new in fromcrs.transform(coords) if isinstance(new[0], float) and isinstance(new[1], float)]
-##            newx,newy = zip(newcoords)
-##            xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
-##            # ...
-
-        bbox = [xmin,ymax,xmax,ymin]
-        ratio = (xmax-xmin)/(ymax-ymin)
-        #print bbox
-        rasterdef = dict(width=int(raster.width*ratio),
-                         height=raster.height,
-                         bbox=bbox)
-        targetrast = data.RasterData(mode=raster.mode, **rasterdef)        
-            
-    for band in raster:
-        targetrast.add_band()
-
-    # reproject coords using pyproj
-    if method == 'nearest':
-        # TODO: should be best and easy with tiling and quadmesh
-        # ...
-        
-        # cell by cell, should work, but partially funky results...
-        xs,ys = zip(*(targetrast.cell_to_geo(col,row) for row in range(targetrast.height) for col in range(targetrast.width)))
-        newxs,newys = pyproj.transform(tocrs,fromcrs,xs,ys)
-        gridpos = ((col,row) for row in range(targetrast.height) for col in range(targetrast.width))
-        newcoords = zip(gridpos,newxs,newys)
-        newcoords = [(pos,nx,ny) for pos,nx,ny in newcoords if isinstance(nx, float) and isinstance(ny, float)]
-        for targetpos,nx,ny in newcoords:
-            tcol,trow = targetpos
-            sourcepos = raster.geo_to_cell(nx,ny)
-            if not (0 <= sourcepos[0] < raster.width):
-                continue
-            if not (0 <= sourcepos[1] < raster.height):
-                continue
-            for i,band in enumerate(raster):
-                try:
-                    sourcecell = band.get(*sourcepos)
-                    targetrast.bands[i].set(tcol,trow,sourcecell.value)
-                except:
-                    pass
-
-##        # get target coordinates
-##        xs = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
-##        ys = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
-##        
-##        for row,y in enumerate(ys):
-##            # convert crs coords
-##            cxs,cys = zip(*((x,y) for x in xs))
-##            newcoords = zip(*pyproj.transform(tocrs,fromcrs,cxs,cys))
-##            
-##            reproj = []
-##            valid = []
-##            for x in xs:
-##                nx,ny = pyproj.transform(fromcrs,tocrs,x,y)
-##                if isinstance(nx, (int,float)) and isinstance(ny, (int,float)):
-##                    reproj.append((nx,ny))
-##                    valid.append(True)
-##                else:
-##                    reproj.append((0,0))
-##                    valid.append(False)
-##            reproj = PIL.ImagePath.Path(reproj)
+##    algorithm = method
+##    algocode = {"nearest":PIL.Image.NEAREST,
+##                "bilinear":PIL.Image.BILINEAR,
+##                "bicubic":PIL.Image.BICUBIC,
+##                }[algorithm.lower()]
 ##
-##            # go from reprojected target coordinates and over to source pixels
-##            reproj.transform(raster.inv_affine)
+##    if crs == raster.crs:   # need pycrs to compare crs in a smarter way
+##        raise Exception("The from and to crs are the same, so no need to reproject.")
 ##
-##            # manually get and set the pixels using some algorithm
-##            for sourceband,targetband in zip(raster,targetrast):
-##                for col,(isvalid,pixel) in enumerate(zip(valid,reproj)):
-##                    if not isvalid:
-##                        continue
-##                    pixel = int(round(pixel[0])),int(round(pixel[1]))
-##                    val = sourceband.get(*pixel)
-##                    targetband.set(col,row,val)
-    else:
-        raise NotImplementedError("Not a valid algorithm")
-
+##    fromcrs = pyproj.Proj(raster.crs)
+##    tocrs = pyproj.Proj(crs)
+##
 ##    # first, create target raster based on rasterdef
-##    rasterdef = rasterdef or raster.rasterdef
-##    # TODO: need to calc xscale yscale based on reprojected bbox?
-##    # ... 
-##    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
-##    for band in raster:
-##        targetrast.add_band(img=band.img)
+##    projbox = []
+##    if rasterdef:
+##        targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+##    else:
+##        # auto detect valid output bbox
+##        # TODO: instead of bbox which cannot detect rotation or shear,
+##        # ...construct georef from 2 or 3 tiepoints between grid coords and crs coords
+##        # ...eg corner col,row and x,y
+##        # ...will be implemented in create_affine(), see https://stackoverflow.com/questions/22954239/given-three-points-compute-affine-transformation
+##        xs,ys = zip(*(raster.cell_to_geo(col,row) for row in range(raster.height) for col in range(raster.width)))
+##        newcoords = zip(*pyproj.transform(fromcrs,tocrs,xs,ys))
+##        newcoords = [new for new in newcoords if isinstance(new[0], float) and isinstance(new[1], float)]
+##        newx,newy = zip(*newcoords)
+##        xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
+##        
+####        xmin,ymin,xmax,ymax = 0,0,0,0
+####        for row in range(raster.height):
+####            coords = [raster.cell_to_geo(col,row) for col in range(raster.width)]
+####            newcoords = [new for new in fromcrs.transform(coords) if isinstance(new[0], float) and isinstance(new[1], float)]
+####            newx,newy = zip(newcoords)
+####            xmin,ymin,xmax,ymax = min(newx),min(newy),max(newx),max(newy)
+####            # ...
 ##
-##    # get target coordinates
-##    coords = [targetrast.cell_to_geo(px,py) for px in range(targetrast.width) for py in range(targetrast.height)]
-##    lons,lats = zip(*coords)
+##        bbox = [xmin,ymax,xmax,ymin]
+##        ratio = (xmax-xmin)/(ymax-ymin)
+##        #print bbox
+##        rasterdef = dict(width=int(raster.width*ratio),
+##                         height=raster.height,
+##                         bbox=bbox)
+##        targetrast = data.RasterData(mode=raster.mode, **rasterdef)        
+##            
+##    for band in raster:
+##        targetrast.add_band()
 ##
 ##    # reproject coords using pyproj
-##    nlons,nlats = pyproj.transform(fromcrs,tocrs,lons,lats)
-##    xmin,xmax = min(nlons),max(nlons)
-##    ymin,ymax = min(nlats),max(nlats)
+##    if method == 'nearest':
+##        # TODO: should be best and easy with tiling and quadmesh
+##        # ...
+##        
+##        # cell by cell, should work, but partially funky results...
+##        xs,ys = zip(*(targetrast.cell_to_geo(col,row) for row in range(targetrast.height) for col in range(targetrast.width)))
+##        newxs,newys = pyproj.transform(tocrs,fromcrs,xs,ys)
+##        gridpos = ((col,row) for row in range(targetrast.height) for col in range(targetrast.width))
+##        newcoords = zip(gridpos,newxs,newys)
+##        newcoords = [(pos,nx,ny) for pos,nx,ny in newcoords if isinstance(nx, float) and isinstance(ny, float)]
+##        for targetpos,nx,ny in newcoords:
+##            tcol,trow = targetpos
+##            sourcepos = raster.geo_to_cell(nx,ny)
+##            if not (0 <= sourcepos[0] < raster.width):
+##                continue
+##            if not (0 <= sourcepos[1] < raster.height):
+##                continue
+##            for i,band in enumerate(raster):
+##                try:
+##                    sourcecell = band.get(*sourcepos)
+##                    targetrast.bands[i].set(tcol,trow,sourcecell.value)
+##                except:
+##                    pass
 ##
-##    # manually get and set the pixels using some algorithm
-##    if algorithm == "nearest":
-##        for row in range(targetrast.height):
-##            for col in range(targetrast.width):
-##                i = row * targetrast.height + col
-##                nlon = nlons[i]
-##                nlat = nlats[i]
-##
-##                # hmm...
-##                
-##                pixel = raster.geo_to_cell(nlon,nlat)
-##                print pixel
-##                for sourceband,targetband in zip(raster,targetrast):
-##                    val = sourceband.get(*pixel).value
-##                    print val
-##                    targetband.set(col,row,val)
+####        # get target coordinates
+####        xs = PIL.ImagePath.Path([targetrast.cell_to_geo(px,0) for px in range(targetrast.width)])
+####        ys = PIL.ImagePath.Path([targetrast.cell_to_geo(0,py) for py in range(targetrast.height)])
+####        
+####        for row,y in enumerate(ys):
+####            # convert crs coords
+####            cxs,cys = zip(*((x,y) for x in xs))
+####            newcoords = zip(*pyproj.transform(tocrs,fromcrs,cxs,cys))
+####            
+####            reproj = []
+####            valid = []
+####            for x in xs:
+####                nx,ny = pyproj.transform(fromcrs,tocrs,x,y)
+####                if isinstance(nx, (int,float)) and isinstance(ny, (int,float)):
+####                    reproj.append((nx,ny))
+####                    valid.append(True)
+####                else:
+####                    reproj.append((0,0))
+####                    valid.append(False)
+####            reproj = PIL.ImagePath.Path(reproj)
+####
+####            # go from reprojected target coordinates and over to source pixels
+####            reproj.transform(raster.inv_affine)
+####
+####            # manually get and set the pixels using some algorithm
+####            for sourceband,targetband in zip(raster,targetrast):
+####                for col,(isvalid,pixel) in enumerate(zip(valid,reproj)):
+####                    if not isvalid:
+####                        continue
+####                    pixel = int(round(pixel[0])),int(round(pixel[1]))
+####                    val = sourceband.get(*pixel)
+####                    targetband.set(col,row,val)
 ##    else:
 ##        raise NotImplementedError("Not a valid algorithm")
-
-    return targetrast
+##
+####    # first, create target raster based on rasterdef
+####    rasterdef = rasterdef or raster.rasterdef
+####    # TODO: need to calc xscale yscale based on reprojected bbox?
+####    # ... 
+####    targetrast = data.RasterData(mode=raster.mode, **rasterdef)
+####    for band in raster:
+####        targetrast.add_band(img=band.img)
+####
+####    # get target coordinates
+####    coords = [targetrast.cell_to_geo(px,py) for px in range(targetrast.width) for py in range(targetrast.height)]
+####    lons,lats = zip(*coords)
+####
+####    # reproject coords using pyproj
+####    nlons,nlats = pyproj.transform(fromcrs,tocrs,lons,lats)
+####    xmin,xmax = min(nlons),max(nlons)
+####    ymin,ymax = min(nlats),max(nlats)
+####
+####    # manually get and set the pixels using some algorithm
+####    if algorithm == "nearest":
+####        for row in range(targetrast.height):
+####            for col in range(targetrast.width):
+####                i = row * targetrast.height + col
+####                nlon = nlons[i]
+####                nlat = nlats[i]
+####
+####                # hmm...
+####                
+####                pixel = raster.geo_to_cell(nlon,nlat)
+####                print pixel
+####                for sourceband,targetband in zip(raster,targetrast):
+####                    val = sourceband.get(*pixel).value
+####                    print val
+####                    targetband.set(col,row,val)
+####    else:
+####        raise NotImplementedError("Not a valid algorithm")
+##
+##    return targetrast
 
     # TODO: Potential speedup algorithm
     # table-based reprojection, so only have to reproject 100*100 values
