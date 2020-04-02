@@ -416,6 +416,7 @@ class Map:
                    ppi=self.ppi, crs=self.crs)
         dupl.backgroundgroup = self.backgroundgroup.copy()
         if self.drawer: dupl.drawer = self.drawer.copy()
+        if self.img: dupl.img = self.img.copy()
         dupl.foregroundgroup = self.foregroundgroup.copy()
         return dupl
 
@@ -1641,7 +1642,7 @@ class RasterLayer:
         # TODO: How to prevent hiding values for binary or other small-range rasters?
         # TODO: Maybe don't autoset to avoid confusion, instead having to set manually. 
         if self.data.mode in 'float32 float16 int32 int16' and ('maxval' not in options or "minval" not in options):
-            options["cutoff"] = options.get("cutoff", (0.1,99.9))
+            pass #options["cutoff"] = options.get("cutoff", (0.1,99.9))
 
         # stretching
         if options["type"] in ("grayscale","colorscale"):

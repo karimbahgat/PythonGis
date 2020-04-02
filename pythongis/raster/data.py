@@ -1158,7 +1158,7 @@ class RasterData(object):
         else:
             for band in self.bands:
                 new.add_band(band.copy())
-        new._cached_mask = self._cached_mask
+            new._cached_mask = self._cached_mask
         return new
 
     def get(self, x, y, band):
