@@ -278,7 +278,8 @@ def from_file(filepath, crs=None, **georef):
 
         def read_nodata(raw_tags):
             nodataval = raw_tags.get(42113)
-            if nodataval:
+            if nodataval != None:
+                nodataval = nodataval[0] # single value inside a tuple
                 try:
                     float(nodataval) # make sure is possible to make into nr
                     nodataval = eval(nodataval) # eval from string to nr

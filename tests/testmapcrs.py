@@ -23,8 +23,8 @@ testcrs = next(pycrs.utils.search('eckert iv'))['proj4']
 #data.view(crs=testcrs)
 
 #### raster crs
-#rast.view()
-rast.manage.reproject(testcrs, resample='nearest').view()
+rast.view() #testcrs)
+#rast.manage.reproject(testcrs, resample='nearest').view()
 #rast.manage.reproject(testcrs, resample='bilinear').view()
 
 dsadsads

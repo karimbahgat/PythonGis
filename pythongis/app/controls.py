@@ -635,7 +635,7 @@ class IdentifyControl(tk2.basics.Label):
                     
             elif isinstance(layer.data, pg.RasterData):
                 values = [layer.data.get(x, y, band).value for band in layer.data.bands]
-                if any(values):
+                if any((v != None for v in values)):
                     anyhits = True
                     shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
                     _tab = ribbon.add_tab(shortname)
