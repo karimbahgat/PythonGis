@@ -1,0 +1,4992 @@
+<!doctype html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+
+    <title>pythongis.app.map API documentation</title>
+    <meta name="description" content="" />
+
+  <link href='http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300' rel='stylesheet' type='text/css'>
+  
+  <style type="text/css">
+  
+* {
+  box-sizing: border-box;
+}
+/*! normalize.css v1.1.1 | MIT License | git.io/normalize */
+
+/* ==========================================================================
+   HTML5 display definitions
+   ========================================================================== */
+
+/**
+ * Correct `block` display not defined in IE 6/7/8/9 and Firefox 3.
+ */
+
+article,
+aside,
+details,
+figcaption,
+figure,
+footer,
+header,
+hgroup,
+main,
+nav,
+section,
+summary {
+    display: block;
+}
+
+/**
+ * Correct `inline-block` display not defined in IE 6/7/8/9 and Firefox 3.
+ */
+
+audio,
+canvas,
+video {
+    display: inline-block;
+    *display: inline;
+    *zoom: 1;
+}
+
+/**
+ * Prevent modern browsers from displaying `audio` without controls.
+ * Remove excess height in iOS 5 devices.
+ */
+
+audio:not([controls]) {
+    display: none;
+    height: 0;
+}
+
+/**
+ * Address styling not present in IE 7/8/9, Firefox 3, and Safari 4.
+ * Known issue: no IE 6 support.
+ */
+
+[hidden] {
+    display: none;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+/**
+ * 1. Prevent system color scheme's background color being used in Firefox, IE,
+ *    and Opera.
+ * 2. Prevent system color scheme's text color being used in Firefox, IE, and
+ *    Opera.
+ * 3. Correct text resizing oddly in IE 6/7 when body `font-size` is set using
+ *    `em` units.
+ * 4. Prevent iOS text size adjust after orientation change, without disabling
+ *    user zoom.
+ */
+
+html {
+    background: #fff; /* 1 */
+    color: #000; /* 2 */
+    font-size: 100%; /* 3 */
+    -webkit-text-size-adjust: 100%; /* 4 */
+    -ms-text-size-adjust: 100%; /* 4 */
+}
+
+/**
+ * Address `font-family` inconsistency between `textarea` and other form
+ * elements.
+ */
+
+html,
+button,
+input,
+select,
+textarea {
+    font-family: sans-serif;
+}
+
+/**
+ * Address margins handled incorrectly in IE 6/7.
+ */
+
+body {
+    margin: 0;
+}
+
+/* ==========================================================================
+   Links
+   ========================================================================== */
+
+/**
+ * Address `outline` inconsistency between Chrome and other browsers.
+ */
+
+a:focus {
+    outline: thin dotted;
+}
+
+/**
+ * Improve readability when focused and also mouse hovered in all browsers.
+ */
+
+a:active,
+a:hover {
+    outline: 0;
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+
+/**
+ * Address font sizes and margins set differently in IE 6/7.
+ * Address font sizes within `section` and `article` in Firefox 4+, Safari 5,
+ * and Chrome.
+ */
+
+h1 {
+    font-size: 2em;
+    margin: 0.67em 0;
+}
+
+h2 {
+    font-size: 1.5em;
+    margin: 0.83em 0;
+}
+
+h3 {
+    font-size: 1.17em;
+    margin: 1em 0;
+}
+
+h4 {
+    font-size: 1em;
+    margin: 1.33em 0;
+}
+
+h5 {
+    font-size: 0.83em;
+    margin: 1.67em 0;
+}
+
+h6 {
+    font-size: 0.67em;
+    margin: 2.33em 0;
+}
+
+/**
+ * Address styling not present in IE 7/8/9, Safari 5, and Chrome.
+ */
+
+abbr[title] {
+    border-bottom: 1px dotted;
+}
+
+/**
+ * Address style set to `bolder` in Firefox 3+, Safari 4/5, and Chrome.
+ */
+
+b,
+strong {
+    font-weight: bold;
+}
+
+blockquote {
+    margin: 1em 40px;
+}
+
+/**
+ * Address styling not present in Safari 5 and Chrome.
+ */
+
+dfn {
+    font-style: italic;
+}
+
+/**
+ * Address differences between Firefox and other browsers.
+ * Known issue: no IE 6/7 normalization.
+ */
+
+hr {
+    -moz-box-sizing: content-box;
+    box-sizing: content-box;
+    height: 0;
+}
+
+/**
+ * Address styling not present in IE 6/7/8/9.
+ */
+
+mark {
+    background: #ff0;
+    color: #000;
+}
+
+/**
+ * Address margins set differently in IE 6/7.
+ */
+
+p,
+pre {
+    margin: 1em 0;
+}
+
+/**
+ * Correct font family set oddly in IE 6, Safari 4/5, and Chrome.
+ */
+
+code,
+kbd,
+pre,
+samp {
+    font-family: monospace, serif;
+    _font-family: 'courier new', monospace;
+    font-size: 1em;
+}
+
+/**
+ * Improve readability of pre-formatted text in all browsers.
+ */
+
+pre {
+    white-space: pre;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/**
+ * Address CSS quotes not supported in IE 6/7.
+ */
+
+q {
+    quotes: none;
+}
+
+/**
+ * Address `quotes` property not supported in Safari 4.
+ */
+
+q:before,
+q:after {
+    content: '';
+    content: none;
+}
+
+/**
+ * Address inconsistent and variable font size in all browsers.
+ */
+
+small {
+    font-size: 80%;
+}
+
+/**
+ * Prevent `sub` and `sup` affecting `line-height` in all browsers.
+ */
+
+sub,
+sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+}
+
+sup {
+    top: -0.5em;
+}
+
+sub {
+    bottom: -0.25em;
+}
+
+/* ==========================================================================
+   Lists
+   ========================================================================== */
+
+/**
+ * Address margins set differently in IE 6/7.
+ */
+
+dl,
+menu,
+ol,
+ul {
+    margin: 1em 0;
+}
+
+dd {
+    margin: 0 0 0 40px;
+}
+
+/**
+ * Address paddings set differently in IE 6/7.
+ */
+
+menu,
+ol,
+ul {
+    padding: 0 0 0 40px;
+}
+
+/**
+ * Correct list images handled incorrectly in IE 7.
+ */
+
+nav ul,
+nav ol {
+    list-style: none;
+    list-style-image: none;
+}
+
+/* ==========================================================================
+   Embedded content
+   ========================================================================== */
+
+/**
+ * 1. Remove border when inside `a` element in IE 6/7/8/9 and Firefox 3.
+ * 2. Improve image quality when scaled in IE 7.
+ */
+
+img {
+    border: 0; /* 1 */
+    -ms-interpolation-mode: bicubic; /* 2 */
+}
+
+/**
+ * Correct overflow displayed oddly in IE 9.
+ */
+
+svg:not(:root) {
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Figures
+   ========================================================================== */
+
+/**
+ * Address margin not present in IE 6/7/8/9, Safari 5, and Opera 11.
+ */
+
+figure {
+    margin: 0;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+/**
+ * Correct margin displayed oddly in IE 6/7.
+ */
+
+form {
+    margin: 0;
+}
+
+/**
+ * Define consistent border, margin, and padding.
+ */
+
+fieldset {
+    border: 1px solid #c0c0c0;
+    margin: 0 2px;
+    padding: 0.35em 0.625em 0.75em;
+}
+
+/**
+ * 1. Correct color not being inherited in IE 6/7/8/9.
+ * 2. Correct text not wrapping in Firefox 3.
+ * 3. Correct alignment displayed oddly in IE 6/7.
+ */
+
+legend {
+    border: 0; /* 1 */
+    padding: 0;
+    white-space: normal; /* 2 */
+    *margin-left: -7px; /* 3 */
+}
+
+/**
+ * 1. Correct font size not being inherited in all browsers.
+ * 2. Address margins set differently in IE 6/7, Firefox 3+, Safari 5,
+ *    and Chrome.
+ * 3. Improve appearance and consistency in all browsers.
+ */
+
+button,
+input,
+select,
+textarea {
+    font-size: 100%; /* 1 */
+    margin: 0; /* 2 */
+    vertical-align: baseline; /* 3 */
+    *vertical-align: middle; /* 3 */
+}
+
+/**
+ * Address Firefox 3+ setting `line-height` on `input` using `!important` in
+ * the UA stylesheet.
+ */
+
+button,
+input {
+    line-height: normal;
+}
+
+/**
+ * Address inconsistent `text-transform` inheritance for `button` and `select`.
+ * All other form control elements do not inherit `text-transform` values.
+ * Correct `button` style inheritance in Chrome, Safari 5+, and IE 6+.
+ * Correct `select` style inheritance in Firefox 4+ and Opera.
+ */
+
+button,
+select {
+    text-transform: none;
+}
+
+/**
+ * 1. Avoid the WebKit bug in Android 4.0.* where (2) destroys native `audio`
+ *    and `video` controls.
+ * 2. Correct inability to style clickable `input` types in iOS.
+ * 3. Improve usability and consistency of cursor style between image-type
+ *    `input` and others.
+ * 4. Remove inner spacing in IE 7 without affecting normal text inputs.
+ *    Known issue: inner spacing remains in IE 6.
+ */
+
+button,
+html input[type="button"], /* 1 */
+input[type="reset"],
+input[type="submit"] {
+    -webkit-appearance: button; /* 2 */
+    cursor: pointer; /* 3 */
+    *overflow: visible;  /* 4 */
+}
+
+/**
+ * Re-set default cursor for disabled elements.
+ */
+
+button[disabled],
+html input[disabled] {
+    cursor: default;
+}
+
+/**
+ * 1. Address box sizing set to content-box in IE 8/9.
+ * 2. Remove excess padding in IE 8/9.
+ * 3. Remove excess padding in IE 7.
+ *    Known issue: excess padding remains in IE 6.
+ */
+
+input[type="checkbox"],
+input[type="radio"] {
+    box-sizing: border-box; /* 1 */
+    padding: 0; /* 2 */
+    *height: 13px; /* 3 */
+    *width: 13px; /* 3 */
+}
+
+/**
+ * 1. Address `appearance` set to `searchfield` in Safari 5 and Chrome.
+ * 2. Address `box-sizing` set to `border-box` in Safari 5 and Chrome
+ *    (include `-moz` to future-proof).
+ */
+
+input[type="search"] {
+    -webkit-appearance: textfield; /* 1 */
+    -moz-box-sizing: content-box;
+    -webkit-box-sizing: content-box; /* 2 */
+    box-sizing: content-box;
+}
+
+/**
+ * Remove inner padding and search cancel button in Safari 5 and Chrome
+ * on OS X.
+ */
+
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+}
+
+/**
+ * Remove inner padding and border in Firefox 3+.
+ */
+
+button::-moz-focus-inner,
+input::-moz-focus-inner {
+    border: 0;
+    padding: 0;
+}
+
+/**
+ * 1. Remove default vertical scrollbar in IE 6/7/8/9.
+ * 2. Improve readability and alignment in all browsers.
+ */
+
+textarea {
+    overflow: auto; /* 1 */
+    vertical-align: top; /* 2 */
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+/**
+ * Remove most spacing between table cells.
+ */
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+  </style>
+
+  <style type="text/css">
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+  }
+  body {
+    background: #fff;
+    font-family: "Source Sans Pro", "Helvetica Neueue", Helvetica, sans;
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.6em;
+  }
+  #content {
+    width: 70%;
+    max-width: 850px;
+    float: left;
+    padding: 30px 60px;
+    border-left: 1px solid #ddd;
+  }
+  #sidebar {
+    width: 25%;
+    float: left;
+    padding: 30px;
+    overflow: hidden;
+  }
+  #nav {
+    font-size: 130%;
+    margin: 0 0 15px 0;
+  }
+
+  #top {
+    display: block;
+    position: fixed;
+    bottom: 5px;
+    left: 5px;
+    font-size: .85em;
+    text-transform: uppercase;
+  }
+
+  #footer {
+    font-size: .75em;
+    padding: 5px 30px;
+    border-top: 1px solid #ddd;
+    text-align: right;
+  }
+    #footer p {
+      margin: 0 0 0 30px;
+      display: inline-block;
+    }
+
+  h1, h2, h3, h4, h5 {
+    font-weight: 300;
+  }
+  h1 {
+    font-size: 2.5em;
+    line-height: 1.1em;
+    margin: 0 0 .50em 0;
+  }
+
+  h2 {
+    font-size: 1.75em;
+    margin: 1em 0 .50em 0;
+  }
+
+  h3 {
+    margin: 25px 0 10px 0;
+  }
+
+  h4 {
+    margin: 0;
+    font-size: 105%;
+  }
+
+  a {
+    color: #058;
+    text-decoration: none;
+    transition: color .3s ease-in-out;
+  }
+
+  a:hover {
+    color: #e08524;
+    transition: color .3s ease-in-out;
+  }
+
+  pre, code, .mono, .name {
+    font-family: "Ubuntu Mono", "Cousine", "DejaVu Sans Mono", monospace;
+  }
+
+  .title .name {
+    font-weight: bold;
+  }
+  .section-title {
+    margin-top: 2em;
+  }
+  .ident {
+    color: #900;
+  }
+
+  code {
+    background: #f9f9f9;
+  } 
+
+  pre {
+    background: #fefefe;
+    border: 1px solid #ddd;
+    box-shadow: 2px 2px 0 #f3f3f3;
+    margin: 0 30px;
+    padding: 15px 30px;
+  }
+
+  .codehilite {
+    margin: 0 30px 10px 30px;
+  }
+
+    .codehilite pre {
+      margin: 0;
+    }
+    .codehilite .err { background: #ff3300; color: #fff !important; } 
+
+  table#module-list {
+    font-size: 110%;
+  }
+
+    table#module-list tr td:first-child {
+      padding-right: 10px;
+      white-space: nowrap;
+    }
+
+    table#module-list td {
+      vertical-align: top;
+      padding-bottom: 8px;
+    }
+
+      table#module-list td p {
+        margin: 0 0 7px 0;
+      }
+
+  .def {
+    display: table;
+  }
+
+    .def p {
+      display: table-cell;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .def p:first-child {
+      white-space: nowrap;
+    }
+
+    .def p:last-child {
+      width: 100%;
+    }
+
+
+  #index {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+  }
+    ul#index .class_name {
+      /* font-size: 110%; */
+      font-weight: bold;
+    }
+    #index ul {
+      margin: 0;
+    }
+
+  .item {
+    margin: 0 0 15px 0;
+  }
+
+    .item .class {
+      margin: 0 0 25px 30px;
+    }
+
+      .item .class ul.class_list {
+        margin: 0 0 20px 0;
+      }
+
+    .item .name {
+      background: #fafafa;
+      margin: 0;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 3px;
+      display: inline-block;
+      min-width: 40%;
+    }
+      .item .name:hover {
+        background: #f6f6f6;
+      }
+
+    .item .empty_desc {
+      margin: 0 0 5px 0;
+      padding: 0;
+    }
+
+    .item .inheritance {
+      margin: 3px 0 0 30px;
+    }
+
+    .item .inherited {
+      color: #666;
+    }
+
+    .item .desc {
+      padding: 0 8px;
+      margin: 0;
+    }
+
+      .item .desc p {
+        margin: 0 0 10px 0;
+      }
+
+    .source_cont {
+      margin: 0;
+      padding: 0;
+    }
+
+    .source_link a {
+      background: #ffc300;
+      font-weight: 400;
+      font-size: .75em;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow: 1px 1px 0 #f4b700;
+      
+      padding: 3px 8px;
+      border-radius: 2px;
+      transition: background .3s ease-in-out;
+    }
+      .source_link a:hover {
+        background: #FF7200;
+        text-shadow: none;
+        transition: background .3s ease-in-out;
+      }
+
+    .source {
+      display: none;
+      max-height: 600px;
+      overflow-y: scroll;
+      margin-bottom: 15px;
+    }
+
+      .source .codehilite {
+        margin: 0;
+      }
+
+  .desc h1, .desc h2, .desc h3 {
+    font-size: 100% !important;
+  }
+  .clear {
+    clear: both;
+  }
+
+  @media all and (max-width: 950px) {
+    #sidebar {
+      width: 35%;
+    }
+    #content {
+      width: 65%;
+    }
+  }
+  @media all and (max-width: 650px) {
+    #top {
+      display: none;
+    }
+    #sidebar {
+      float: none;
+      width: auto;
+    }
+    #content {
+      float: none;
+      width: auto;
+      padding: 30px;
+    }
+
+    #index ul {
+      padding: 0;
+      margin-bottom: 15px;
+    }
+    #index ul li {
+      display: inline-block;
+      margin-right: 30px;
+    }
+    #footer {
+      text-align: left;
+    }
+    #footer p {
+      display: block;
+      margin: inherit;
+    }
+  }
+
+  /*****************************/
+
+  </style>
+
+
+  <style type="text/css">
+  
+/* ==========================================================================
+   EXAMPLE Media Queries for Responsive Design.
+   These examples override the primary ('mobile first') styles.
+   Modify as content requires.
+   ========================================================================== */
+
+@media only screen and (min-width: 35em) {
+    /* Style adjustments for viewports that meet the condition */
+}
+
+@media print,
+       (-o-min-device-pixel-ratio: 5/4),
+       (-webkit-min-device-pixel-ratio: 1.25),
+       (min-resolution: 120dpi) {
+    /* Style adjustments for high resolution devices */
+}
+
+/* ==========================================================================
+   Print styles.
+   Inlined to avoid required HTTP connection: h5bp.com/r
+   ========================================================================== */
+
+@media print {
+    * {
+        background: transparent !important;
+        color: #000 !important; /* Black prints faster: h5bp.com/s */
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    a,
+    a:visited {
+        text-decoration: underline;
+    }
+
+    a[href]:after {
+        content: " (" attr(href) ")";
+    }
+
+    abbr[title]:after {
+        content: " (" attr(title) ")";
+    }
+
+    /*
+     * Don't show links for images, or javascript/internal links
+     */
+
+    .ir a:after,
+    a[href^="javascript:"]:after,
+    a[href^="#"]:after {
+        content: "";
+    }
+
+    pre,
+    blockquote {
+        border: 1px solid #999;
+        page-break-inside: avoid;
+    }
+
+    thead {
+        display: table-header-group; /* h5bp.com/t */
+    }
+
+    tr,
+    img {
+        page-break-inside: avoid;
+    }
+
+    img {
+        max-width: 100% !important;
+    }
+
+    @page {
+        margin: 0.5cm;
+    }
+
+    p,
+    h2,
+    h3 {
+        orphans: 3;
+        widows: 3;
+    }
+
+    h2,
+    h3 {
+        page-break-after: avoid;
+    }
+}
+
+  </style>
+
+  <script type="text/javascript">
+  function toggle(id, $link) {
+    $node = document.getElementById(id);
+    if (!$node)
+    return;
+    if (!$node.style.display || $node.style.display == 'none') {
+    $node.style.display = 'block';
+    $link.innerHTML = 'Hide source &nequiv;';
+    } else {
+    $node.style.display = 'none';
+    $link.innerHTML = 'Show source &equiv;';
+    }
+  }
+  </script>
+</head>
+<body>
+<a href="#" id="top">Top</a>
+
+<div id="container">
+    
+  
+  <div id="sidebar">
+    <h1>Index</h1>
+    <ul id="index">
+
+
+    <li class="set"><h3><a href="#header-classes">Classes</a></h3>
+      <ul>
+        <li class="mono">
+        <span class="class_name"><a href="#pythongis.app.map.MapView">MapView</a></span>
+        
+          
+  <ul>
+    <li class="mono"><a href="#pythongis.app.map.MapView.__init__">__init__</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.add_control">add_control</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag">addtag</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_above">addtag_above</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_all">addtag_all</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_below">addtag_below</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_closest">addtag_closest</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_enclosed">addtag_enclosed</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_overlapping">addtag_overlapping</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.addtag_withtag">addtag_withtag</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.after">after</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.after_cancel">after_cancel</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.after_idle">after_idle</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.bbox">bbox</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.bell">bell</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.bind">bind</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.bind_all">bind_all</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.bind_class">bind_class</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.bindtags">bindtags</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.canvasx">canvasx</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.canvasy">canvasy</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.cget">cget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.clipboard_append">clipboard_append</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.clipboard_clear">clipboard_clear</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.clipboard_get">clipboard_get</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.colormodel">colormodel</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.columnconfigure">columnconfigure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.config">config</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.configure">configure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.coords">coords</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_arc">create_arc</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_bitmap">create_bitmap</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_image">create_image</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_line">create_line</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_oval">create_oval</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_polygon">create_polygon</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_rectangle">create_rectangle</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_text">create_text</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.create_window">create_window</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.dchars">dchars</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.delete">delete</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.deletecommand">deletecommand</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.destroy">destroy</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.dtag">dtag</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.event_add">event_add</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.event_delete">event_delete</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.event_generate">event_generate</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.event_info">event_info</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find">find</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_above">find_above</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_all">find_all</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_below">find_below</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_closest">find_closest</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_enclosed">find_enclosed</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_overlapping">find_overlapping</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.find_withtag">find_withtag</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.focus">focus</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.focus_displayof">focus_displayof</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.focus_force">focus_force</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.focus_get">focus_get</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.focus_lastfor">focus_lastfor</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.focus_set">focus_set</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.forget">forget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.getboolean">getboolean</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.gettags">gettags</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.getvar">getvar</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grab_current">grab_current</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grab_release">grab_release</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grab_set">grab_set</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grab_set_global">grab_set_global</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grab_status">grab_status</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid">grid</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_bbox">grid_bbox</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_columnconfigure">grid_columnconfigure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_configure">grid_configure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_forget">grid_forget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_info">grid_info</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_location">grid_location</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_propagate">grid_propagate</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_remove">grid_remove</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_rowconfigure">grid_rowconfigure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_size">grid_size</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.grid_slaves">grid_slaves</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.icursor">icursor</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.image_names">image_names</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.image_types">image_types</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.index">index</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.info">info</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.insert">insert</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.itemcget">itemcget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.itemconfig">itemconfig</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.itemconfigure">itemconfigure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.keys">keys</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.lift">lift</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.location">location</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.log_zoom">log_zoom</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.lower">lower</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.mainloop">mainloop</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.mouse2coords">mouse2coords</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.move">move</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.nametowidget">nametowidget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.option_add">option_add</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.option_clear">option_clear</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.option_get">option_get</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.option_readfile">option_readfile</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.pack">pack</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.pack_configure">pack_configure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.pack_forget">pack_forget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.pack_info">pack_info</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.pack_propagate">pack_propagate</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.pack_slaves">pack_slaves</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.place">place</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.place_configure">place_configure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.place_forget">place_forget</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.place_info">place_info</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.place_slaves">place_slaves</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.postscript">postscript</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.propagate">propagate</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.quit">quit</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.register">register</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.rowconfigure">rowconfigure</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.scale">scale</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.scan_dragto">scan_dragto</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.scan_mark">scan_mark</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.select_adjust">select_adjust</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.select_clear">select_clear</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.select_from">select_from</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.select_item">select_item</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.select_to">select_to</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.selection_clear">selection_clear</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.selection_get">selection_get</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.selection_handle">selection_handle</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.selection_own">selection_own</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.selection_own_get">selection_own_get</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.send">send</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.setvar">setvar</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.size">size</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.slaves">slaves</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tag_bind">tag_bind</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tag_lower">tag_lower</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tag_raise">tag_raise</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tag_unbind">tag_unbind</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.threaded_rendering">threaded_rendering</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_bisque">tk_bisque</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_focusFollowsMouse">tk_focusFollowsMouse</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_focusNext">tk_focusNext</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_focusPrev">tk_focusPrev</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_menuBar">tk_menuBar</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_setPalette">tk_setPalette</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tk_strictMotif">tk_strictMotif</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.tkraise">tkraise</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.type">type</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.unbind">unbind</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.unbind_all">unbind_all</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.unbind_class">unbind_class</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.update">update</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.update_idletasks">update_idletasks</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.update_image">update_image</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.wait_variable">wait_variable</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.wait_visibility">wait_visibility</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.wait_window">wait_window</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.waitvar">waitvar</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_atom">winfo_atom</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_atomname">winfo_atomname</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_cells">winfo_cells</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_children">winfo_children</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_class">winfo_class</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_colormapfull">winfo_colormapfull</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_containing">winfo_containing</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_depth">winfo_depth</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_exists">winfo_exists</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_fpixels">winfo_fpixels</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_geometry">winfo_geometry</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_height">winfo_height</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_id">winfo_id</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_interps">winfo_interps</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_ismapped">winfo_ismapped</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_manager">winfo_manager</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_name">winfo_name</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_parent">winfo_parent</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_pathname">winfo_pathname</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_pixels">winfo_pixels</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_pointerx">winfo_pointerx</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_pointerxy">winfo_pointerxy</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_pointery">winfo_pointery</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_reqheight">winfo_reqheight</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_reqwidth">winfo_reqwidth</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_rgb">winfo_rgb</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_rootx">winfo_rootx</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_rooty">winfo_rooty</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screen">winfo_screen</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screencells">winfo_screencells</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screendepth">winfo_screendepth</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screenheight">winfo_screenheight</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screenmmheight">winfo_screenmmheight</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screenmmwidth">winfo_screenmmwidth</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screenvisual">winfo_screenvisual</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_screenwidth">winfo_screenwidth</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_server">winfo_server</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_toplevel">winfo_toplevel</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_viewable">winfo_viewable</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_visual">winfo_visual</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_visualid">winfo_visualid</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_visualsavailable">winfo_visualsavailable</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_vrootheight">winfo_vrootheight</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_vrootwidth">winfo_vrootwidth</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_vrootx">winfo_vrootx</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_vrooty">winfo_vrooty</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_width">winfo_width</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_x">winfo_x</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.winfo_y">winfo_y</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.xview">xview</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.xview_moveto">xview_moveto</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.xview_scroll">xview_scroll</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.yview">yview</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.yview_moveto">yview_moveto</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.yview_scroll">yview_scroll</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_bbox">zoom_bbox</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_global">zoom_global</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_if_finished">zoom_if_finished</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_in">zoom_in</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_next">zoom_next</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_out">zoom_out</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_previous">zoom_previous</a></li>
+    <li class="mono"><a href="#pythongis.app.map.MapView.zoom_rect">zoom_rect</a></li>
+  </ul>
+
+        </li>
+      </ul>
+    </li>
+
+    </ul>
+  </div>
+
+    <article id="content">
+      
+  
+
+  
+
+
+  <header id="section-intro">
+  <h1 class="title"><span class="name">pythongis.app.map</span> module</h1>
+  
+  
+
+  </header>
+
+  <section id="section-items">
+
+
+    <h2 class="section-title" id="header-classes">Classes</h2>
+      
+      <div class="item">
+      <p id="pythongis.app.map.MapView" class="name">class <span class="ident">MapView</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+
+      <div class="class">
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          <li><a href="#pythongis.app.map.MapView">MapView</a></li>
+          <li>Tkinter.Canvas</li>
+          <li>Tkinter.Widget</li>
+          <li>Tkinter.BaseWidget</li>
+          <li>Tkinter.Misc</li>
+          <li>Tkinter.Pack</li>
+          <li>Tkinter.Place</li>
+          <li>Tkinter.Grid</li>
+          <li>Tkinter.XView</li>
+          <li>Tkinter.YView</li>
+          </ul>
+          <h3>Methods</h3>
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, master, renderer, **kwargs)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.add_control">
+    <p>def <span class="ident">add_control</span>(</p><p>self, control)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag">
+    <p>def <span class="ident">addtag</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Internal function.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_above">
+    <p>def <span class="ident">addtag_above</span>(</p><p>self, newtag, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to all items above TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_all">
+    <p>def <span class="ident">addtag_all</span>(</p><p>self, newtag)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to all items.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_below">
+    <p>def <span class="ident">addtag_below</span>(</p><p>self, newtag, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to all items below TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_closest">
+    <p>def <span class="ident">addtag_closest</span>(</p><p>self, newtag, x, y, halo=None, start=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to item which is closest to pixel at X, Y.
+If several match take the top-most.
+All items closer than HALO are considered overlapping (all are
+closests). If START is specified the next below this tag is taken.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_enclosed">
+    <p>def <span class="ident">addtag_enclosed</span>(</p><p>self, newtag, x1, y1, x2, y2)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to all items in the rectangle defined
+by X1,Y1,X2,Y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_overlapping">
+    <p>def <span class="ident">addtag_overlapping</span>(</p><p>self, newtag, x1, y1, x2, y2)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to all items which overlap the rectangle
+defined by X1,Y1,X2,Y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.addtag_withtag">
+    <p>def <span class="ident">addtag_withtag</span>(</p><p>self, newtag, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add tag NEWTAG to all items with TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.after">
+    <p>def <span class="ident">after</span>(</p><p>self, ms, func=None, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Call function once after given time.</p>
+<p>MS specifies the time in milliseconds. FUNC gives the
+function which shall be called. Additional parameters
+are given as parameters to the function call.  Return
+identifier to cancel scheduling with after_cancel.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.after_cancel">
+    <p>def <span class="ident">after_cancel</span>(</p><p>self, id)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Cancel scheduling of function identified with ID.</p>
+<p>Identifier returned by after or after_idle must be
+given as first parameter.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.after_idle">
+    <p>def <span class="ident">after_idle</span>(</p><p>self, func, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Call FUNC once if the Tcl main loop has no event to
+process.</p>
+<p>Return an identifier to cancel the scheduling with
+after_cancel.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.bbox">
+    <p>def <span class="ident">bbox</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of X1,Y1,X2,Y2 coordinates for a rectangle
+which encloses all items with tags specified as arguments.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.bell">
+    <p>def <span class="ident">bell</span>(</p><p>self, displayof=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Ring a display's bell.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.bind">
+    <p>def <span class="ident">bind</span>(</p><p>self, sequence=None, func=None, add=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Bind to this widget at event SEQUENCE a call to function FUNC.</p>
+<p>SEQUENCE is a string of concatenated event
+patterns. An event pattern is of the form
+<MODIFIER-MODIFIER-TYPE-DETAIL> where MODIFIER is one
+of Control, Mod2, M2, Shift, Mod3, M3, Lock, Mod4, M4,
+Button1, B1, Mod5, M5 Button2, B2, Meta, M, Button3,
+B3, Alt, Button4, B4, Double, Button5, B5 Triple,
+Mod1, M1. TYPE is one of Activate, Enter, Map,
+ButtonPress, Button, Expose, Motion, ButtonRelease
+FocusIn, MouseWheel, Circulate, FocusOut, Property,
+Colormap, Gravity Reparent, Configure, KeyPress, Key,
+Unmap, Deactivate, KeyRelease Visibility, Destroy,
+Leave and DETAIL is the button number for ButtonPress,
+ButtonRelease and DETAIL is the Keysym for KeyPress and
+KeyRelease. Examples are
+<Control-Button-1> for pressing Control and mouse button 1 or
+<Alt-A> for pressing A and the Alt key (KeyPress can be omitted).
+An event pattern can also be a virtual event of the form
+&lt;<AString>&gt; where AString can be arbitrary. This
+event can be generated by event_generate.
+If events are concatenated they must appear shortly
+after each other.</p>
+<p>FUNC will be called if the event sequence occurs with an
+instance of Event as argument. If the return value of FUNC is
+"break" no further bound function is invoked.</p>
+<p>An additional boolean parameter ADD specifies whether FUNC will
+be called additionally to the other bound function or whether
+it will replace the previous function.</p>
+<p>Bind will return an identifier to allow deletion of the bound function with
+unbind without memory leak.</p>
+<p>If FUNC or SEQUENCE is omitted the bound function or list
+of bound events are returned.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.bind_all">
+    <p>def <span class="ident">bind_all</span>(</p><p>self, sequence=None, func=None, add=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Bind to all widgets at an event SEQUENCE a call to function FUNC.
+An additional boolean parameter ADD specifies whether FUNC will
+be called additionally to the other bound function or whether
+it will replace the previous function. See bind for the return value.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.bind_class">
+    <p>def <span class="ident">bind_class</span>(</p><p>self, className, sequence=None, func=None, add=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Bind to widgets with bindtag CLASSNAME at event
+SEQUENCE a call of function FUNC. An additional
+boolean parameter ADD specifies whether FUNC will be
+called additionally to the other bound function or
+whether it will replace the previous function. See bind for
+the return value.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.bindtags">
+    <p>def <span class="ident">bindtags</span>(</p><p>self, tagList=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set or get the list of bindtags for this widget.</p>
+<p>With no argument return the list of all bindtags associated with
+this widget. With a list of strings as argument the bindtags are
+set to this list. The bindtags determine in which order events are
+processed (see bind).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.canvasx">
+    <p>def <span class="ident">canvasx</span>(</p><p>self, screenx, gridspacing=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the canvas x coordinate of pixel position SCREENX rounded
+to nearest multiple of GRIDSPACING units.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.canvasy">
+    <p>def <span class="ident">canvasy</span>(</p><p>self, screeny, gridspacing=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the canvas y coordinate of pixel position SCREENY rounded
+to nearest multiple of GRIDSPACING units.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.cget">
+    <p>def <span class="ident">cget</span>(</p><p>self, key)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the resource value for a KEY given as string.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.clipboard_append">
+    <p>def <span class="ident">clipboard_append</span>(</p><p>self, string, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Append STRING to the Tk clipboard.</p>
+<p>A widget specified at the optional displayof keyword
+argument specifies the target display. The clipboard
+can be retrieved with selection_get.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.clipboard_clear">
+    <p>def <span class="ident">clipboard_clear</span>(</p><p>self, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Clear the data in the Tk clipboard.</p>
+<p>A widget specified for the optional displayof keyword
+argument specifies the target display.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.clipboard_get">
+    <p>def <span class="ident">clipboard_get</span>(</p><p>self, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Retrieve data from the clipboard on window's display.</p>
+<p>The window keyword defaults to the root window of the Tkinter
+application.</p>
+<p>The type keyword specifies the form in which the data is
+to be returned and should be an atom name such as STRING
+or FILE_NAME.  Type defaults to STRING, except on X11, where the default
+is to try UTF8_STRING and fall back to STRING.</p>
+<p>This command is equivalent to:</p>
+<p>selection_get(CLIPBOARD)</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.colormodel">
+    <p>def <span class="ident">colormodel</span>(</p><p>self, value=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Useless. Not implemented in Tk.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.columnconfigure">
+    <p>def <span class="ident">columnconfigure</span>(</p><p>self, index, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure column INDEX of a grid.</p>
+<p>Valid resources are minsize (minimum size of the column),
+weight (how much does additional space propagate to this column)
+and pad (how much space to let additionally).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.config">
+    <p>def <span class="ident">config</span>(</p><p>self, cnf=None, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure resources of a widget.</p>
+<p>The values for resources are specified as keyword
+arguments. To get an overview about
+the allowed keyword arguments call the method keys.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.configure">
+    <p>def <span class="ident">configure</span>(</p><p>self, cnf=None, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure resources of a widget.</p>
+<p>The values for resources are specified as keyword
+arguments. To get an overview about
+the allowed keyword arguments call the method keys.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.coords">
+    <p>def <span class="ident">coords</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of coordinates for the item given in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_arc">
+    <p>def <span class="ident">create_arc</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create arc shaped region with coordinates x1,y1,x2,y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_bitmap">
+    <p>def <span class="ident">create_bitmap</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create bitmap with coordinates x1,y1.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_image">
+    <p>def <span class="ident">create_image</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create image item with coordinates x1,y1.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_line">
+    <p>def <span class="ident">create_line</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create line with coordinates x1,y1,...,xn,yn.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_oval">
+    <p>def <span class="ident">create_oval</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create oval with coordinates x1,y1,x2,y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_polygon">
+    <p>def <span class="ident">create_polygon</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create polygon with coordinates x1,y1,...,xn,yn.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_rectangle">
+    <p>def <span class="ident">create_rectangle</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create rectangle with coordinates x1,y1,x2,y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_text">
+    <p>def <span class="ident">create_text</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create text with coordinates x1,y1.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.create_window">
+    <p>def <span class="ident">create_window</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Create window with coordinates x1,y1,x2,y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.dchars">
+    <p>def <span class="ident">dchars</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Delete characters of text items identified by tag or id in ARGS (possibly
+several times) from FIRST to LAST character (including).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.delete">
+    <p>def <span class="ident">delete</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Delete items identified by all tag or ids contained in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.deletecommand">
+    <p>def <span class="ident">deletecommand</span>(</p><p>self, name)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Internal function.</p>
+<p>Delete the Tcl command provided in NAME.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.destroy">
+    <p>def <span class="ident">destroy</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Destroy this and all descendants widgets.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.dtag">
+    <p>def <span class="ident">dtag</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Delete tag or id given as last arguments in ARGS from items
+identified by first argument in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.event_add">
+    <p>def <span class="ident">event_add</span>(</p><p>self, virtual, *sequences)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Bind a virtual event VIRTUAL (of the form &lt;<Name>&gt;)
+to an event SEQUENCE such that the virtual event is triggered
+whenever SEQUENCE occurs.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.event_delete">
+    <p>def <span class="ident">event_delete</span>(</p><p>self, virtual, *sequences)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unbind a virtual event VIRTUAL from SEQUENCE.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.event_generate">
+    <p>def <span class="ident">event_generate</span>(</p><p>self, sequence, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Generate an event SEQUENCE. Additional
+keyword arguments specify parameter of the event
+(e.g. x, y, rootx, rooty).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.event_info">
+    <p>def <span class="ident">event_info</span>(</p><p>self, virtual=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all virtual events or the information
+about the SEQUENCE bound to the virtual event VIRTUAL.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find">
+    <p>def <span class="ident">find</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Internal function.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_above">
+    <p>def <span class="ident">find_above</span>(</p><p>self, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return items above TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_all">
+    <p>def <span class="ident">find_all</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return all items.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_below">
+    <p>def <span class="ident">find_below</span>(</p><p>self, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return all items below TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_closest">
+    <p>def <span class="ident">find_closest</span>(</p><p>self, x, y, halo=None, start=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return item which is closest to pixel at X, Y.
+If several match take the top-most.
+All items closer than HALO are considered overlapping (all are
+closest). If START is specified the next below this tag is taken.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_enclosed">
+    <p>def <span class="ident">find_enclosed</span>(</p><p>self, x1, y1, x2, y2)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return all items in rectangle defined
+by X1,Y1,X2,Y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_overlapping">
+    <p>def <span class="ident">find_overlapping</span>(</p><p>self, x1, y1, x2, y2)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return all items which overlap the rectangle
+defined by X1,Y1,X2,Y2.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.find_withtag">
+    <p>def <span class="ident">find_withtag</span>(</p><p>self, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return all items with TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.focus">
+    <p>def <span class="ident">focus</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set focus to the first item specified in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.focus_displayof">
+    <p>def <span class="ident">focus_displayof</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the widget which has currently the focus on the
+display where this widget is located.</p>
+<p>Return None if the application does not have the focus.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.focus_force">
+    <p>def <span class="ident">focus_force</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Direct input focus to this widget even if the
+application does not have the focus. Use with
+caution!</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.focus_get">
+    <p>def <span class="ident">focus_get</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the widget which has currently the focus in the
+application.</p>
+<p>Use focus_displayof to allow working with several
+displays. Return None if application does not have
+the focus.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.focus_lastfor">
+    <p>def <span class="ident">focus_lastfor</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the widget which would have the focus if top level
+for this widget gets the focus from the window manager.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.focus_set">
+    <p>def <span class="ident">focus_set</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Direct input focus to this widget.</p>
+<p>If the application currently does not have the focus
+this widget will get the focus if the application gets
+the focus through the window manager.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.forget">
+    <p>def <span class="ident">forget</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unmap this widget and do not use it for the packing order.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.getboolean">
+    <p>def <span class="ident">getboolean</span>(</p><p>self, s)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a boolean value for Tcl boolean values true and false given as parameter.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.gettags">
+    <p>def <span class="ident">gettags</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return tags associated with the first item specified in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.getvar">
+    <p>def <span class="ident">getvar</span>(</p><p>self, name=&#39;PY_VAR&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return value of Tcl variable NAME.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grab_current">
+    <p>def <span class="ident">grab_current</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return widget which has currently the grab in this application
+or None.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grab_release">
+    <p>def <span class="ident">grab_release</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Release grab for this widget if currently set.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grab_set">
+    <p>def <span class="ident">grab_set</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set grab for this widget.</p>
+<p>A grab directs all events to this and descendant
+widgets in the application.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grab_set_global">
+    <p>def <span class="ident">grab_set_global</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set global grab for this widget.</p>
+<p>A global grab directs all events to this and
+descendant widgets on the display. Use with caution -
+other applications do not get events anymore.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grab_status">
+    <p>def <span class="ident">grab_status</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return None, "local" or "global" if this widget has
+no, a local or a global grab.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid">
+    <p>def <span class="ident">grid</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Position a widget in the parent widget in a grid. Use as options:
+column=number - use cell identified with given column (starting with 0)
+columnspan=number - this widget will span several columns
+in=master - use master to contain this widget
+in_=master - see 'in' option description
+ipadx=amount - add internal padding in x direction
+ipady=amount - add internal padding in y direction
+padx=amount - add padding in x direction
+pady=amount - add padding in y direction
+row=number - use cell identified with given row (starting with 0)
+rowspan=number - this widget will span several rows
+sticky=NSEW - if cell is larger on which sides will this
+              widget stick to the cell boundary</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_bbox">
+    <p>def <span class="ident">grid_bbox</span>(</p><p>self, column=None, row=None, col2=None, row2=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of integer coordinates for the bounding
+box of this widget controlled by the geometry manager grid.</p>
+<p>If COLUMN, ROW is given the bounding box applies from
+the cell with row and column 0 to the specified
+cell. If COL2 and ROW2 are given the bounding box
+starts at that cell.</p>
+<p>The returned integers specify the offset of the upper left
+corner in the master widget and the width and height.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_columnconfigure">
+    <p>def <span class="ident">grid_columnconfigure</span>(</p><p>self, index, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure column INDEX of a grid.</p>
+<p>Valid resources are minsize (minimum size of the column),
+weight (how much does additional space propagate to this column)
+and pad (how much space to let additionally).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_configure">
+    <p>def <span class="ident">grid_configure</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Position a widget in the parent widget in a grid. Use as options:
+column=number - use cell identified with given column (starting with 0)
+columnspan=number - this widget will span several columns
+in=master - use master to contain this widget
+in_=master - see 'in' option description
+ipadx=amount - add internal padding in x direction
+ipady=amount - add internal padding in y direction
+padx=amount - add padding in x direction
+pady=amount - add padding in y direction
+row=number - use cell identified with given row (starting with 0)
+rowspan=number - this widget will span several rows
+sticky=NSEW - if cell is larger on which sides will this
+              widget stick to the cell boundary</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_forget">
+    <p>def <span class="ident">grid_forget</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unmap this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_info">
+    <p>def <span class="ident">grid_info</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return information about the options
+for positioning this widget in a grid.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_location">
+    <p>def <span class="ident">grid_location</span>(</p><p>self, x, y)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of column and row which identify the cell
+at which the pixel at position X and Y inside the master
+widget is located.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_propagate">
+    <p>def <span class="ident">grid_propagate</span>(</p><p>self, flag=[&#39;_noarg_&#39;])</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set or get the status for propagation of geometry information.</p>
+<p>A boolean argument specifies whether the geometry information
+of the slaves will determine the size of this widget. If no argument
+is given, the current setting will be returned.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_remove">
+    <p>def <span class="ident">grid_remove</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unmap this widget but remember the grid options.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_rowconfigure">
+    <p>def <span class="ident">grid_rowconfigure</span>(</p><p>self, index, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure row INDEX of a grid.</p>
+<p>Valid resources are minsize (minimum size of the row),
+weight (how much does additional space propagate to this row)
+and pad (how much space to let additionally).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_size">
+    <p>def <span class="ident">grid_size</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of the number of column and rows in the grid.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.grid_slaves">
+    <p>def <span class="ident">grid_slaves</span>(</p><p>self, row=None, column=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all slaves of this widget
+in its packing order.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.icursor">
+    <p>def <span class="ident">icursor</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set cursor at position POS in the item identified by TAGORID.
+In ARGS TAGORID must be first.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.image_names">
+    <p>def <span class="ident">image_names</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all existing image names.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.image_types">
+    <p>def <span class="ident">image_types</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all available image types (e.g. photo bitmap).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.index">
+    <p>def <span class="ident">index</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return position of cursor as integer in item specified in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.info">
+    <p>def <span class="ident">info</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return information about the packing options
+for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.insert">
+    <p>def <span class="ident">insert</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Insert TEXT in item TAGORID at position POS. ARGS must
+be TAGORID POS TEXT.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.itemcget">
+    <p>def <span class="ident">itemcget</span>(</p><p>self, tagOrId, option)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the resource value for an OPTION for item TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.itemconfig">
+    <p>def <span class="ident">itemconfig</span>(</p><p>self, tagOrId, cnf=None, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure resources of an item TAGORID.</p>
+<p>The values for resources are specified as keyword
+arguments. To get an overview about
+the allowed keyword arguments call the method without arguments.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.itemconfigure">
+    <p>def <span class="ident">itemconfigure</span>(</p><p>self, tagOrId, cnf=None, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure resources of an item TAGORID.</p>
+<p>The values for resources are specified as keyword
+arguments. To get an overview about
+the allowed keyword arguments call the method without arguments.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.keys">
+    <p>def <span class="ident">keys</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all resource names of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.lift">
+    <p>def <span class="ident">lift</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Raise an item TAGORID given in ARGS
+(optional above another item).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.location">
+    <p>def <span class="ident">location</span>(</p><p>self, x, y)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of column and row which identify the cell
+at which the pixel at position X and Y inside the master
+widget is located.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.log_zoom">
+    <p>def <span class="ident">log_zoom</span>(</p><p>self, bbox)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.lower">
+    <p>def <span class="ident">lower</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Lower an item TAGORID given in ARGS
+(optional below another item).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.mainloop">
+    <p>def <span class="ident">mainloop</span>(</p><p>self, n=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Call the mainloop of Tk.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.mouse2coords">
+    <p>def <span class="ident">mouse2coords</span>(</p><p>self, x, y)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.move">
+    <p>def <span class="ident">move</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Move an item TAGORID given in ARGS.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.nametowidget">
+    <p>def <span class="ident">nametowidget</span>(</p><p>self, name)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the Tkinter instance of a widget identified by
+its Tcl name NAME.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.option_add">
+    <p>def <span class="ident">option_add</span>(</p><p>self, pattern, value, priority=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set a VALUE (second parameter) for an option
+PATTERN (first parameter).</p>
+<p>An optional third parameter gives the numeric priority
+(defaults to 80).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.option_clear">
+    <p>def <span class="ident">option_clear</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Clear the option database.</p>
+<p>It will be reloaded if option_add is called.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.option_get">
+    <p>def <span class="ident">option_get</span>(</p><p>self, name, className)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the value for an option NAME for this widget
+with CLASSNAME.</p>
+<p>Values with higher priority override lower values.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.option_readfile">
+    <p>def <span class="ident">option_readfile</span>(</p><p>self, fileName, priority=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Read file FILENAME into the option database.</p>
+<p>An optional second parameter gives the numeric
+priority.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.pack">
+    <p>def <span class="ident">pack</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Pack a widget in the parent widget. Use as options:
+after=widget - pack it after you have packed widget
+anchor=NSEW (or subset) - position widget according to
+                          given direction
+before=widget - pack it before you will pack widget
+expand=bool - expand widget if parent size grows
+fill=NONE or X or Y or BOTH - fill widget if widget grows
+in=master - use master to contain this widget
+in_=master - see 'in' option description
+ipadx=amount - add internal padding in x direction
+ipady=amount - add internal padding in y direction
+padx=amount - add padding in x direction
+pady=amount - add padding in y direction
+side=TOP or BOTTOM or LEFT or RIGHT -  where to add this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.pack_configure">
+    <p>def <span class="ident">pack_configure</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Pack a widget in the parent widget. Use as options:
+after=widget - pack it after you have packed widget
+anchor=NSEW (or subset) - position widget according to
+                          given direction
+before=widget - pack it before you will pack widget
+expand=bool - expand widget if parent size grows
+fill=NONE or X or Y or BOTH - fill widget if widget grows
+in=master - use master to contain this widget
+in_=master - see 'in' option description
+ipadx=amount - add internal padding in x direction
+ipady=amount - add internal padding in y direction
+padx=amount - add padding in x direction
+pady=amount - add padding in y direction
+side=TOP or BOTTOM or LEFT or RIGHT -  where to add this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.pack_forget">
+    <p>def <span class="ident">pack_forget</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unmap this widget and do not use it for the packing order.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.pack_info">
+    <p>def <span class="ident">pack_info</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return information about the packing options
+for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.pack_propagate">
+    <p>def <span class="ident">pack_propagate</span>(</p><p>self, flag=[&#39;_noarg_&#39;])</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set or get the status for propagation of geometry information.</p>
+<p>A boolean argument specifies whether the geometry information
+of the slaves will determine the size of this widget. If no argument
+is given the current setting will be returned.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.pack_slaves">
+    <p>def <span class="ident">pack_slaves</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all slaves of this widget
+in its packing order.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.place">
+    <p>def <span class="ident">place</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Place a widget in the parent widget. Use as options:
+in=master - master relative to which the widget is placed
+in_=master - see 'in' option description
+x=amount - locate anchor of this widget at position x of master
+y=amount - locate anchor of this widget at position y of master
+relx=amount - locate anchor of this widget between 0.0 and 1.0
+              relative to width of master (1.0 is right edge)
+rely=amount - locate anchor of this widget between 0.0 and 1.0
+              relative to height of master (1.0 is bottom edge)
+anchor=NSEW (or subset) - position anchor according to given direction
+width=amount - width of this widget in pixel
+height=amount - height of this widget in pixel
+relwidth=amount - width of this widget between 0.0 and 1.0
+                  relative to width of master (1.0 is the same width
+                  as the master)
+relheight=amount - height of this widget between 0.0 and 1.0
+                   relative to height of master (1.0 is the same
+                   height as the master)
+bordermode="inside" or "outside" - whether to take border width of
+                                   master widget into account</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.place_configure">
+    <p>def <span class="ident">place_configure</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Place a widget in the parent widget. Use as options:
+in=master - master relative to which the widget is placed
+in_=master - see 'in' option description
+x=amount - locate anchor of this widget at position x of master
+y=amount - locate anchor of this widget at position y of master
+relx=amount - locate anchor of this widget between 0.0 and 1.0
+              relative to width of master (1.0 is right edge)
+rely=amount - locate anchor of this widget between 0.0 and 1.0
+              relative to height of master (1.0 is bottom edge)
+anchor=NSEW (or subset) - position anchor according to given direction
+width=amount - width of this widget in pixel
+height=amount - height of this widget in pixel
+relwidth=amount - width of this widget between 0.0 and 1.0
+                  relative to width of master (1.0 is the same width
+                  as the master)
+relheight=amount - height of this widget between 0.0 and 1.0
+                   relative to height of master (1.0 is the same
+                   height as the master)
+bordermode="inside" or "outside" - whether to take border width of
+                                   master widget into account</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.place_forget">
+    <p>def <span class="ident">place_forget</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unmap this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.place_info">
+    <p>def <span class="ident">place_info</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return information about the placing options
+for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.place_slaves">
+    <p>def <span class="ident">place_slaves</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all slaves of this widget
+in its packing order.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.postscript">
+    <p>def <span class="ident">postscript</span>(</p><p>self, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Print the contents of the canvas to a postscript
+file. Valid options: colormap, colormode, file, fontmap,
+height, pageanchor, pageheight, pagewidth, pagex, pagey,
+rotate, width, x, y.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.propagate">
+    <p>def <span class="ident">propagate</span>(</p><p>self, flag=[&#39;_noarg_&#39;])</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set or get the status for propagation of geometry information.</p>
+<p>A boolean argument specifies whether the geometry information
+of the slaves will determine the size of this widget. If no argument
+is given the current setting will be returned.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.quit">
+    <p>def <span class="ident">quit</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Quit the Tcl interpreter. All widgets will be destroyed.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.register">
+    <p>def <span class="ident">register</span>(</p><p>self, func, subst=None, needcleanup=1)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a newly created Tcl function. If this
+function is called, the Python function FUNC will
+be executed. An optional function SUBST can
+be given which will be executed before FUNC.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.rowconfigure">
+    <p>def <span class="ident">rowconfigure</span>(</p><p>self, index, cnf={}, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Configure row INDEX of a grid.</p>
+<p>Valid resources are minsize (minimum size of the row),
+weight (how much does additional space propagate to this row)
+and pad (how much space to let additionally).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.scale">
+    <p>def <span class="ident">scale</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Scale item TAGORID with XORIGIN, YORIGIN, XSCALE, YSCALE.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.scan_dragto">
+    <p>def <span class="ident">scan_dragto</span>(</p><p>self, x, y, gain=10)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Adjust the view of the canvas to GAIN times the
+difference between X and Y and the coordinates given in
+scan_mark.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.scan_mark">
+    <p>def <span class="ident">scan_mark</span>(</p><p>self, x, y)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Remember the current X, Y coordinates.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.select_adjust">
+    <p>def <span class="ident">select_adjust</span>(</p><p>self, tagOrId, index)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Adjust the end of the selection near the cursor of an item TAGORID to index.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.select_clear">
+    <p>def <span class="ident">select_clear</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Clear the selection if it is in this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.select_from">
+    <p>def <span class="ident">select_from</span>(</p><p>self, tagOrId, index)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set the fixed end of a selection in item TAGORID to INDEX.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.select_item">
+    <p>def <span class="ident">select_item</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the item which has the selection.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.select_to">
+    <p>def <span class="ident">select_to</span>(</p><p>self, tagOrId, index)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set the variable end of a selection in item TAGORID to INDEX.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.selection_clear">
+    <p>def <span class="ident">selection_clear</span>(</p><p>self, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Clear the current X selection.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.selection_get">
+    <p>def <span class="ident">selection_get</span>(</p><p>self, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the contents of the current X selection.</p>
+<p>A keyword parameter selection specifies the name of
+the selection and defaults to PRIMARY.  A keyword
+parameter displayof specifies a widget on the display
+to use. A keyword parameter type specifies the form of data to be
+fetched, defaulting to STRING except on X11, where UTF8_STRING is tried
+before STRING.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.selection_handle">
+    <p>def <span class="ident">selection_handle</span>(</p><p>self, command, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Specify a function COMMAND to call if the X
+selection owned by this widget is queried by another
+application.</p>
+<p>This function must return the contents of the
+selection. The function will be called with the
+arguments OFFSET and LENGTH which allows the chunking
+of very long selections. The following keyword
+parameters can be provided:
+selection - name of the selection (default PRIMARY),
+type - type of the selection (e.g. STRING, FILE_NAME).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.selection_own">
+    <p>def <span class="ident">selection_own</span>(</p><p>self, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Become owner of X selection.</p>
+<p>A keyword parameter selection specifies the name of
+the selection (default PRIMARY).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.selection_own_get">
+    <p>def <span class="ident">selection_own_get</span>(</p><p>self, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return owner of X selection.</p>
+<p>The following keyword parameter can
+be provided:
+selection - name of the selection (default PRIMARY),
+type - type of the selection (e.g. STRING, FILE_NAME).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.send">
+    <p>def <span class="ident">send</span>(</p><p>self, interp, cmd, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Send Tcl command CMD to different interpreter INTERP to be executed.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.setvar">
+    <p>def <span class="ident">setvar</span>(</p><p>self, name=&#39;PY_VAR&#39;, value=&#39;1&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set Tcl variable NAME to VALUE.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.size">
+    <p>def <span class="ident">size</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of the number of column and rows in the grid.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.slaves">
+    <p>def <span class="ident">slaves</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all slaves of this widget
+in its packing order.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tag_bind">
+    <p>def <span class="ident">tag_bind</span>(</p><p>self, tagOrId, sequence=None, func=None, add=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Bind to all items with TAGORID at event SEQUENCE a call to function FUNC.</p>
+<p>An additional boolean parameter ADD specifies whether FUNC will be
+called additionally to the other bound function or whether it will
+replace the previous function. See bind for the return value.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tag_lower">
+    <p>def <span class="ident">tag_lower</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Lower an item TAGORID given in ARGS
+(optional below another item).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tag_raise">
+    <p>def <span class="ident">tag_raise</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Raise an item TAGORID given in ARGS
+(optional above another item).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tag_unbind">
+    <p>def <span class="ident">tag_unbind</span>(</p><p>self, tagOrId, sequence, funcid=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unbind for all items with TAGORID for event SEQUENCE  the
+function identified with FUNCID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.threaded_rendering">
+    <p>def <span class="ident">threaded_rendering</span>(</p><p>self, update_image=True)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_bisque">
+    <p>def <span class="ident">tk_bisque</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Change the color scheme to light brown as used in Tk 3.6 and before.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_focusFollowsMouse">
+    <p>def <span class="ident">tk_focusFollowsMouse</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>The widget under mouse will get automatically focus. Can not
+be disabled easily.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_focusNext">
+    <p>def <span class="ident">tk_focusNext</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the next widget in the focus order which follows
+widget which has currently the focus.</p>
+<p>The focus order first goes to the next child, then to
+the children of the child recursively and then to the
+next sibling which is higher in the stacking order.  A
+widget is omitted if it has the takefocus resource set
+to 0.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_focusPrev">
+    <p>def <span class="ident">tk_focusPrev</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return previous widget in the focus order. See tk_focusNext for details.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_menuBar">
+    <p>def <span class="ident">tk_menuBar</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Do not use. Needed in Tk 3.6 and earlier.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_setPalette">
+    <p>def <span class="ident">tk_setPalette</span>(</p><p>self, *args, **kw)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set a new color scheme for all widget elements.</p>
+<p>A single color as argument will cause that all colors of Tk
+widget elements are derived from this.
+Alternatively several keyword parameters and its associated
+colors can be given. The following keywords are valid:
+activeBackground, foreground, selectColor,
+activeForeground, highlightBackground, selectBackground,
+background, highlightColor, selectForeground,
+disabledForeground, insertBackground, troughColor.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tk_strictMotif">
+    <p>def <span class="ident">tk_strictMotif</span>(</p><p>self, boolean=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set Tcl internal variable, whether the look and feel
+should adhere to Motif.</p>
+<p>A parameter of 1 means adhere to Motif (e.g. no color
+change if mouse passes over slider).
+Returns the set value.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.tkraise">
+    <p>def <span class="ident">tkraise</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Raise an item TAGORID given in ARGS
+(optional above another item).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.type">
+    <p>def <span class="ident">type</span>(</p><p>self, tagOrId)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the type of the item TAGORID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.unbind">
+    <p>def <span class="ident">unbind</span>(</p><p>self, sequence, funcid=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unbind for this widget for event SEQUENCE  the
+function identified with FUNCID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.unbind_all">
+    <p>def <span class="ident">unbind_all</span>(</p><p>self, sequence)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unbind for all widgets for event SEQUENCE all functions.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.unbind_class">
+    <p>def <span class="ident">unbind_class</span>(</p><p>self, className, sequence)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Unbind for all widgets with bindtag CLASSNAME for event SEQUENCE
+all functions.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.update">
+    <p>def <span class="ident">update</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Enter event loop until all pending events have been processed by Tcl.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.update_idletasks">
+    <p>def <span class="ident">update_idletasks</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Enter event loop until all idle callbacks have been called. This
+will update the display of windows but not process events caused by
+the user.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.update_image">
+    <p>def <span class="ident">update_image</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.wait_variable">
+    <p>def <span class="ident">wait_variable</span>(</p><p>self, name=&#39;PY_VAR&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Wait until the variable is modified.</p>
+<p>A parameter of type IntVar, StringVar, DoubleVar or
+BooleanVar must be given.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.wait_visibility">
+    <p>def <span class="ident">wait_visibility</span>(</p><p>self, window=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Wait until the visibility of a WIDGET changes
+(e.g. it appears).</p>
+<p>If no parameter is given self is used.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.wait_window">
+    <p>def <span class="ident">wait_window</span>(</p><p>self, window=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Wait until a WIDGET is destroyed.</p>
+<p>If no parameter is given self is used.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.waitvar">
+    <p>def <span class="ident">waitvar</span>(</p><p>self, name=&#39;PY_VAR&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Wait until the variable is modified.</p>
+<p>A parameter of type IntVar, StringVar, DoubleVar or
+BooleanVar must be given.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_atom">
+    <p>def <span class="ident">winfo_atom</span>(</p><p>self, name, displayof=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return integer which represents atom NAME.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_atomname">
+    <p>def <span class="ident">winfo_atomname</span>(</p><p>self, id, displayof=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return name of atom with identifier ID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_cells">
+    <p>def <span class="ident">winfo_cells</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return number of cells in the colormap for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_children">
+    <p>def <span class="ident">winfo_children</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all widgets which are children of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_class">
+    <p>def <span class="ident">winfo_class</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return window class name of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_colormapfull">
+    <p>def <span class="ident">winfo_colormapfull</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return true if at the last color request the colormap was full.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_containing">
+    <p>def <span class="ident">winfo_containing</span>(</p><p>self, rootX, rootY, displayof=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the widget which is at the root coordinates ROOTX, ROOTY.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_depth">
+    <p>def <span class="ident">winfo_depth</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of bits per pixel.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_exists">
+    <p>def <span class="ident">winfo_exists</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return true if this widget exists.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_fpixels">
+    <p>def <span class="ident">winfo_fpixels</span>(</p><p>self, number)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of pixels for the given distance NUMBER
+(e.g. "3c") as float.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_geometry">
+    <p>def <span class="ident">winfo_geometry</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return geometry string for this widget in the form "widthxheight+X+Y".</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_height">
+    <p>def <span class="ident">winfo_height</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return height of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_id">
+    <p>def <span class="ident">winfo_id</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return identifier ID for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_interps">
+    <p>def <span class="ident">winfo_interps</span>(</p><p>self, displayof=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the name of all Tcl interpreters for this display.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_ismapped">
+    <p>def <span class="ident">winfo_ismapped</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return true if this widget is mapped.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_manager">
+    <p>def <span class="ident">winfo_manager</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the window manager name for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_name">
+    <p>def <span class="ident">winfo_name</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the name of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_parent">
+    <p>def <span class="ident">winfo_parent</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the name of the parent of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_pathname">
+    <p>def <span class="ident">winfo_pathname</span>(</p><p>self, id, displayof=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the pathname of the widget given by ID.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_pixels">
+    <p>def <span class="ident">winfo_pixels</span>(</p><p>self, number)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Rounded integer value of winfo_fpixels.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_pointerx">
+    <p>def <span class="ident">winfo_pointerx</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the x coordinate of the pointer on the root window.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_pointerxy">
+    <p>def <span class="ident">winfo_pointerxy</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a tuple of x and y coordinates of the pointer on the root window.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_pointery">
+    <p>def <span class="ident">winfo_pointery</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the y coordinate of the pointer on the root window.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_reqheight">
+    <p>def <span class="ident">winfo_reqheight</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return requested height of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_reqwidth">
+    <p>def <span class="ident">winfo_reqwidth</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return requested width of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_rgb">
+    <p>def <span class="ident">winfo_rgb</span>(</p><p>self, color)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return tuple of decimal values for red, green, blue for
+COLOR in this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_rootx">
+    <p>def <span class="ident">winfo_rootx</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return x coordinate of upper left corner of this widget on the
+root window.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_rooty">
+    <p>def <span class="ident">winfo_rooty</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return y coordinate of upper left corner of this widget on the
+root window.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screen">
+    <p>def <span class="ident">winfo_screen</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the screen name of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screencells">
+    <p>def <span class="ident">winfo_screencells</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of the cells in the colormap of the screen
+of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screendepth">
+    <p>def <span class="ident">winfo_screendepth</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of bits per pixel of the root window of the
+screen of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screenheight">
+    <p>def <span class="ident">winfo_screenheight</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of pixels of the height of the screen of this widget
+in pixel.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screenmmheight">
+    <p>def <span class="ident">winfo_screenmmheight</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of pixels of the height of the screen of
+this widget in mm.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screenmmwidth">
+    <p>def <span class="ident">winfo_screenmmwidth</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of pixels of the width of the screen of
+this widget in mm.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screenvisual">
+    <p>def <span class="ident">winfo_screenvisual</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return one of the strings directcolor, grayscale, pseudocolor,
+staticcolor, staticgray, or truecolor for the default
+colormodel of this screen.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_screenwidth">
+    <p>def <span class="ident">winfo_screenwidth</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the number of pixels of the width of the screen of
+this widget in pixel.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_server">
+    <p>def <span class="ident">winfo_server</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return information of the X-Server of the screen of this widget in
+the form "XmajorRminor vendor vendorVersion".</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_toplevel">
+    <p>def <span class="ident">winfo_toplevel</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the toplevel widget of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_viewable">
+    <p>def <span class="ident">winfo_viewable</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return true if the widget and all its higher ancestors are mapped.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_visual">
+    <p>def <span class="ident">winfo_visual</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return one of the strings directcolor, grayscale, pseudocolor,
+staticcolor, staticgray, or truecolor for the
+colormodel of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_visualid">
+    <p>def <span class="ident">winfo_visualid</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the X identifier for the visual for this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_visualsavailable">
+    <p>def <span class="ident">winfo_visualsavailable</span>(</p><p>self, includeids=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of all visuals available for the screen
+of this widget.</p>
+<p>Each item in the list consists of a visual name (see winfo_visual), a
+depth and if INCLUDEIDS=1 is given also the X identifier.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_vrootheight">
+    <p>def <span class="ident">winfo_vrootheight</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the height of the virtual root window associated with this
+widget in pixels. If there is no virtual root window return the
+height of the screen.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_vrootwidth">
+    <p>def <span class="ident">winfo_vrootwidth</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the width of the virtual root window associated with this
+widget in pixel. If there is no virtual root window return the
+width of the screen.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_vrootx">
+    <p>def <span class="ident">winfo_vrootx</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the x offset of the virtual root relative to the root
+window of the screen of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_vrooty">
+    <p>def <span class="ident">winfo_vrooty</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the y offset of the virtual root relative to the root
+window of the screen of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_width">
+    <p>def <span class="ident">winfo_width</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the width of this widget.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_x">
+    <p>def <span class="ident">winfo_x</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the x coordinate of the upper left corner of this widget
+in the parent.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.winfo_y">
+    <p>def <span class="ident">winfo_y</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the y coordinate of the upper left corner of this widget
+in the parent.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.xview">
+    <p>def <span class="ident">xview</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Query and change the horizontal position of the view.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.xview_moveto">
+    <p>def <span class="ident">xview_moveto</span>(</p><p>self, fraction)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Adjusts the view in the window so that FRACTION of the
+total width of the canvas is off-screen to the left.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.xview_scroll">
+    <p>def <span class="ident">xview_scroll</span>(</p><p>self, number, what)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Shift the x-view according to NUMBER which is measured in "units"
+or "pages" (WHAT).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.yview">
+    <p>def <span class="ident">yview</span>(</p><p>self, *args)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Query and change the vertical position of the view.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.yview_moveto">
+    <p>def <span class="ident">yview_moveto</span>(</p><p>self, fraction)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Adjusts the view in the window so that FRACTION of the
+total height of the canvas is off-screen to the top.</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.yview_scroll">
+    <p>def <span class="ident">yview_scroll</span>(</p><p>self, number, what)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Shift the y-view according to NUMBER which is measured in
+"units" or "pages" (WHAT).</p></div>
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_bbox">
+    <p>def <span class="ident">zoom_bbox</span>(</p><p>self, bbox, log=False)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_global">
+    <p>def <span class="ident">zoom_global</span>(</p><p>self, log=False)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_if_finished">
+    <p>def <span class="ident">zoom_if_finished</span>(</p><p>self, log=False)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_in">
+    <p>def <span class="ident">zoom_in</span>(</p><p>self, log=False)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_next">
+    <p>def <span class="ident">zoom_next</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_out">
+    <p>def <span class="ident">zoom_out</span>(</p><p>self, log=False)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_previous">
+    <p>def <span class="ident">zoom_previous</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="pythongis.app.map.MapView.zoom_rect">
+    <p>def <span class="ident">zoom_rect</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+</div>
+
+  </div>
+  
+      </div>
+      </div>
+
+  </section>
+
+    </article>
+  <div class="clear"> </div>
+  <footer id="footer">
+    <p>
+      Documentation generated by
+      <a href="https://github.com/BurntSushi/pdoc">pdoc 0.3.2</a>
+    </p>
+
+    <p>pdoc is in the public domain with the
+      <a href="http://unlicense.org">UNLICENSE</a></p>
+
+    <p>Design by <a href="http://nadh.in">Kailash Nadh</a></p>
+  </footer>
+</div>
+</body>
+</html>

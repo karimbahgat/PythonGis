@@ -19,6 +19,6 @@ from . import renderer
 from vector.data import VectorData
 from raster.data import RasterData
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 

@@ -1,6 +1,12 @@
 
 ## Changes
 
+### 0.2.0 (2020-06-15)
+
+- Misc addons and fixes.
+- Better and more stable app and rendering
+- Roughly stable for some time
+
 ### 0.1.0 (2017-04-23)
 
 - First setup test.
