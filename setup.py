@@ -11,7 +11,7 @@ setup(	long_description=open("README.rst").read(),
 	version="""0.1.0""",
 	keywords="""GIS spatial read write management conversion analysis distances visualization""",
 	packages=['pythongis', 'pythongis/app', 'pythongis/app/(old)', 'pythongis/app/(old)/icons', 'pythongis/app/(old)/toolkit', 'pythongis/raster', 'pythongis/vector', 'pythongis/vector/fileformats', 'pythongis/vector/fileformats/thirdparty', 'pythongis/vector/fileformats/thirdparty/PyDTA', 'pythongis/vector/fileformats/thirdparty/stata_dta', 'pythongis/vector/fileformats/thirdparty/stata_dta/stata_math', 'pythongis/vector/fileformats/thirdparty/stata_dta/stata_missing'],
-	requires=['shapely', 'pycrs', 'pyshp', 'pygeoj', 'pyqtree', 'Pillow', 'pyagg', 'colour', 'classypie', 'tk2'],
+	requires=['shapely', 'pyproj', 'pycrs', 'pyshp', 'pygeoj', 'pyqtree', 'Pillow', 'aggdraw', 'colour', 'xlrd', 'xlwt', 'pyagg'],
 	classifiers=['License :: OSI Approved', 'Programming Language :: Python', 'Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'Intended Audience :: Science/Research', 'Intended Audience :: End Users/Desktop', 'Topic :: Scientific/Engineering :: GIS'],
 	description="""A simple Python GIS framework for doing actual work.""",
 	)
