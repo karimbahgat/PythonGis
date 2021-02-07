@@ -45,6 +45,7 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
             def _func(fs):
                 gs = [f.get_shapely() for f in fs if f.geometry]
                 if len(gs) > 1:
+                    print(gs)
                     from shapely.ops import cascaded_union
                     return cascaded_union(gs).__geo_interface__
                 elif len(gs) == 1:

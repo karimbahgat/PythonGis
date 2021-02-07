@@ -2038,7 +2038,7 @@ class Legend:
                     categories = set((cls.key(item),tuple(classval)) for item,classval in cls) # only the unique keys
                     breaks,classvalues = zip(*sorted(categories, key=lambda e:e[0]))
                 elif options.get("valuetype") == "proportional":
-                    breaks = options.get("ticks", cls.breaks)
+                    breaks = cls.breaks
                     classvalues = cls.classvalues_interp
                     options["length"] = options.get("length", "40%min")
                     options["thickness"] = options.get("thickness", "4%min")
@@ -2067,11 +2067,11 @@ class Legend:
                     gradient = [rgb("black"),rgb("white")]
                 else:
                     gradient = layer.styleoptions["gradcolors"]
-                options["ticks"] = options.get("ticks", [layer.styleoptions["minval"], layer.styleoptions["maxval"]])
+                breaks = [ layer.styleoptions["minval"], layer.styleoptions["maxval"] ]
                 options["length"] = options.get("length", "40%min")
                 options["thickness"] = options.get("thickness", "4%min")
                 options["direction"] = options.get("direction", "e")
-                self._legend.add_fillcolors(shape=None, breaks=options["ticks"], classvalues=gradient,
+                self._legend.add_fillcolors(shape=None, breaks=breaks, classvalues=gradient,
                                             valuetype="proportional",
                                             **options)
 
