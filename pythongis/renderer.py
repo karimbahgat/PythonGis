@@ -167,8 +167,8 @@ def get_crs_transformer(fromcrs, tocrs):
     if isinstance(tocrs, basestring):
         tocrs = pycrs.parse.from_unknown_text(tocrs)
 
-    fromcrs = fromcrs.to_proj4()
-    tocrs = tocrs.to_proj4()
+    fromcrs = fromcrs.to_proj4() + ' +over'
+    tocrs = tocrs.to_proj4() + ' +over'
     
     if fromcrs != tocrs:
         import pyproj
