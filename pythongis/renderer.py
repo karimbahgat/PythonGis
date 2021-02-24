@@ -1406,6 +1406,7 @@ class VectorLayer:
     
             # for each
             for feat in features:
+                fid = id(feat)
 
                 # reproject
                 if _transform:
@@ -1424,7 +1425,6 @@ class VectorLayer:
                         val = self.styleoptions[key]
                         if isinstance(val, dict):
                             # lookup self in precomputed symboldict
-                            fid = id(feat)
                             if fid in val["symbols"]:
                                 rendict[key] = val["symbols"][fid]
                             else:
