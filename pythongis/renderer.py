@@ -239,11 +239,12 @@ class Layout:
         self.maps.append(mapobj)
         return mapobj
 
-    def add_legend(self, legend=None, legendoptions=None, **pasteoptions):
+    def add_legend(self, legend=None, **pasteoptions):
+        # legend is either existing Legend instance or legendoptions dict
         self.changed = True
-        if not legend:
+        if not isinstance(legend, Legend):
             # auto creates and builds legend based on first map (TODO: allow from other maps too)
-            legendoptions = legendoptions or dict()
+            legendoptions = legend or dict()
             legend = self.maps[0].get_legend(**legendoptions)
 
         legend.pasteoptions.update(pasteoptions)
@@ -591,15 +592,18 @@ class Map:
 
     def get_legend(self, **legendoptions):
         legendoptions = legendoptions or dict()
-        legend = Legend(map=self, **legendoptions)
+        legend = Legend(map=self, **legendoptions) # legend is directly tied to the layers in this map
         return legend
 
-    def add_legend(self, legendoptions=None, **pasteoptions):
+    def add_legend(self, legend=None, **pasteoptions):
+        # legend can be either existing Legend instance or legendoptions dict
         self.changed = True
-        legendoptions = legendoptions or {}
-        legend = self.get_legend(**legendoptions)
+        if not isinstance(legend, Legend):
+            legendoptions = legend or {}
+            legend = self.get_legend(**legendoptions)
         legend.pasteoptions.update(pasteoptions)
         self.foregroundgroup.add_layer(legend)
+        return legend
 
     # Batch utilities
 

@@ -7,9 +7,13 @@ data = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
 m = data.map(4000,2000)
 m.add_layer(data)
 m.title = "Test title"
-m.add_legend({'direction':'s'})
-leg = m.foregroundgroup[-1]
+# legend
+leg = m.add_legend({'direction':'s'})
 leg.add_single_symbol(m.layers[0], title="Extra")
+# legend 2
+leg = pg.renderer.Legend(title="Legend 2")
+leg.add_single_symbol(m.layers[0], title="Manual")
+m.add_legend(leg, xy=('99%w','99%h'), anchor='se')
 m.view()
 
 fdsf
