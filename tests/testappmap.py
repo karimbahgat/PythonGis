@@ -1,7 +1,7 @@
 
 import pythongis as pg
 
-data = pg.VectorData(r"C:\Users\kimo\Downloads\cshapes_0.5-1\cshapes.shp")
+data = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
 #data = pg.VectorData(r"C:\Users\karbah\Dropbox\PRIO\2016, CShapes\cshapes.shp")
 
 data.view()

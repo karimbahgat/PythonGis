@@ -20,12 +20,21 @@ class SimpleMapViewerGUI(tk2.Tk):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 
         ###
-        
-        mainframe = tk2.Frame(self)
-        mainframe.pack(side='left', fill='both', expand=1)
 
-        layersframe = tk2.Frame(self)
-        layersframe.pack(side='right', fill='y', expand=0)
+        panes = tk2.tk.PanedWindow(self, orient=tk2.tk.HORIZONTAL)
+        panes.pack(fill='both', expand=1)
+        
+        mainframe = tk2.Frame(self) #panes.add_pane() #
+        #mainframe.pack(fill='both', expand=0) #side='left', fill='both', expand=1)
+        panes.add(mainframe, stretch='always')
+
+        layersframe = tk2.Frame(self) #panes.add_pane() #
+        #layersframe.pack(fill='both', expand=0) #side='right', fill='y', expand=0)
+        panes.add(layersframe, stretch='always', width=150) # arbitrary
+
+        #panes.paneconfig(mainframe, width=400)
+        #panes.paneconfig(layersframe, width=100)
+        #panes.sash_place(0, 500, 500)
 
         ###
 
@@ -39,7 +48,7 @@ class SimpleMapViewerGUI(tk2.Tk):
         bottombar.pack(fill='x', expand=0)
 
         layerscontrol = pg.app.controls.StaticLayersControl(layersframe)
-        layerscontrol.pack(fill='y', expand=1) #place(relx=0.99, rely=0.02, anchor="ne")
+        layerscontrol.pack(fill='both', expand=1) #place(relx=0.99, rely=0.02, anchor="ne")
         mapview.add_control(layerscontrol)
         layerscontrol.set_layers(mapp.layers)
 
