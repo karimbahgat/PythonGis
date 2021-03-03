@@ -30,7 +30,7 @@ class SimpleMapViewerGUI(tk2.Tk):
 
         layersframe = tk2.Frame(self) #panes.add_pane() #
         #layersframe.pack(fill='both', expand=0) #side='right', fill='y', expand=0)
-        panes.add(layersframe, stretch='always', width=150) # arbitrary
+        panes.add(layersframe, stretch='always', width=120) # arbitrary
 
         #panes.paneconfig(mainframe, width=400)
         #panes.paneconfig(layersframe, width=100)

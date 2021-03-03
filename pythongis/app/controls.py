@@ -119,8 +119,9 @@ class LayersControl(tk2.basics.Label):
         import PIL, PIL.Image, PIL.ImageTk
         lyr = widget.item
         #lyr.render(width=300, height=150, bbox=[lyr.bbox[0],lyr.bbox[3],lyr.bbox[2],lyr.bbox[1]])
-        w,h = self.mapview.renderer.width, self.mapview.renderer.height
-        w,h = w/4, h/4
+        #w,h = self.mapview.renderer.width, self.mapview.renderer.height
+        #w,h = w/4, h/4
+        w,h = 150,75
         if lyr.img:
             im = lyr.img.resize((w,h), resample=PIL.Image.BILINEAR) #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
             tkim = PIL.ImageTk.PhotoImage(im)
@@ -346,8 +347,9 @@ class StaticLayersControl(tk2.basics.Label):
         import PIL, PIL.Image, PIL.ImageTk
         lyr = widget.item
         #lyr.render(width=300, height=150, bbox=[lyr.bbox[0],lyr.bbox[3],lyr.bbox[2],lyr.bbox[1]])
-        w,h = self.mapview.renderer.width, self.mapview.renderer.height
-        w,h = w//6, h//6
+        #w,h = self.mapview.renderer.width, self.mapview.renderer.height
+        #w,h = w//6, h//6
+        w,h = 150,75
         if lyr.img:
             im = lyr.img.resize((w,h), resample=PIL.Image.BILINEAR) #.transform(lyr.img.size, PIL.Image.AFFINE, [1,0.9,0, 0,1,0, 0,0,1])
             tkim = PIL.ImageTk.PhotoImage(im)
