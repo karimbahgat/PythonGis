@@ -1525,6 +1525,8 @@ class VectorLayer:
 
             # draw each as text 
             for feat in features:
+                fid = id(feat)
+                
                 text = textkey(feat)
                 
                 if text is not None:
@@ -1545,7 +1547,6 @@ class VectorLayer:
                         for key,val in self.styleoptions["textoptions"].copy().items():
                             if isinstance(val, dict):
                                 # lookup self in precomputed symboldict
-                                fid = id(feat)
                                 if fid in val["symbols"]:
                                     rendict[key] = val["symbols"][fid]
                                 else:
