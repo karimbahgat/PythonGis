@@ -333,11 +333,9 @@ class Map:
         layers.connected_maps.append(self)
 
         # background decorations
-        self.backgroundgroup = BackgroundLayerGroup()
-        if background:
-            obj = Background(self)
-            self.backgroundgroup.add_layer(obj)
         self.background = rgb(background)
+        self.backgroundgroup = BackgroundLayerGroup()
+        self.backgroundgroup.add_layer(Background()) # background object refers back to the map's "background" attr
 
         # create the drawer with a default unprojected lat-long coordinate system
         # setting width and height locks the ratio, otherwise map size will adjust to the coordspace
@@ -358,7 +356,7 @@ class Map:
         # title (these properties affect the actual rendered title after init)
         self.title = title
         self.titleoptions = titleoptions or {}
-        self.foregroundgroup.add_layer(Title(self))
+        self.foregroundgroup.add_layer(Title()) # title object refers back to the map's "title" and "titleoptions" attr
 
         self.dimensions = dict()
             
@@ -593,7 +591,7 @@ class Map:
 
     def get_legend(self, **legendoptions):
         legendoptions = legendoptions or dict()
-        legend = Legend(self, **legendoptions)
+        legend = Legend(map=self, **legendoptions)
         return legend
 
     def add_legend(self, legendoptions=None, **pasteoptions):
@@ -680,13 +678,13 @@ class Map:
         #t=time.time()
         
         for layer in self.backgroundgroup:
-            layer.render()
+            layer.render(self) # each layer needs to know which map to draw to
         
         for layer in self.layers:
             self.render_one(layer, antialias=antialias, update_draworder=False)
 
         for layer in self.foregroundgroup:
-            layer.render()
+            layer.render(self) # each layer needs to know which map to draw to
         #print "# rendall",time.time()-t
             
         self.changed = False
@@ -2006,16 +2004,20 @@ class RasterLayer:
 
 
 class Legend:
-    def __init__(self, map, layers=None, autobuild=True, **options):
-        self.map = map
-        self.layers = layers or []
+    def __init__(self, map=None, layers=None, autobuild=True, **options):
+        self.map = map # if set, automatically builds the legend from the specified map
+        self.layers = layers or [] # if set, ties the legend specifically to the given layers
         self.img = None
-        self.autobuild = autobuild
         self.options = options
         self.pasteoptions = dict(xy=("2%w","98%h"), anchor="sw")
-        self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **self.options)
+        self._operations = []
+
+        self.autobuild = autobuild # IMPORTANT: to be removed! currently has no effect
 
     def add_fillcolors(self, layer, **override):
+        self._operations.append( (self._add_fillcolors, layer, override) )
+
+    def _add_fillcolors(self, layer, **override):
         # use layer's legendoptions and possibly override
         options = dict(layer.legendoptions)
         options.update(override)
@@ -2060,7 +2062,7 @@ class Legend:
 
             else:
                 # add as static symbol if none of the dynamic ones
-                self.add_single_symbol(shape, **options)
+                self._add_single_symbol(shape, **options)
 
         elif isinstance(layer, RasterLayer):
             if layer.styleoptions["type"] in ("grayscale","colorscale"):
@@ -2077,6 +2079,9 @@ class Legend:
                                             **options)
 
     def add_fillsizes(self, layer, **override):
+        self._operations.append( (self._add_fillsizes, layer, override) )
+
+    def _add_fillsizes(self, layer, **override):
         if isinstance(layer, VectorLayer):
             # use layer's legendoptions and possibly override
             options = dict(layer.legendoptions)
@@ -2119,12 +2124,15 @@ class Legend:
 
             else:
                 # add as static symbol if none of the dynamic ones
-                self.add_single_symbol(shape, **options)
+                self._add_single_symbol(shape, **options)
 
         elif isinstance(layer, RasterLayer):
             raise Exception("Fillsize is not a possible legend entry for a raster layer")
 
     def add_single_symbol(self, layer, **override):
+        self._operations.append( (self._add_single_symbol, layer, override) )
+
+    def _add_single_symbol(self, layer, **override):
         if isinstance(layer, VectorLayer):
             # use layer's legendoptions and possibly override
             options = dict(layer.styleoptions)
@@ -2163,14 +2171,8 @@ class Legend:
         elif isinstance(layer, RasterLayer):
             raise Exception("_get_layer_shape is only meant for vector data, not raster data")
 
-    def _autobuild(self):
-        # maybe somehow clear itself in case autobuild and rendering multiple times for updating
-        self._legend = pyagg.legend.Legend(refcanvas=self.map.drawer, **self.options)
-        
-        # build the legend automatically
-        # either based on all map layers with the legend flag
-        # or based on specified layer instances, even if legend flag is off
-        layers = self.layers or [l for l in self.map if l.legend]
+    def _build_from_layers(self, layers):
+        # build the legend automatically from specified layers
         for layer in layers:
             if isinstance(layer, VectorLayer):
                 # Todo: better handling when more than one classypie option for same layer
@@ -2180,66 +2182,74 @@ class Legend:
                 if "fillcolor" in layer.styleoptions and isinstance(layer.styleoptions["fillcolor"], dict):
                     # is dynamic and should be highlighted specially
                     #print 999,layer,layer.legendoptions
-                    self.add_fillcolors(layer, **layer.legendoptions)
+                    self._add_fillcolors(layer, **layer.legendoptions)
                     anydynamic = True
                 if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                     # is dynamic and should be highlighted specially
-                    self.add_fillsizes(layer, **layer.legendoptions)
+                    self._add_fillsizes(layer, **layer.legendoptions)
                     anydynamic = True
                     
                 # add as static symbol if none of the dynamic ones
                 if not anydynamic:
-                    self.add_single_symbol(layer, **layer.legendoptions)
+                    self._add_single_symbol(layer, **layer.legendoptions)
 
             elif isinstance(layer, RasterLayer):
                 if layer.styleoptions["type"] in ("grayscale","colorscale"):
-                    self.add_fillcolors(layer, **layer.legendoptions)
+                    self._add_fillcolors(layer, **layer.legendoptions)
 
-    def render(self):
-        # ensure the drawer is created so pyagg legend can use it to calculate sizes etc
-        if not self.map.drawer:
-            self.map._create_drawer()
-        self._legend.refcanvas = self.map.drawer
+    def render(self, map):
+        # create new pyagg legend onto which things get rendered
+        self._legend = pyagg.legend.Legend(refcanvas=map.drawer, **self.options)
+        # autobuild
+        if self.layers:
+            # custom list of layers are given, build all of them, regardless of legend flag
+            self._build_from_layers(self.layers)
+        elif self.map:
+            # linked map is given, build all map layers whose legend flag is on
+            layers = [l for l in map if l.legend]
+            self._build_from_layers(layers)
+        # loop and run manually added operations
+        print self._operations
+        for func,lyr,opts in self._operations:
+            print func,lyr,opts
+            func(lyr, **opts)
         # render it
-        if self.autobuild:
-            self._autobuild()
         rendered = self._legend.render()
         self.img = rendered.get_image()
 
 
 
 class Background:
-    def __init__(self, map):
-        self.map = map
+    def __init__(self):
         self.img = None
         self.pasteoptions = dict()
 
-    def render(self):
-        canv = pyagg.Canvas(self.map.drawer.width, self.map.drawer.height, self.map.background)
-        self.img = canv.get_image()
+    def render(self, map):
+        if map.background:
+            canv = pyagg.Canvas(map.drawer.width, map.drawer.height, map.background)
+            self.img = canv.get_image()
 
 
 
 class Title:
-    def __init__(self, layout):
-        self.layout = layout
+    def __init__(self):
         self.img = None
         self.pasteoptions = dict(xy=("50%w","1%h"), anchor="n")
 
-    def render(self):
-        if self.layout.title:
+    def render(self, map):
+        if map.title:
             # since title is rendered on separate img then pasted,
             # some titleoptions needs to be passed to pasteoptions
             # instead of the rendering method
-            titleoptions = dict(textsize="3%w", padding=0.32)
-            titleoptions.update(self.layout.titleoptions.copy())
+            titleoptions = dict(textsize="3%w", padding=0.32) # default
+            titleoptions.update(map.titleoptions.copy())
             titleoptions.pop("xy", None)
             titleoptions.pop("anchor", None)
             boxoptions = dict(fillcolor=titleoptions.pop('fillcolor','white'),
                               outlinecolor=titleoptions.pop('outlinecolor','black'),
                               outlinewidth=titleoptions.pop('outlinewidth','5%min'),
                               )
-            rendered = pyagg.legend.BaseGroup(refcanvas=self.layout.drawer, title=self.layout.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
+            rendered = pyagg.legend.BaseGroup(refcanvas=map.drawer, title=map.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
             self.img = rendered.get_image()
 
 

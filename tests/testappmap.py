@@ -4,7 +4,12 @@ import pythongis as pg
 data = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
 #data = pg.VectorData(r"C:\Users\karbah\Dropbox\PRIO\2016, CShapes\cshapes.shp")
 
-m = data.map()
+m = data.map(4000,2000)
+m.add_layer(data)
+m.title = "Test title"
+m.add_legend({'direction':'s'})
+leg = m.foregroundgroup[-1]
+leg.add_single_symbol(m.layers[0], title="Extra")
 m.view()
 
 fdsf
