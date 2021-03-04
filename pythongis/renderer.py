@@ -229,7 +229,7 @@ class Layout:
         self.title = title
         self.titleoptions = dict(textsize="6%w")
         if titleoptions: self.titleoptions.update(titleoptions)
-        self.foregroundgroup.add_layer(Title(self))
+        self.foregroundgroup.add_layer(Title())
             
         self.img = self.drawer.get_image()
 
@@ -358,8 +358,6 @@ class Map:
         self.title = title
         self.titleoptions = titleoptions or {}
         self.foregroundgroup.add_layer(Title()) # title object refers back to the map's "title" and "titleoptions" attr
-
-        self.dimensions = dict()
             
         self.img = None
         self.changed = True
@@ -605,54 +603,6 @@ class Map:
         self.foregroundgroup.add_layer(legend)
         return legend
 
-    # Batch utilities
-
-##    def add_dimension(self, dimtag, dimvalues):
-##        self.dimensions[dimtag] = [(dimval,dimfunc,self)for dimval,dimfunc in dimvalues] # list of dimval-dimfunc pairs
-##
-##    def iter_dimensions(self, groupings=None):
-##        # collect all dimensions from layers and the map itself as a flat list
-##        alldimensions = dict()
-##        for lyr in self:
-##            if lyr.dimensions: 
-##                alldimensions.update(lyr.dimensions) # note, duplicate dim names will be overwritten
-##        alldimensions.update(self.dimensions)
-##        
-##        # yield all dimensions as all possible value combinations of each other
-##        dimtagvalpairs = [[(dimtag,dimval) for dimval,dimfunc,dimparent in dimvalues] for dimtag,dimvalues in alldimensions.items()]
-##        allcombis = itertools.product(*dimtagvalpairs)
-##
-##        def submapgen():
-##            for dimcombi in allcombis:
-##                # create the map and run all the functions for that combination
-##                submap = self.copy()
-##                for dimtag,dimval in dimcombi:
-##                    dimfunc,dimparent = next(( (_dimfunc,_dimparent) for _dimval,_dimfunc,_dimparent in alldimensions[dimtag] if dimval == _dimval),None)  # first instance where dimval matches, same as dict lookup inside a list of keyval pairs
-##                    if dimparent is self:
-##                        dimfunc(submap)
-##                    else:
-##                        dimparent = dimparent.copy()
-##                        dimfunc(dimparent)
-##                dimdict = dict(dimcombi)
-##                yield dimdict,submap
-##                
-##        if groupings:
-##            # yield all grouped by each unique value combination belonging to the dimension names specified in groupings
-##            # eg grouping by a region dimension will return groups of dimdict,submap for each unique value of region
-##
-##            def key(item):
-##                dimdict,submap = item
-##                keyval = [dimdict[gr] for gr in groupings]
-##                return keyval
-##            
-##            for _id,dimcombis in itertools.groupby(sorted(submapgen(),key=key), key=key):
-##                yield list(dimcombis) # list of dimdict,submap pairs belonging to same group
-##
-##        else:
-##            # yield all flat, one by one
-##            for dimdict,submap in submapgen():
-##                yield dimdict,submap
-
     # Drawing
 
     def render_one(self, layer, antialias=True, update_draworder=True):
@@ -783,7 +733,6 @@ class LayerGroup:
     def __init__(self):
         self._layers = list()
         self.connected_maps = list()
-        self.dimensions = dict()
         self.changed = False
 
     def __iter__(self):
@@ -830,10 +779,6 @@ class LayerGroup:
 
         else:
             raise Exception("Cannot get bbox since there are no layers with geometries")
-
-##    def add_dimension(self, dimtag, dimvalues):
-##        # used by parent map to batch render all varieties of this layer
-##        self.dimensions[dimtag] = dimvalues # list of dimval-dimfunc pairs
 
     def copy(self):
         layergroup = LayerGroup()
@@ -2213,9 +2158,7 @@ class Legend:
             layers = [l for l in map if l.legend]
             self._build_from_layers(layers)
         # loop and run manually added operations
-        print self._operations
         for func,lyr,opts in self._operations:
-            print func,lyr,opts
             func(lyr, **opts)
         # render it
         rendered = self._legend.render()
