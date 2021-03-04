@@ -268,6 +268,10 @@ class Layout:
 ##        self.foreground.add_layer(decor)
 
     def render_all(self, columns=None, rows=None, antialias=False, **kwargs):
+        # WARNING: depreceated, old method name
+        self.render(columns, rows, antialias, **kwargs)
+
+    def render(self, columns=None, rows=None, antialias=False, **kwargs):
         # render and draworder in one
         self.drawer.clear()
 
@@ -610,46 +614,50 @@ class Map:
     # Drawing
 
     def render_one(self, layer, antialias=True, update_draworder=True):
-        if not self.drawer: self._create_drawer()
-        
-        if layer.visible: 
-            layer.render(width=self.drawer.width,
-                         height=self.drawer.height,
-                         bbox=self.drawer.coordspace_bbox,
-                         antialias=antialias,
-                         crs=self.crs)
-            layer.render_text(width=self.drawer.width,
-                             height=self.drawer.height,
-                             bbox=self.drawer.coordspace_bbox,
-                             crs=self.crs,
-                             default_textoptions=self.textoptions)
-            if update_draworder:
-                self.update_draworder()
+        # WARNING: deprecated, to be removed
+        self.render(layer, antialias, update_draworder)
 
     def render_all(self, antialias=True):
-        #import time
-        #t=time.time()
+        # WARNING: deprecated, to be removed
+        self.render(antialias=antialias)
+
+    def render(self, layer=None, antialias=True, update_draworder=True):
         if not self.drawer: self._create_drawer()
-        #print "# createdraw",time.time()-t
 
-        #import time
-        #t=time.time()
-        
-        for layer in self.backgroundgroup:
-            layer.render(self) # each layer needs to know which map to draw to
-        
-        for layer in self.layers:
-            self.render_one(layer, antialias=antialias, update_draworder=False)
-
-        for layer in self.foregroundgroup:
-            layer.render(self) # each layer needs to know which map to draw to
-        #print "# rendall",time.time()-t
+        if layer:
+            # render a single layer
+            if layer.visible: 
+                layer.render(width=self.drawer.width,
+                             height=self.drawer.height,
+                             bbox=self.drawer.coordspace_bbox,
+                             antialias=antialias,
+                             crs=self.crs)
+                layer.render_text(width=self.drawer.width,
+                                 height=self.drawer.height,
+                                 bbox=self.drawer.coordspace_bbox,
+                                 crs=self.crs,
+                                 default_textoptions=self.textoptions)
+        else:
+            # render all
+            #import time
+            #t=time.time()            
+            for layer in self.backgroundgroup:
+                layer.render(self) # each layer needs to know which map to draw to
             
-        self.changed = False
-        import time
-        t=time.time()
-        self.update_draworder()
-        print "# draword",time.time()-t
+            for layer in self.layers:
+                self.render(layer, antialias=antialias, update_draworder=False)
+
+            for layer in self.foregroundgroup:
+                layer.render(self) # each layer needs to know which map to draw to
+            #print "# rendall",time.time()-t
+                
+            self.changed = False
+
+        if update_draworder:
+            import time
+            t=time.time()
+            self.update_draworder()
+            print "# draword",time.time()-t
 
     def update_draworder(self):
         if self.drawer: self.drawer.clear()

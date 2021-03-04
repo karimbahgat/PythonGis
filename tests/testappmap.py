@@ -14,6 +14,8 @@ leg.add_single_symbol(m.layers[0], title="Extra")
 leg = pg.renderer.Legend(title="Legend 2")
 leg.add_single_symbol(m.layers[0], title="Manual")
 m.add_legend(leg, xy=('99%w','99%h'), anchor='se')
+#
+#m.render()
 m.view()
 
 fdsf
