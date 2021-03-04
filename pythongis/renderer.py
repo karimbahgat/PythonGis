@@ -303,6 +303,10 @@ class Layout:
                     # instead of the rendering method
                     extraargs = dict([(k,self.titleoptions[k]) for k in ["xy","anchor"] if k in self.titleoptions])
                     pasteoptions.update(extraargs)
+##                elif isinstance(layer, Text):
+##                    # same for text
+##                    extraargs = dict([(k,layer.textoptions[k]) for k in ["xy","anchor"] if k in layer.textoptions])
+##                    pasteoptions.update(extraargs)
                 self.drawer.paste(layer.img, **pasteoptions)
             
         self.img = self.drawer.get_image()
@@ -676,6 +680,10 @@ class Map:
                     # instead of the rendering method
                     extraargs = dict([(k,self.titleoptions[k]) for k in ["xy","anchor"] if k in self.titleoptions])
                     pasteoptions.update(extraargs)
+##                elif isinstance(layer, Text):
+##                    # same for text
+##                    extraargs = dict([(k,layer.textoptions[k]) for k in ["xy","anchor"] if k in layer.textoptions])
+##                    pasteoptions.update(extraargs)
                 self.drawer.paste(layer.img, **pasteoptions)
 
         self.layers.changed = False
@@ -2175,6 +2183,30 @@ class Background:
         if map.background:
             canv = pyagg.Canvas(map.drawer.width, map.drawer.height, map.background)
             self.img = canv.get_image()
+
+
+
+# TODO: Maybe change this to TextLayer so can allow multiple texts on a single large image??? Or maybe not... 
+##class Text:
+##    def __init__(self, text, **textoptions):
+##        self.text = text
+##        self.textoptions = textoptions
+##        self.img = None
+##        self.pasteoptions = dict() # not used...? 
+##
+##    def render(self, map):
+##        # since title is rendered on separate img then pasted,
+##        # some titleoptions needs to be passed to pasteoptions
+##        # instead of the rendering method
+##        textoptions = self.textoptions.copy()
+##        textoptions.pop("xy", None)
+##        textoptions.pop("anchor", None)
+##        boxoptions = dict(fillcolor=textoptions.pop('fillcolor','white'),
+##                          outlinecolor=textoptions.pop('outlinecolor','black'),
+##                          outlinewidth=textoptions.pop('outlinewidth','5%min'),
+##                          )
+##        rendered = pyagg.legend.BaseGroup(refcanvas=map.drawer, title=self.text, titleoptions=textoptions, **boxoptions).render() # pyagg label indeed implements a render method()
+##        self.img = rendered.get_image()
 
 
 
