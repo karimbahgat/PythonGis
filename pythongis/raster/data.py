@@ -1090,6 +1090,14 @@ class RasterData(object):
         self.bands = [Band(img, nodataval=nodataval) for img in bands]
         self._cached_mask = None
 
+        # standalone mask? 
+        # TODO: make this more robust, read from various inputs above (filepath,img,data,etc)
+        if len(self.bands) == 4:
+            # rgba
+            a = self.bands[-1]
+            a.nodataval = 0
+            self._cached_mask = a.mask
+
         # store reference to raster to enable pixel convenience methods
         for b in self.bands:
             b._rast = self
