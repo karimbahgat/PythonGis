@@ -1326,18 +1326,7 @@ class VectorData:
             limit (optional): Limits the number of rows to be displayed, in case of very large datasets. 
         """
         from .. import app
-        win = app.builder.TableGUI()
-        if limit:
-            def rows():
-                for i,f in enumerate(self):
-                    yield f.row
-                    if i >= limit:
-                        break
-        else:
-            def rows():
-                for f in self:
-                    yield f.row
-        win.browser.table.populate(self.fields, rows())
+        win = app.builder.DatasetTableGUI(self, limit=limit)
         win.mainloop()
 
     def view(self, width=None, height=None, bbox=None, title="", background=None, crs=None, **styleoptions):

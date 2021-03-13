@@ -382,6 +382,15 @@ class StaticLayersControl(tk2.basics.Label):
         zoombut = tk2.basics.Button(nameframe, command=lambda: self.mapview.zoom_bbox(lyr.bbox, log=True))
         zoombut.set_icon(icons.iconpath("zoom_rect.png"), width=15, height=15)
         zoombut.pack(side='left')
+        def browse():
+            win = tk2.Window()
+            win.state('zoom')
+            lyr = widget.item
+            browser = builder.DatasetTableBrowser(win, lyr.data, limit=None)
+            browser.pack(fill="both", expand=1)
+        browsebut = tk2.basics.Button(nameframe, command=browse)
+        browsebut.set_icon(icons.iconpath("datatable.png"), width=15, height=15)
+        browsebut.pack(side='left')
         confbut = tk2.basics.Button(nameframe)
         confbut.set_icon(icons.iconpath("config2.png"), width=15, height=15)
         confbut.pack(side='left')

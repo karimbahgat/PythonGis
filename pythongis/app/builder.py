@@ -5,11 +5,11 @@ from . import icons
 import pythongis as pg
 import tk2
 
-class TableGUI(tk2.Tk):
-    def __init__(self, *args, **kwargs):
+class DatasetTableGUI(tk2.Tk):
+    def __init__(self, data, limit=None, *args, **kwargs):
         tk2.basics.Tk.__init__(self, *args, **kwargs)
 
-        self.browser = TableBrowser(self)
+        self.browser = DatasetTableBrowser(self, data, limit=limit)
         self.browser.pack(fill="both", expand=1)
 
         self.state('zoomed')
@@ -30,7 +30,7 @@ class SimpleMapViewerGUI(tk2.Tk):
 
         layersframe = tk2.Frame(self) #panes.add_pane() #
         #layersframe.pack(fill='both', expand=0) #side='right', fill='y', expand=0)
-        panes.add(layersframe, stretch='always', width=120) # arbitrary
+        panes.add(layersframe, stretch='always', width=140) # arbitrary
 
         #panes.paneconfig(mainframe, width=400)
         #panes.paneconfig(layersframe, width=100)
@@ -343,7 +343,22 @@ class TableBrowser(tk2.basics.Label):
         self.table = tk2.scrollwidgets.Table(self)
         self.table.pack(fill="both", expand=1)
 
-        
+class DatasetTableBrowser(TableBrowser):
+    def __init__(self, master, data, limit=None, *args, **kwargs):
+        TableBrowser.__init__(self, master, *args, **kwargs)
+
+        if limit:
+            def rows():
+                for i,f in enumerate(data):
+                    yield f.row
+                    if i >= limit:
+                        break
+        else:
+            def rows():
+                for f in data:
+                    yield f.row
+
+        self.table.populate(data.fields, rows())
 
 
 

@@ -3,6 +3,7 @@ import pythongis as pg
 
 data = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
 #data = pg.VectorData(r"C:\Users\karbah\Dropbox\PRIO\2016, CShapes\cshapes.shp")
+#data.browse(limit=10)
 
 m = pg.renderer.Map(4000,2000)
 m.add_layer(data) # removing this creates error
