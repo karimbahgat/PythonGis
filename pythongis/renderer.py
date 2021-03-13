@@ -1055,6 +1055,8 @@ class VectorLayer:
                         else:
                             colgen = ColorPalette('dynamic-seq')
                             val["colors"] = [colgen.get(0), colgen.get(1), colgen.get(2)]
+                    if ('size' in key or 'width' in key) and 'sizes' not in val:
+                        val['sizes'] = [0.5,10] # 0.5-10% of map width but only because map's default unit is %w, what if it's changed? 
 
                     # remove args that are not part of classypie
                     val = dict(val)

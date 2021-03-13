@@ -4,15 +4,18 @@ import pythongis as pg
 data = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
 #data = pg.VectorData(r"C:\Users\karbah\Dropbox\PRIO\2016, CShapes\cshapes.shp")
 
-m = data.map(4000,2000)
-m.add_layer(data)
+m = pg.renderer.Map(4000,2000)
+m.add_layer(data) # removing this creates error
+m.add_layer(r"C:\Users\kimok\Downloads\GRAY_50M_SR_OB\GRAY_50M_SR_OB.tif",
+            type='colorscale', gradcolors=['blue','white'])
+m.add_layer(data)#.convert.to_points(), fillsize={'key':'AREA'})
 m.title = "Test title"
 # legend
-leg = m.add_legend({'direction':'s'})
-leg.add_single_symbol(m.layers[0], title="Extra")
+leg = m.add_legend({'title':'Main legend','direction':'s'})
+leg.add_single_symbol(m.layers[0], title="Custom symbol")
 # legend 2
 leg = pg.renderer.Legend(title="Legend 2")
-leg.add_single_symbol(m.layers[0], title="Manual")
+leg.add_single_symbol(m.layers[0], title="Custom symbol")
 m.add_legend(leg, xy=('99%w','99%h'), anchor='se')
 #
 #m.render()
