@@ -6,11 +6,15 @@ data = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
 #data.browse(limit=10)
 
 m = pg.renderer.Map(4000,2000)
-m.add_layer(data) # removing this creates error
+m.add_layer(data)#, outlinewidth='10px')#,legendoptions={'title':'Hello','titleoptions':{'textsize':4}}) # removing this creates error
 m.add_layer(r"C:\Users\kimok\Downloads\GRAY_50M_SR_OB\GRAY_50M_SR_OB.tif",
-            type='colorscale', gradcolors=['blue','white'])
+            type='colorscale', gradcolors=['blue','white'],
+            #legendoptions={'direction':'n'},#'titleoptions':{'textsize':4}}
+            )
 m.add_layer(data)#.convert.to_points(), fillsize={'key':'AREA'})
-m.title = "Test title"
+m.add_layer(data, fillcolor={'key':'AREA','breaks':'proportional'},
+            legendoptions={'ticknum':3})
+m.title = "Test title"#\non multiple\nlines"
 # legend
 leg = m.add_legend({'title':'Main legend','direction':'s'})
 leg.add_single_symbol(m.layers[0], title="Custom symbol")

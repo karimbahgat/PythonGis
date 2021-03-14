@@ -2018,11 +2018,13 @@ class Legend:
                     classvalues = cls.classvalues_interp
 
                 # add any other nonvarying layer options
-                for k in "fillsize outlinecolor outlinewidth".split():
-                    if k not in options and k in layer.styleoptions:
-                        v = layer.styleoptions[k]
-                        if not isinstance(v, dict):
-                            options[k] = v
+                if options.get("valuetype") != "proportional":
+                    # except for gradient bar shouldnt mimic the symbol, only the color... 
+                    for k in "fillsize outlinecolor outlinewidth".split():
+                        if k not in options and k in layer.styleoptions:
+                            v = layer.styleoptions[k]
+                            if not isinstance(v, dict):
+                                options[k] = v
 
                 #print options
                 self._legend.add_fillcolors(shape, breaks, classvalues, **options)
@@ -2230,13 +2232,13 @@ class Title:
             # since title is rendered on separate img then pasted,
             # some titleoptions needs to be passed to pasteoptions
             # instead of the rendering method
-            titleoptions = dict(textsize="3%w", padding=0.32) # default
+            titleoptions = dict(textsize="3%w", padding=0.4) # default
             titleoptions.update(map.titleoptions.copy())
             titleoptions.pop("xy", None)
             titleoptions.pop("anchor", None)
             boxoptions = dict(fillcolor=titleoptions.pop('fillcolor','white'),
                               outlinecolor=titleoptions.pop('outlinecolor','black'),
-                              outlinewidth=titleoptions.pop('outlinewidth','5%min'),
+                              outlinewidth=titleoptions.pop('outlinewidth','0.3%min'),
                               )
             rendered = pyagg.legend.BaseGroup(refcanvas=map.drawer, title=map.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
             self.img = rendered.get_image()

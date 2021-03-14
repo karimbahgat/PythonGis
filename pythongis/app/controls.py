@@ -562,7 +562,7 @@ Distance: {} km.'''.format(_from, _to, km)
         tk2.messagebox.showinfo(title='Distance Measurement',
                                 message=msg)
 
-class IdentifyControl(tk2.basics.Label):
+class IdentifyControlOLD(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
@@ -645,6 +645,138 @@ class IdentifyControl(tk2.basics.Label):
                     browser.table.populate(fields=layer.data.fields, rows=[f.row for f in feats])
                     
             elif isinstance(layer.data, pg.RasterData):
+                values = [layer.data.get(x, y, band).value for band in layer.data.bands]
+                if any((v != None for v in values)):
+                    anyhits = True
+                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
+                    _tab = ribbon.add_tab(shortname)
+                    _frame = tk2.Frame(_tab, label=layer.data.name)
+                    _frame.pack(fill='both', expand=1)
+                    
+                    col,row = layer.data.geo_to_cell(x, y)
+                    cellcol = tk2.Label(_frame, text="Column: %s" % col )
+                    cellcol.pack(fill="x", expand=1)
+                    cellrow = tk2.Label(_frame, text="Row: %s" % row )
+                    cellrow.pack(fill="x", expand=1)
+
+                    for bandnum,val in enumerate(values):
+                        text = "Band %i: \n\t%s" % (bandnum, val)
+                        valuelabel = tk2.Label(_frame, text=text)
+                        valuelabel.pack(fill="both", expand=1)
+
+        if not anyhits:
+            infowin.destroy()
+
+class IdentifyControl(tk2.basics.Label):
+    def __init__(self, master, *args, **kwargs):
+        # MAYBE RENAME "SELECT"?....
+        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+        self.identifybut = tk2.basics.Button(self, command=self.begin_identify)
+        self.identifybut.set_icon(icons.iconpath("identify.png"), width=40, height=40)
+        self.identifybut.pack()
+
+        self.mouseicon_tk = icons.get("identify.png", width=30, height=30)
+
+    def begin_identify(self):
+        print "begin identify..."
+        # replace mouse with identicon
+        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
+        #self.mapview.config(cursor="none")
+        def follow_mouse(event):
+            # gets called for entire app, so check to see if directly on canvas widget
+            root = self.winfo_toplevel()
+            rootxy = root.winfo_pointerxy()
+            mousewidget = root.winfo_containing(*rootxy)
+            if mousewidget == self.mapview:
+                curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
+                self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
+        self.followbind = self.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
+        # start select
+        def startclick(event):
+            self.startxy = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            startx,starty = self.startxy
+            self.rect = self.mapview.create_rectangle(startx, starty, startx+1, starty+1, fill=None)
+            # bind new drag movement
+            self.dragbind = self.winfo_toplevel().bind("<B1-Motion>", dragmove, '+')
+            self.releasebind = self.winfo_toplevel().bind("<ButtonRelease-1>", release, "+")
+            # unbind click event
+            self.winfo_toplevel().unbind("<Button-1>", self.clickbind)
+        self.clickbind = self.winfo_toplevel().bind("<Button-1>", startclick, "+")
+        # drag move
+        def dragmove(event):
+            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+            startx,starty = self.startxy
+            self.mapview.coords(self.rect, startx, starty, curx, cury)
+        # release
+        def release(event):
+            # reset
+            cancel()
+            # find
+            x,y = self.mapview.mouse2coords(*self.startxy)
+            x2,y2 = self.mapview.mouse2coords(event.x, event.y)
+            bbox = [min(x,x2),min(y,y2),max(x,x2),max(y,y2)]
+            self.identify(bbox)
+        # cancel with esc button
+        def cancel(event=None):
+            # unbind events
+            self.winfo_toplevel().unbind('<Motion>', self.followbind)
+            #self.winfo_toplevel().unbind('<Button-1>', self.clickbind) # already unbound earlier
+            self.winfo_toplevel().unbind('<B1-Motion>', self.dragbind)
+            self.winfo_toplevel().unbind('<ButtonRelease-1>', self.releasebind)
+            self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+            #self.mapview.config(cursor="arrow")
+            # delete rect and mouse icon
+            self.mapview.delete(self.rect)
+            self.mapview.delete(self.mouseicon_on_canvas)
+        self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
+
+    def identify(self, bbox):
+        print "identify: ", bbox
+        infowin = tk2.Window()
+        infowin.wm_geometry("500x300")
+        #infowin.state('zoomed')
+
+        title = tk2.Label(infowin, text="Hits for coordinates: %s" % bbox)
+        title.pack(fill="x")#, expand=1)
+        
+        ribbon = tk2.Ribbon(infowin)
+        ribbon.pack(fill="both", expand=1)
+
+        # find coord distance for approx 5 pixel uncertainty
+        pixelbuff = 10
+        p1 = self.mapview.renderer.pixel2coord(0, 0)
+        p2 = self.mapview.renderer.pixel2coord(pixelbuff, 0)
+        coorddist = self.mapview.renderer.drawer.measure_dist(p1, p2)
+
+        # add uncertainty buffer around bbox
+        from shapely.geometry import box
+        d = coorddist
+        x,y,x2,y2 = bbox
+        bbox = x-d,y-d,x2+d,y2+d
+        print "with buffer: ", coorddist, bbox
+        rect = box(*bbox)
+        
+        anyhits = None
+        for layer in self.mapview.renderer.layers:
+            if not layer.visible:
+                continue
+            print layer
+            if isinstance(layer.data, pg.VectorData):
+                feats = [feat for feat in layer.data.quick_overlap(bbox) if feat.get_shapely().intersects(rect)]
+                
+                if feats:
+                    anyhits = True
+                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
+                    _tab = ribbon.add_tab(shortname)
+                    _frame = tk2.Frame(_tab, label=layer.data.name)
+                    _frame.pack(fill='both', expand=1)
+                    
+                    browser = builder.TableBrowser(_frame)
+                    browser.pack(fill="both", expand=1)
+                    browser.table.populate(fields=layer.data.fields, rows=[f.row for f in feats])
+                    
+            elif False: #isinstance(layer.data, pg.RasterData):
                 values = [layer.data.get(x, y, band).value for band in layer.data.bands]
                 if any((v != None for v in values)):
                     anyhits = True
