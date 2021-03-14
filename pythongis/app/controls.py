@@ -9,6 +9,7 @@ from . import icons
 
 
 class LayersControl(tk2.basics.Label):
+    # OLD
     def __init__(self, master, *args, **kwargs):
         tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
@@ -562,111 +563,6 @@ Distance: {} km.'''.format(_from, _to, km)
         tk2.messagebox.showinfo(title='Distance Measurement',
                                 message=msg)
 
-class IdentifyControlOLD(tk2.basics.Label):
-    def __init__(self, master, *args, **kwargs):
-        tk2.basics.Label.__init__(self, master, *args, **kwargs)
-
-        self.identifybut = tk2.basics.Button(self, command=self.begin_identify)
-        self.identifybut.set_icon(icons.iconpath("identify.png"), width=40, height=40)
-        self.identifybut.pack()
-
-        self.mouseicon_tk = icons.get("identify.png", width=30, height=30)
-
-    def begin_identify(self):
-        print "begin identify..."
-        # replace mouse with identicon
-        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
-        #self.mapview.config(cursor="none")
-        def follow_mouse(event):
-            # gets called for entire app, so check to see if directly on canvas widget
-            root = self.winfo_toplevel()
-            rootxy = root.winfo_pointerxy()
-            mousewidget = root.winfo_containing(*rootxy)
-            if mousewidget == self.mapview:
-                curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
-                self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
-        self.followbind = self.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
-        # identify once clicked
-        def callident(event):
-            # reset
-            cancel()
-            # find
-            x,y = self.mapview.mouse2coords(event.x, event.y)
-            self.identify(x, y)
-        self.clickbind = self.winfo_toplevel().bind("<ButtonRelease-1>", callident, "+")
-        # cancel with esc button
-        def cancel(event=None):
-            self.winfo_toplevel().unbind('<Motion>', self.followbind)
-            self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
-            self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
-            #self.mapview.config(cursor="arrow")
-            self.mapview.delete(self.mouseicon_on_canvas)
-        self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
-
-    def identify(self, x, y):
-        print "identify: ",x, y
-        infowin = tk2.Window()
-        infowin.wm_geometry("500x300")
-        #infowin.state('zoomed')
-
-        title = tk2.Label(infowin, text="Hits for coordinates: %s, %s" % (x, y))
-        title.pack(fill="x")#, expand=1)
-        
-        ribbon = tk2.Ribbon(infowin)
-        ribbon.pack(fill="both", expand=1)
-
-        # find coord distance for approx 5 pixel uncertainty
-        pixelbuff = 10
-        p1 = self.mapview.renderer.pixel2coord(0, 0)
-        p2 = self.mapview.renderer.pixel2coord(pixelbuff, 0)
-        coorddist = self.mapview.renderer.drawer.measure_dist(p1, p2)
-
-        # create uncertainty buffer around clickpoint
-        from shapely.geometry import Point
-        p = Point(x, y).buffer(coorddist)
-        
-        anyhits = None
-        for layer in self.mapview.renderer.layers:
-            if not layer.visible:
-                continue
-            print layer
-            if isinstance(layer.data, pg.VectorData):
-                feats = [feat for feat in layer.data.quick_overlap(p.bounds) if feat.get_shapely().intersects(p)]
-                
-                if feats:
-                    anyhits = True
-                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
-                    _tab = ribbon.add_tab(shortname)
-                    _frame = tk2.Frame(_tab, label=layer.data.name)
-                    _frame.pack(fill='both', expand=1)
-                    
-                    browser = builder.TableBrowser(_frame)
-                    browser.pack(fill="both", expand=1)
-                    browser.table.populate(fields=layer.data.fields, rows=[f.row for f in feats])
-                    
-            elif isinstance(layer.data, pg.RasterData):
-                values = [layer.data.get(x, y, band).value for band in layer.data.bands]
-                if any((v != None for v in values)):
-                    anyhits = True
-                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
-                    _tab = ribbon.add_tab(shortname)
-                    _frame = tk2.Frame(_tab, label=layer.data.name)
-                    _frame.pack(fill='both', expand=1)
-                    
-                    col,row = layer.data.geo_to_cell(x, y)
-                    cellcol = tk2.Label(_frame, text="Column: %s" % col )
-                    cellcol.pack(fill="x", expand=1)
-                    cellrow = tk2.Label(_frame, text="Row: %s" % row )
-                    cellrow.pack(fill="x", expand=1)
-
-                    for bandnum,val in enumerate(values):
-                        text = "Band %i: \n\t%s" % (bandnum, val)
-                        valuelabel = tk2.Label(_frame, text=text)
-                        valuelabel.pack(fill="both", expand=1)
-
-        if not anyhits:
-            infowin.destroy()
-
 class IdentifyControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
         # MAYBE RENAME "SELECT"?....
@@ -680,6 +576,8 @@ class IdentifyControl(tk2.basics.Label):
 
     def begin_identify(self):
         print "begin identify..."
+        # temporarily disable pan mode
+        self.mapview.mouse_mode = None
         # replace mouse with identicon
         self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
         #self.mapview.config(cursor="none")
@@ -719,6 +617,8 @@ class IdentifyControl(tk2.basics.Label):
             self.identify(bbox)
         # cancel with esc button
         def cancel(event=None):
+            # turn back on pan mode
+            self.mapview.mouse_mode = 'pan'
             # unbind events
             self.winfo_toplevel().unbind('<Motion>', self.followbind)
             #self.winfo_toplevel().unbind('<Button-1>', self.clickbind) # already unbound earlier
@@ -737,10 +637,19 @@ class IdentifyControl(tk2.basics.Label):
         infowin.wm_geometry("500x300")
         #infowin.state('zoomed')
 
-        title = tk2.Label(infowin, text="Hits for coordinates: %s" % bbox)
-        title.pack(fill="x")#, expand=1)
+        wrap = tk2.Label(infowin)
+        wrap.pack(fill="x", expand=1)
+        title = tk2.Label(wrap, text="Coordinates:")
+        title.pack()
+        coords = tk2.Entry(wrap, width=75, justify='center', state='readonly')
+        if bbox[:2] == bbox[2:]:
+            text = '{}, {}'.format(*bbox[:2])
+        else:
+            text = '{}, {}, {}, {}'.format(*bbox)
+        coords.set( text )
+        coords.pack(padx=4, pady=8)
         
-        ribbon = tk2.Ribbon(infowin)
+        ribbon = tk2.Ribbon(infowin, anchor='wn')
         ribbon.pack(fill="both", expand=1)
 
         # find coord distance for approx 5 pixel uncertainty
@@ -754,7 +663,6 @@ class IdentifyControl(tk2.basics.Label):
         d = coorddist
         x,y,x2,y2 = bbox
         bbox = x-d,y-d,x2+d,y2+d
-        print "with buffer: ", coorddist, bbox
         rect = box(*bbox)
         
         anyhits = None
@@ -769,35 +677,133 @@ class IdentifyControl(tk2.basics.Label):
                     anyhits = True
                     shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
                     _tab = ribbon.add_tab(shortname)
-                    _frame = tk2.Frame(_tab, label=layer.data.name)
+                    _frame = tk2.Frame(_tab) #, label=layer.data.name)
                     _frame.pack(fill='both', expand=1)
                     
                     browser = builder.TableBrowser(_frame)
                     browser.pack(fill="both", expand=1)
                     browser.table.populate(fields=layer.data.fields, rows=[f.row for f in feats])
                     
-            elif False: #isinstance(layer.data, pg.RasterData):
-                values = [layer.data.get(x, y, band).value for band in layer.data.bands]
-                if any((v != None for v in values)):
+            elif isinstance(layer.data, pg.RasterData):
+                crop = layer.data.manage.crop(bbox)
+                #print crop, crop.bands[0].summarystats()
+                #crop.bands[0].render(600,400).img.show()
+                
+                if crop:
+                    # unfinished
                     anyhits = True
+                    hist = crop.bands[0].histogram(600, 400, bins=100)
                     shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
                     _tab = ribbon.add_tab(shortname)
-                    _frame = tk2.Frame(_tab, label=layer.data.name)
+                    _frame = tk2.Frame(_tab) #, label=layer.data.name)
                     _frame.pack(fill='both', expand=1)
+                    graph = tk2.Label(_frame, image=hist.img)
+                    graph.pack(fill="both", expand=1)
                     
-                    col,row = layer.data.geo_to_cell(x, y)
-                    cellcol = tk2.Label(_frame, text="Column: %s" % col )
-                    cellcol.pack(fill="x", expand=1)
-                    cellrow = tk2.Label(_frame, text="Row: %s" % row )
-                    cellrow.pack(fill="x", expand=1)
-
-                    for bandnum,val in enumerate(values):
-                        text = "Band %i: \n\t%s" % (bandnum, val)
-                        valuelabel = tk2.Label(_frame, text=text)
-                        valuelabel.pack(fill="both", expand=1)
+##                values = [layer.data.get(x, y, band).value for band in layer.data.bands]
+##                if any((v != None for v in values)):
+##                    anyhits = True
+##                    shortname = layer.data.name.replace('\\','/').split('/')[-1] # in case of path
+##                    _tab = ribbon.add_tab(shortname)
+##                    _frame = tk2.Frame(_tab) #, label=layer.data.name)
+##                    _frame.pack(fill='both', expand=1)
+##                    
+##                    col,row = layer.data.geo_to_cell(x, y)
+##                    cellcol = tk2.Label(_frame, text="Column: %s" % col )
+##                    cellcol.pack(fill="x", expand=1)
+##                    cellrow = tk2.Label(_frame, text="Row: %s" % row )
+##                    cellrow.pack(fill="x", expand=1)
+##
+##                    for bandnum,val in enumerate(values):
+##                        text = "Band %i: \n\t%s" % (bandnum, val)
+##                        valuelabel = tk2.Label(_frame, text=text)
+##                        valuelabel.pack(fill="both", expand=1)
 
         if not anyhits:
             infowin.destroy()
+
+##class PanControl(tk2.basics.Label):
+##    def __init__(self, master, *args, **kwargs):
+##        tk2.basics.Label.__init__(self, master, *args, **kwargs)
+##
+##        self.identifybut = tk2.basics.Button(self, command=self.begin_identify)
+##        self.identifybut.set_icon(icons.iconpath("identify.png"), width=40, height=40)
+##        self.identifybut.pack()
+##
+##        self.mouseicon_tk = icons.get("identify.png", width=30, height=30)
+##
+##    def enable_pan(self):
+##        print "enabling pan..."
+##        # replace mouse with identicon
+##        self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
+##        #self.mapview.config(cursor="none")
+##        def follow_mouse(event):
+##            # gets called for entire app, so check to see if directly on canvas widget
+##            root = self.winfo_toplevel()
+##            rootxy = root.winfo_pointerxy()
+##            mousewidget = root.winfo_containing(*rootxy)
+##            if mousewidget == self.mapview:
+##                curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
+##                self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
+##        self.followbind = self.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
+##        # start select
+##        def startclick(event):
+##            self.startxy = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+##            startx,starty = self.startxy
+##            self.rect = self.mapview.create_rectangle(startx, starty, startx+1, starty+1, fill=None)
+##            # bind new drag movement
+##            self.dragbind = self.winfo_toplevel().bind("<B1-Motion>", dragmove, '+')
+##            self.releasebind = self.winfo_toplevel().bind("<ButtonRelease-1>", release, "+")
+##            # unbind click event
+##            self.winfo_toplevel().unbind("<Button-1>", self.clickbind)
+##        self.clickbind = self.winfo_toplevel().bind("<Button-1>", startclick, "+")
+##        # drag move
+##        def dragmove(event):
+##            curx,cury = self.mapview.canvasx(event.x), self.mapview.canvasy(event.y)
+##            startx,starty = self.startxy
+##            self.mapview.coords(self.rect, startx, starty, curx, cury)
+##        # release
+##        def release(event):
+##            # reset
+##            cancel()
+##            # find
+##            x,y = self.mapview.mouse2coords(*self.startxy)
+##            x2,y2 = self.mapview.mouse2coords(event.x, event.y)
+##            bbox = [min(x,x2),min(y,y2),max(x,x2),max(y,y2)]
+##            self.identify(bbox)
+##        # cancel with esc button
+##        def cancel(event=None):
+##            # unbind events
+##            self.winfo_toplevel().unbind('<Motion>', self.followbind)
+##            #self.winfo_toplevel().unbind('<Button-1>', self.clickbind) # already unbound earlier
+##            self.winfo_toplevel().unbind('<B1-Motion>', self.dragbind)
+##            self.winfo_toplevel().unbind('<ButtonRelease-1>', self.releasebind)
+##            self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+##            #self.mapview.config(cursor="arrow")
+##            # delete rect and mouse icon
+##            self.mapview.delete(self.rect)
+##            self.mapview.delete(self.mouseicon_on_canvas)
+##        self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
+##
+##    def pan_to(self, x, y):
+##        startx,starty = self.startxy
+##        #curx,cury = self.canvasx(event.x), self.canvasy(event.y)
+##        xmoved = int(curx - startx)
+##        ymoved = int(cury - starty)
+##        #print startx,starty,curx,cury,xmoved,ymoved
+##        #print 'pre move',self.renderer.bbox
+##        #print 'offset',xmoved,ymoved
+##        if xmoved or ymoved:
+##            # offset image rendering
+##            self.mapview.renderer.offset(xmoved, ymoved)
+##            #print 'post move',self.renderer.bbox
+##            # log it
+##            self.mapview.log_zoom(self.mapview.renderer.bbox)
+##            # since threaded rendering will update the offset image, reanchor the dragged canvas image
+##            self.mapview.coords(self.image_on_canvas, 0, 0) # always reanchor rendered image nw at 0,0 in case of panning
+##            # render
+##            self.mapview.threaded_rendering() #update_image=False)
+
 
 class DrawPolyControl(tk2.basics.Label):
     def __init__(self, master, *args, **kwargs):
