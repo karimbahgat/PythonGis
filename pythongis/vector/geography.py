@@ -133,23 +133,23 @@ class Geography(object):
                         
                     return buffercoords
                
-                if "Multi" in geometry.type:
-                    coords = [[singlebuff(subgeom)] for subgeom in geometry["geoms"]]
+                if "Multi" in geog.type:
+                    coords = [[singlebuff(subgeom)] for subgeom in geog.geogs]
                     return Geography(type="MultiPolygon", coordinates=coords)
 
                 else:
-                    coords = [singlebuff(geometry)]
+                    coords = [singlebuff(geog)]
                     return Geography(type="Polygon", coordinates=coords)
                 
             else:
                 raise Exception("Geodetic buffer only implemented for points")
             
         if self.type == "GeometryCollection":
-            geojs = [geog.buffer(dist, resolution).__geo_interface__ for geog in self.geogs]
+            geojs = [geog.buffer(distance, resolution).__geo_interface__ for geog in self.geogs]
             return Geography(type="GeometryCollection", geometries=geojs)
 
         else:
-            return _handle(self, distance=dist, resolution=resolution)
+            return _handle(self, distance=distance, resolution=resolution)
 
     def line_to(self, other, great_circle=False, segments=None):
         if not great_circle:
@@ -174,10 +174,15 @@ class Geography(object):
 
 import itertools, math
 
+try:
+    zip = itertools.izip
+except:
+    pass
+
 def _pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
-    return itertools.izip(a, b)
+    return zip(a, b)
 
 def _vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245, f=1/298.257223563, MILES_PER_KILOMETER=0.621371, MAX_ITERATIONS=200, CONVERGENCE_THRESHOLD=1e-12):
     """
@@ -405,4 +410,4 @@ def _great_circle_path(point1, point2, segments):
     mylats[onelessthansegments] = ptlat2
     mylons[onelessthansegments] = ptlon2
 
-    return zip(mylons,mylats)
+    return list(zip(mylons,mylats))

@@ -74,7 +74,7 @@ def _to_vertexes(data):
                 outfile.add_feature(feat.row, None)
             elif "Multi" in feat.geometry["type"]:
                 for linestring in feat.geometry["coordinates"]:
-                    for point in linsetring:
+                    for point in linestring:
                         geoj = {"type": "Point",
                                 "coordinates": point}
                         outfile.add_feature(feat.row, geoj)

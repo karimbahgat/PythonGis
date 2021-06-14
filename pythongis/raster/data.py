@@ -15,6 +15,12 @@ import PIL.Image, PIL.ImageMath, PIL.ImageStat
 # import other
 import pycrs
 
+# PY3 fix
+try: 
+    basestring
+except NameError:
+    basestring = (bytes,str) # PY3
+
 # TODO:
 # not sure if setting mask should paste nodatavals, or if only as a temporary overlay so that underlying values be kept (and only changed via compute etc)...
 # also if conditional should query valid values only or all raw values...

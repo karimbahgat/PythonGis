@@ -1,10 +1,15 @@
 
 import itertools, math
 
+try:
+    zip = itertools.izip
+except:
+    pass
+
 def _pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
-    return itertools.izip(a, b)
+    return zip(a, b)
 
 def _vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245, f=1/298.257223563, MILES_PER_KILOMETER=0.621371, MAX_ITERATIONS=200, CONVERGENCE_THRESHOLD=1e-12):
     """
@@ -286,4 +291,4 @@ def great_circle_path(point1, point2, segments):
     mylats[onelessthansegments] = ptlat2
     mylons[onelessthansegments] = ptlon2
 
-    return zip(mylons,mylats)
+    return list(zip(mylons,mylats))

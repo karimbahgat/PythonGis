@@ -4,8 +4,8 @@ import pycrs
 
 pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 
-data = pg.VectorData(r"C:\Users\kimok\Desktop\BIGDATA\priocountries\priocountries.shp")
-rast = pg.RasterData(r"C:\Users\kimok\OneDrive\Documents\GitHub\AutoMap\tests\testmaps\burkina_georeferenced.tif")
+data = pg.VectorData(r"P:\(Temp Backup)\priocountries\priocountries.shp")#"C:\Users\kimok\Desktop\BIGDATA\priocountries\priocountries.shp")
+rast = pg.RasterData(r"C:\Users\kimok\Documents\GitHub\AutoMap\tests\testmaps\burkina_pol96_georeferenced.tif")
 
 #testcrs = '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs'
 #testcrs = pycrs.parse.from_sr_code(6980).to_proj4() # space
@@ -23,7 +23,8 @@ testcrs = next(pycrs.utils.search('eckert iv'))['proj4']
 #data.view(crs=testcrs)
 
 #### raster crs
-rast.view() #testcrs)
+rast.save('C:/Users/kimok/Desktop/testmap.png')
+#rast.view() #testcrs)
 #rast.manage.reproject(testcrs, resample='nearest').view()
 #rast.manage.reproject(testcrs, resample='bilinear').view()
 

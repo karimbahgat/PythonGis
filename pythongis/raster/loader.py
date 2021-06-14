@@ -521,7 +521,7 @@ def from_file(filepath, crs=None, **georef):
     
     else:
 
-        raise UnknownFileError("Could not create a raster from the given filepath: the filetype extension is either missing or not supported")
+        raise Exception("Could not create a raster from the given filepath: the filetype extension is either missing or not supported")
 
 
 def from_lists(data, nodataval=-9999.0, crs=None, cell_anchor="center", **geoargs):

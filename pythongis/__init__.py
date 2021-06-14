@@ -16,8 +16,8 @@ from . import vector
 from . import renderer
 
 # Some object imports
-from vector.data import VectorData
-from raster.data import RasterData
+from .vector.data import VectorData
+from .raster.data import RasterData
 
 __version__ = "0.2.0"
 

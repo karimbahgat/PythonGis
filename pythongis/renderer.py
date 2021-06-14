@@ -18,6 +18,13 @@ from .vector.loader import detect_filetype as vector_filetype
 from .raster.data import RasterData
 from .raster.loader import detect_filetype as raster_filetype
 
+# PY3 fix
+try: 
+    basestring
+    zip = itertools.izip
+except:
+    basestring = (bytes,str) # PY3
+
 
 
 # TODO:
@@ -131,7 +138,7 @@ def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
             brightness = min(1, col.luminance * brightness)
             col.luminance = brightness
         rgb = col.rgb
-    elif isinstance(basecolor, (str,unicode)):
+    elif isinstance(basecolor, basestring):
         #color text name
         replacenames = {'blue':'dodgerblue','orange':'darkorange','green':'limegreen','red':'crimson','purple':'slateblue','brown':'saddlebrown','pink':'hotpink'}
         basecolor = replacenames.get(basecolor, basecolor)
@@ -178,11 +185,11 @@ def get_crs_transformer(fromcrs, tocrs):
             x,y = p
             return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
         def _project(points):
-            xs,ys = itertools.izip(*points)
+            xs,ys = zip(*points)
             xs,ys = pyproj.transform(fromcrs,
                                      tocrs,
                                      xs, ys)
-            newpoints = list(itertools.izip(xs, ys))
+            newpoints = list(zip(xs, ys))
             newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
             return newpoints
     else:
@@ -657,7 +664,7 @@ class Map:
             import time
             t=time.time()
             self.update_draworder()
-            print "# draword",time.time()-t
+            print("# draword",time.time()-t)
 
     def update_draworder(self):
         if self.drawer: self.drawer.clear()
@@ -869,8 +876,8 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 
-def initSharedData(datadict):
-    print 'initfunc'
+""" def initSharedData(datadict):
+    print('initfunc')
     global sharedData
     sharedData = datadict
 
@@ -986,7 +993,7 @@ def parallel_vecrend(features, width, height, bbox, styleoptions, antialias=True
 
     #img.show()
 
-    return None
+    return None """
 
 
 
@@ -1193,7 +1200,7 @@ class VectorLayer:
     @property
     def bbox(self):
         if self.has_geometry():
-            xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self.features() if feat.geometry))
+            xmins, ymins, xmaxs, ymaxs = zip(*(feat.bbox for feat in self.features() if feat.geometry))
             bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
             return bbox
         else:
@@ -1410,7 +1417,7 @@ class VectorLayer:
                 drawer.draw_geojson(feat.geometry, **rendict)
 
             # flush
-            print "internal",time.time()-t
+            print("internal",time.time()-t)
             self.img = drawer.get_image()
 
             # transparency
@@ -1556,7 +1563,7 @@ class VectorLayer:
                     drawer.draw_text(text, **rendict)
 
             # flush
-            print "internal text",time.time()-t
+            print("internal text",time.time()-t)
             self.img_text = drawer.get_image()
 
             # transparency
@@ -1632,7 +1639,7 @@ class RasterLayer:
 
                 pxcounts = band.img.getcolors(band.width*band.height)
                 pxcounts = ((c,v) for c,v in pxcounts if v != band.nodataval)
-                pxcounts = sorted(pxcounts, key=lambda(c,v): v)
+                pxcounts = sorted(pxcounts, key=lambda cv: cv[1])
                 tot = sum((c for c,v in pxcounts))
 
                 if 'minval' not in options:

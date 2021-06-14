@@ -13,6 +13,13 @@ import pycrs
 
 import PIL, PIL.Image, PIL.ImageDraw, PIL.ImagePath, PIL.ImageChops, PIL.ImageMath
 
+# PY3 fix
+try: 
+    basestring
+    zip = itertools.izip
+except:
+    basestring = (bytes,str) # PY3
+
 def mosaic(rasters, overlaprule="last", **rasterdef):
     """
     Mosaic rasters covering different areas together into one file.
@@ -103,7 +110,7 @@ def sequence(values, rasts):
     rasts = ((val,_make_callable(rast)) for val,rast in rasts.items())
 
     # loop pairs of fromrast torast
-    rasts = sorted(rasts, key=lambda(val,rast): val)
+    rasts = sorted(rasts, key=lambda valrast: valrast[0])
 
     # NEW
     rasts = iter(rasts)
@@ -204,11 +211,11 @@ def reproject(raster, tocrs, resample="nearest", **rasterdef):
                 x,y = p
                 return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
             def _project(points):
-                xs,ys = itertools.izip(*points)
+                xs,ys = zip(*points)
                 xs,ys = pyproj.transform(fromcrs,
                                          tocrs,
                                          xs, ys)
-                newpoints = list(itertools.izip(xs, ys))
+                newpoints = list(zip(xs, ys))
                 newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
                 return newpoints
         else:
@@ -642,7 +649,7 @@ def resample(raster, method="nearest", **rasterdef):
 
     return targetrast
 
-def roll(tilerast, x, y, worldcoords=True):
+def roll(raster, x, y, worldcoords=True):
     """Offsets the cell values along the x and/or y axis, wrapping any
     overflowing cells around to the opposite edge.
     Useful for recentering the midpoint of a raster dataset.

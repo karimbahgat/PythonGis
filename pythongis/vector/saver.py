@@ -8,6 +8,13 @@ import math
 import shapefile as pyshp
 import pygeoj
 
+# PY3 fix
+try: 
+    str = unicode # in py2, make str synonymous with str
+    zip = itertools.izip
+except:
+    pass
+
 
 NaN = float("nan")
 
@@ -28,7 +35,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             else:
                 # floats are rounded
                 return round(value, maxprecision)
-        elif isinstance(value, unicode):
+        elif isinstance(value, str):
             # unicode is custom encoded into bytestring
             return value.encode(encoding)
         elif value is None:
@@ -78,7 +85,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
                     except ValueError:
                         # but turn to text if any of the cells cannot be made to float bc they are txt
                         fieldtype = "C"
-                        value = value if isinstance(value, unicode) else bytes(value)
+                        value = value if isinstance(value, str) else bytes(value)
                         fieldlen = max(( len(value), fieldlen ))
                         
             if fieldtype == "N" and decimals == 0:
@@ -100,12 +107,12 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
         fieldtypes = detect_fieldtypes(fields,rows)
         
         # set fields with correct fieldtype
-        for fieldname,(fieldtype,func,fieldlen,decimals) in itertools.izip(fields, fieldtypes):
+        for fieldname,(fieldtype,func,fieldlen,decimals) in zip(fields, fieldtypes):
             fieldname = fieldname.replace(" ","_")[:10]
             shapewriter.field(fieldname, fieldtype, fieldlen, decimals)
         
         # iterate through original shapes
-        for row,geoj in itertools.izip(rows, geometries):
+        for row,geoj in zip(rows, geometries):
             shapewriter.shape(geoj)
             row = [func(value) for (typ,func,length,deci),value in zip(fieldtypes,row)]
             shapewriter.record(*row)
@@ -117,7 +124,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
     elif filepath.endswith((".geojson",".json")):
         geojwriter = pygeoj.new()
         fieldtypes = detect_fieldtypes(fields,rows)
-        for row,geom in itertools.izip(rows,geometries):
+        for row,geom in zip(rows,geometries):
             # encode row values
             row = (func(value) for (typ,func,length,deci),value in zip(fieldtypes,row))
             row = (encode(value) for value in row)
@@ -138,7 +145,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             csvopts["delimiter"] = kwargs.get("delimiter", ";") # tab is best for automatically opening in excel...
             writer = csv.writer(fileobj, **csvopts)
             writer.writerow([f.encode(encoding) for f in fields])
-            for row,geometry in itertools.izip(rows, geometries):
+            for row,geometry in zip(rows, geometries):
                 writer.writerow([encode(val) for val in row])
 
     elif filepath.endswith(".xls"):
@@ -151,7 +158,7 @@ def to_file(fields, rows, geometries, filepath, encoding="utf8", maxprecision=12
             for c,f in enumerate(fields):
                 sheet.write(0, c, f)
             # rows
-            for r,(row,geometry) in enumerate(itertools.izip(rows, geometries)):
+            for r,(row,geometry) in enumerate(zip(rows, geometries)):
                 for c,val in enumerate(row):
                     # TODO: run val through encode() func, must spit out dates as well
                     sheet.write(r+1, c, val)

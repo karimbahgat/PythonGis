@@ -5,6 +5,12 @@ from .data import *
 import shapely, shapely.ops, shapely.geometry
 from shapely.prepared import prep as supershapely
 
+# PY3 fix
+try: 
+    basestring
+except NameError:
+    basestring = (bytes,str) # PY3
+    
 
 # TODO: when multiple input, uses all possible combinations, but need a way to use spatial indexes etc
 
@@ -72,8 +78,8 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
         elif agg == "min": return min
         elif agg == "first": return lambda seq: seq.__getitem__(0)
         elif agg == "last": return lambda seq: seq.__getitem__(-1)
-        elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))[0]
-        elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda(gid,group): len(list(group)))[0]
+        elif agg == "majority": return lambda seq: max(itertools.groupby(sorted(seq)), key=lambda gidgroup: len(list(gidgroup[1])))[0]
+        elif agg == "minority": return lambda seq: min(itertools.groupby(sorted(seq)), key=lambda gidgroup: len(list(gidgroup[1])))[0]
         elif agg == "mean": return lambda seq: sum(seq)/float(len(seq))
         elif isinstance(agg, basestring) and agg.endswith("concat"):
             delim = agg[:-6]
@@ -87,7 +93,7 @@ def aggreg(iterable, aggregfuncs, geomfunc=None):
     def check_valfunc(valfunc):
         if hasattr(valfunc,"__call__"):
             pass
-        elif isinstance(valfunc,(str,unicode)):
+        elif isinstance(valfunc,basestring):
             hashindex = valfunc
             valfunc = lambda f: f[hashindex]
         else:
@@ -153,10 +159,10 @@ def groupby(iterable, key):
     
     if hasattr(key,"__call__"):
         pass
-    elif isinstance(key,(str,unicode)):
+    elif isinstance(key,basestring):
         hashindex = key
         key = lambda f: f[hashindex]
-    elif isinstance(key,(list,tuple)) and all((isinstance(v,(str,unicode)) for v in key)):
+    elif isinstance(key,(list,tuple)) and all((isinstance(v,basestring) for v in key)):
         hashindexes = key
         key = lambda f: tuple((f[h] for h in hashindexes))
     else:

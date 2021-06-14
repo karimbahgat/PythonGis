@@ -10,6 +10,11 @@ import codecs
 import itertools
 import warnings
 
+try:
+    zip = itertools.izip
+except:
+    pass
+
 # import fileformat modules
 import shapefile as pyshp
 import pygeoj
@@ -61,7 +66,7 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", crs=None, **k
             if hasattr(obj, "bbox"): geoj["bbox"] = list(obj.bbox)
             return geoj
         geometries = (getgeoj(shape) for shape in shapereader.iterShapes())
-        rowgeoms = itertools.izip(rows, geometries)
+        rowgeoms = zip(rows, geometries)
         
         # load projection string from .prj file if exists
         if not crs:
@@ -77,7 +82,7 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", crs=None, **k
         fields = [decode(field) for field in geojfile.common_attributes]
         rows = ([decode(feat.properties[field]) for field in fields] for feat in geojfile)
         geometries = (feat.geometry.__geo_interface__ for feat in geojfile)
-        rowgeoms = itertools.izip(rows, geometries)
+        rowgeoms = zip(rows, geometries)
 
         # load crs
         if not crs:
@@ -203,7 +208,7 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", crs=None, **k
         rowgeoms = ( (row,geom) for row,geom in rowgeoms if select(dict(zip(fields,row))) )
 
     # load to memory in lists
-    rows,geometries = itertools.izip(*rowgeoms)
+    rows,geometries = zip(*rowgeoms)
     rows = list(rows)
     geometries = list(geometries)
 

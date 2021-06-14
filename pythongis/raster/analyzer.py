@@ -337,7 +337,7 @@ def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
                         yield weight * (1 - (dist / rad))
 
             from ..vector import sql
-            valfunc = lambda(v): v
+            valfunc = lambda v: v
             aggfunc = kwargs.get("aggfunc", "sum")
             fieldmapping = [("aggval",valfunc,aggfunc)]
             aggval = sql.aggreg(weights(), fieldmapping)[0]
@@ -374,7 +374,7 @@ def smooth(pointdata, rasterdef, valuefield=None, algorithm="radial", **kwargs):
             import PIL, PIL.ImageOps, PIL.ImageFilter
             rad = kwargs.get("radius", 3)
             filt = PIL.ImageFilter.GaussianBlur(radius=rad)
-            band.img = band.img.filter(filt)
+            newband.img = newband.img.filter(filt)
 
         else:
             # Gauss calculation in pure Python
@@ -556,7 +556,7 @@ def distance(data, **rasterdef):
     
     #outlineband = manager.rasterize(data.convert.to_lines(), **rasterdef).bands[0]
     outlinepixels = PIL.ImageMorph.MorphOp(op_name="edge").match(fillband.img)
-    print "outlinepixels",len(outlinepixels)
+    print("outlinepixels",len(outlinepixels))
 
     import rtree
     spindex = rtree.index.Index()

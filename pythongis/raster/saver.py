@@ -75,8 +75,8 @@ def to_file(bands, meta, filepath, **kwargs):
                 # write header
                 tempfile.write(header)
                 # write cells
-                for y in xrange(height):
-                    row = " ".join((str(cells[x,y]) for x in xrange(width)))+"\n"
+                for y in range(height):
+                    row = " ".join((str(cells[x,y]) for x in range(width)))+"\n"
                     tempfile.write(row)
                     
         # finally create world file for the geotransform

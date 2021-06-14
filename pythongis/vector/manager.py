@@ -11,6 +11,11 @@ import pycrs
 
 from ._helpers import geodetic_buffer
 
+try:
+    zip = itertools.izip
+except:
+    pass
+
 
 
 
@@ -233,7 +238,7 @@ def spatial_join(data, other, condition, subkey=None, keepall=False, clip=False,
             elif 'LineString' in newtyp: newmultiobj = shapely.geometry.MultiLineString
             elif 'Polygon' in newtyp: newmultiobj = shapely.geometry.MultiPolygon
 
-        print newtyp,newmultiobj
+        print(newtyp,newmultiobj)
             
         def clip(f1,f2):
             clipfunc = getattr(f1.get_shapely(), clipname)
@@ -635,8 +640,8 @@ def snap(data, otherdata, tolerance=0.0000001):
         withindist = (otherfeat.get_shapely() for otherfeat in otherdata.quick_overlap(buff.bounds))
         withindist = (othershp for othershp in withindist if buff.intersects(othershp))
         withindist = ((othershp,shp.distance(othershp)) for othershp in withindist)
-        for othershp,dist in sorted(withindist, key=lambda(shp,dist): dist, reverse=True):
-            print "snap"
+        for othershp,dist in sorted(withindist, key=lambda shpdist: shpdist[1], reverse=True):
+            print("snap")
             shp = _snap(shp, othershp, tolerance)
         feat.geometry = shp.__geo_interface__
         
@@ -828,11 +833,11 @@ def reproject(data, tocrs):
     toproj = pyproj.Proj(tocrs.to_proj4())
 
     def _project(points):
-        xs,ys = itertools.izip(*points)
+        xs,ys = zip(*points)
         xs,ys = pyproj.transform(fromproj,
                                  toproj,
                                  xs, ys)
-        newpoints = list(itertools.izip(xs, ys))
+        newpoints = list(zip(xs, ys))
         return newpoints
 
     out = data.copy()

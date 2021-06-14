@@ -21,6 +21,12 @@ from . import loader
 from . import saver
 from . import spindex
 
+# PY3 fix
+try: 
+    basestring
+except NameError:
+    basestring = (bytes,str) # PY3
+
 
 
 DEFAULT_SPATIAL_INDEX = 'rtree'
@@ -147,12 +153,12 @@ class Feature:
         self.id = id
 
     def __getitem__(self, i):
-        if isinstance(i, (str,unicode)):
+        if isinstance(i, basestring):
             i = self._data.fields.index(i)
         return self.row[i]
 
     def __setitem__(self, i, setvalue):
-        if isinstance(i, (str,unicode)):
+        if isinstance(i, basestring):
             i = self._data.fields.index(i)
         self.row[i] = setvalue
 
@@ -175,7 +181,7 @@ class Feature:
                 x,y = coords
                 bbox = [x,y,x,y]
             elif geotype in ("MultiPoint","LineString"):
-                xs, ys = itertools.izip(*coords)
+                xs, ys = zip(*coords)
                 bbox = [min(xs),min(ys),max(xs),max(ys)]
             elif geotype == "MultiLineString":
                 xs = [x for line in coords for x,y in line]
@@ -183,7 +189,7 @@ class Feature:
                 bbox = [min(xs),min(ys),max(xs),max(ys)]
             elif geotype == "Polygon":
                 exterior = coords[0]
-                xs, ys = itertools.izip(*exterior)
+                xs, ys = zip(*exterior)
                 bbox = [min(xs),min(ys),max(xs),max(ys)]
             elif geotype == "MultiPolygon":
                 xs = [x for poly in coords for x,y in poly[0]]
@@ -479,7 +485,7 @@ class VectorData:
             fields,rows,geometries,crs = loader.from_file(filepath, crs=crs, **kwargs)
         else:
             if features:
-                rows,geometries = itertools.izip(*((feat.row,feat.geometry) for feat in features))
+                rows,geometries = zip(*((feat.row,feat.geometry) for feat in features))
             else:
                 rows = rows or []
                 geometries = geometries or []
@@ -490,7 +496,7 @@ class VectorData:
 
         self._id_generator = ID_generator()
         
-        ids_rows_geoms = itertools.izip(self._id_generator,rows,geometries)
+        ids_rows_geoms = zip(self._id_generator,rows,geometries)
         featureobjs = (Feature(self,row,geom,id=id) for id,row,geom in ids_rows_geoms )
         self.features = OrderedDict([ (feat.id,feat) for feat in featureobjs ])
 
@@ -559,7 +565,7 @@ class VectorData:
     @property
     def bbox(self):
         if self.has_geometry():
-            xmins, ymins, xmaxs, ymaxs = itertools.izip(*(feat.bbox for feat in self if feat.geometry))
+            xmins, ymins, xmaxs, ymaxs = zip(*(feat.bbox for feat in self if feat.geometry))
             bbox = min(xmins),min(ymins),max(xmaxs),max(ymaxs)
             return bbox
         else:
@@ -764,7 +770,7 @@ class VectorData:
         for row in printrows:
             outstring += row_format.format(*row) + "\n"
             
-        print outstring
+        print(outstring)
 
     def summarystats(self, *fields):
         """
@@ -815,7 +821,7 @@ class VectorData:
         for row in printrows:
             outstring += row_format.format(*row) + "\n"
 
-        print outstring
+        print(outstring)
 
     def field_values(self, field):
         """Returns sorted list of all the unique values in this field."""
@@ -886,7 +892,7 @@ class VectorData:
         for row in printrows:
             outstring += row_format.format(*row) + "\n"
 
-        print outstring
+        print(outstring)
 
     def histogram(self, field, width=None, height=None, bins=10):
         """Renders the value distribution of a given field in a histogram plot, 
@@ -1060,7 +1066,7 @@ class VectorData:
             fieldmapping_old = fieldmapping
             fieldmapping = [getfm(item) for item in fieldmapping_default]
             fieldmapping += (item for item in fieldmapping_old if item[0] not in self.fields and item[0] not in other.fields)
-            print fieldmapping
+            print(fieldmapping)
 
             def grouppairs(data1, key1, data2, key2):
                 "aggregates"
@@ -1286,7 +1292,7 @@ class VectorData:
     def save(self, savepath, **kwargs):
         fields = self.fields
         rowgeoms = ((feat.row,feat.geometry) for feat in self)
-        rows, geometries = itertools.izip(*rowgeoms)
+        rows, geometries = zip(*rowgeoms)
         saver.to_file(fields, rows, geometries, savepath, **kwargs)
 
     def copy(self):
