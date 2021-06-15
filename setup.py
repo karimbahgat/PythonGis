@@ -12,8 +12,12 @@ setup(	long_description=open("README.rst").read(),
 	version="""0.3.0""",
 	keywords="""GIS spatial read write management conversion analysis distances visualization""",
 	packages=['pythongis', 'pythongis/app', 'pythongis/app/(old)', 'pythongis/app/(old)/icons', 'pythongis/app/(old)/toolkit', 'pythongis/app/icons', 'pythongis/app/tk2', 'pythongis/app/tk2/filednd', 'pythongis/classypie', 'pythongis/raster', 'pythongis/vector', 'pythongis/vector/fileformats', 'pythongis/vector/fileformats/thirdparty', 'pythongis/vector/fileformats/thirdparty/PyDTA', 'pythongis/vector/fileformats/thirdparty/stata_dta', 'pythongis/vector/fileformats/thirdparty/stata_dta/stata_math', 'pythongis/vector/fileformats/thirdparty/stata_dta/stata_missing'],
-	requires=['shapely', 'pyproj', 'pycrs', 'pyshp', 'pygeoj', 'geographiclib', 'pyqtree', 'Pillow', 'colour', 'xlrd', 'xlwt', 'openpyxl'],
-	dependency_links=['https://github.com/karimbahgat/PyAgg/tarball/master'], # just until i can push the py3 fix to pypi
+	install_requires=['shapely', 'pyproj', 'pycrs', 'pyshp', 'pygeoj', 
+					'geographiclib', 'pyqtree', 'Pillow', 'colour', 
+					'xlrd', 'xlwt', 'openpyxl',
+					'PyAgg @ git+https://github.com/karimbahgat/PyAgg', # just until i can push the py3 fix to pypi
+					],
+	#dependency_links=['https://github.com/karimbahgat/PyAgg/tarball/master'],
 	classifiers=['License :: OSI Approved', 'Programming Language :: Python', 'Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'Intended Audience :: Science/Research', 'Intended Audience :: End Users/Desktop', 'Topic :: Scientific/Engineering :: GIS'],
 	description="""A simple Python GIS framework for doing actual work.""",
 	)
