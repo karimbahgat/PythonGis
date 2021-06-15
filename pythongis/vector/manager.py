@@ -520,7 +520,7 @@ def split(data, key, breaks="unique", **kwargs):
         else:
             keywrap = lambda f: f[key]
 
-    import classypie as cp
+    from . import classypie as cp
     if breaks == "unique":
         grouped = cp.unique(data, key=keywrap, **kwargs)
     else:

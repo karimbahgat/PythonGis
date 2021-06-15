@@ -9,7 +9,7 @@ import colour
 
 import shapely, shapely.geometry
 
-import classypie as cp
+from . import classypie as cp
 
 import pycrs
 

@@ -903,7 +903,7 @@ class VectorData:
         - Should it return Canvas, or just straight view() it? 
         """
         import pyagg
-        import classypie
+        from . import classypie
         values = [f[field] for f in self]
 
         bars = []
