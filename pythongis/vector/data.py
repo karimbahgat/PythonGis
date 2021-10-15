@@ -531,7 +531,7 @@ class VectorData:
         """
         Loop through features in order.
         """
-        for feat in self.features.itervalues():
+        for feat in self.features.values():
             yield feat
 
     def __getitem__(self, i):
