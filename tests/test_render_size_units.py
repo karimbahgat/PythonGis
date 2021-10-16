@@ -55,7 +55,20 @@ class TestFillPixelUnits(BaseTestCases.DrawShapes):
         super(BaseTestCases.DrawShapes, self).__init__(*args, **kwargs)
         self.output_prefix += '_fill_pixel'
         self.kwargs = self.kwargs.copy()
-        extra = {'fillsize': '{}px'.format(self.width//50)}
+        extra = {'fillsize': '{}px'.format(10)}
+        self.kwargs.update(extra)
+
+class TestFillPixelUnitsDynamic(BaseTestCases.DrawShapes):
+
+    def __init__(self, *args, **kwargs):
+        super(BaseTestCases.DrawShapes, self).__init__(*args, **kwargs)
+        self.output_prefix += '_fill_pixel_dynamic'
+        self.kwargs = self.kwargs.copy()
+        from random import uniform
+        dynamic = {'breaks': 'equal', 
+                    'key': lambda f: f.geometry['coordinates'][1], #uniform(0,1),
+                    'sizes': ['4px', '10px']}
+        extra = {'fillsize': dynamic}
         self.kwargs.update(extra)
 
 class TestOutlinePixelUnits(BaseTestCases.DrawShapes):
@@ -64,8 +77,22 @@ class TestOutlinePixelUnits(BaseTestCases.DrawShapes):
         super(BaseTestCases.DrawShapes, self).__init__(*args, **kwargs)
         self.output_prefix += '_outline_pixel'
         self.kwargs = self.kwargs.copy()
-        extra = {'fillsize': '{}px'.format(self.width//50),
+        extra = {'fillsize': '{}px'.format(10),
                 'outlinewidth': '{}px'.format(2)}
+        self.kwargs.update(extra)
+
+class TestOutlinePixelUnitsDynamic(BaseTestCases.DrawShapes):
+
+    def __init__(self, *args, **kwargs):
+        super(BaseTestCases.DrawShapes, self).__init__(*args, **kwargs)
+        self.output_prefix += '_outline_pixel_dynamic'
+        self.kwargs = self.kwargs.copy()
+        from random import uniform
+        dynamic = {'breaks': 'equal', 
+                    'key': lambda f: f.geometry['coordinates'][1], #uniform(0,1),
+                    'sizes': ['0.5px', '3px']}
+        extra = {'fillsize': '{}px'.format(10),
+                'outlinewidth': dynamic}
         self.kwargs.update(extra)
 
 # x/y

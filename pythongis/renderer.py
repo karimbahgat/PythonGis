@@ -1072,7 +1072,7 @@ class VectorLayer:
                         val["key"] = lambda f,fn=fieldname: f[fn] # turn field name into callable
                     if "color" in key:
                         val["classvalues"] = val.pop("colors")
-                    elif "size" in key:
+                    elif "size" in key or "width" in key:
                         val["classvalues"] = val.pop("sizes")
                     elif "opacity" in key:
                         val["classvalues"] = val.pop("opacities")
@@ -1089,8 +1089,25 @@ class VectorLayer:
                         else:
                             # color gradient
                             val["classvalues"] = [rgb(col) for col in val["classvalues"]]
-                    else:
-                        pass #val["classvalues"] = [Unit(col) for col in val["classvalues"]]
+                    
+                    # convert any size names to pure numeric so can be handled by classypie
+                    if 'size' in key or 'width' in key:
+                        def split_unit(v):
+                            if isinstance(v, str):
+                                unit = v.lstrip('0123456789.-')
+                                v = float(v.replace(unit, ''))
+                                return v,unit
+                            else:
+                                return v,None
+                        vals,units = zip(*[split_unit(v) for v in val["classvalues"]])
+                        val["classvalues"] = vals
+
+                    # for point symbols, convert from radius to areal sizes for more correct interpolation
+                    # TODO: now only circles, test and calc for other shapes too
+                    if 'size' in key and 'Point' in self.data.type:
+                        shp = self.styleoptions.get('shape')
+                        if shp is None or shp == 'circle':
+                            val["classvalues"] = [math.pi*(radius**2) for radius in val["classvalues"]]
 
                     # cache precalculated values in id dict
                     # more memory friendly alternative is to only calculate breakpoints
@@ -1102,15 +1119,20 @@ class VectorLayer:
                                                    notclassified=notclassified
                                                    )
 
-                    # convert from area to radius for more correct visual comparisons
-                    # first interpolation was done between areas, now convert to radius sizes
+                    # convert from area back to radius for more correct visual comparisons
+                    # (sizes were converted from input radius to area for purposes of interpolation)
                     # TODO: now only circles, test and calc for other shapes too
                     if 'size' in key and 'Point' in self.data.type:
                         shp = self.styleoptions.get('shape')
                         if shp is None or shp == 'circle':
-                            #val['classvalues'] = [math.sqrt(v/math.pi) for v in val['classvalues']]
-                            classifier.classvalues_interp = [math.sqrt(v/math.pi) for v in classifier.classvalues_interp]
+                            classifier.classvalues_interp = [math.sqrt(area/math.pi) for area in classifier.classvalues_interp]
                             self.styleoptions[key]['symbols'] = dict((id(f),classval) for f,classval in classifier)
+
+                    # add back any unit specifiers
+                    if 'size' in key or 'width' in key:
+                        unit = units[0]
+                        if unit:
+                            self.styleoptions[key]['symbols'] = dict((fid,'{}{}'.format(classval,unit)) for fid,classval in self.styleoptions[key]['symbols'].items())
                     
                 elif hasattr(val, "__call__"):
                     pass
@@ -1119,16 +1141,8 @@ class VectorLayer:
                     # convert any color names to pure numeric so can be handled by classypie
                     if "color" in key:
                         val = rgb(val)
-                    elif "size" in key:
-                        #pass #val = Unit(val)
-                        # convert from area to radius for more correct visual comparisons
-                        # TODO: now only circles, test and calc for other shapes too
-                        if 'Point' in self.data.type:
-                            shp = self.styleoptions.get('shape')
-                            if shp is None or shp == 'circle':
-                                val = math.sqrt(val/math.pi)
-                    elif "opacity" in key:
-                        val = val
+                    else:
+                        pass
 
                     self.styleoptions[key] = val
 
