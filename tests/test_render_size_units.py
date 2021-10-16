@@ -27,6 +27,7 @@ class BaseTestCases:
 
         def save_map(self, name):
             print('save',self.output_prefix,name)
+            self.map.add_legend()
             self.map.save('outputs/{}_{}.png'.format(self.output_prefix, name))
 
         def test_circle(self):
@@ -40,6 +41,12 @@ class BaseTestCases:
             print(self.kwargs)
             self.map.add_layer(pointdata, shape='box', **self.kwargs)
             self.save_map('box')
+
+        def test_triangle(self):
+            self.create_map()
+            print(self.kwargs)
+            self.map.add_layer(pointdata, shape='triangle', **self.kwargs)
+            self.save_map('triangle')
 
         def test_polygon(self):
             self.create_map()
@@ -66,7 +73,7 @@ class TestFillPixelUnitsDynamic(BaseTestCases.DrawShapes):
         self.kwargs = self.kwargs.copy()
         from random import uniform
         dynamic = {'breaks': 'equal', 
-                    'key': lambda f: f.geometry['coordinates'][1], #uniform(0,1),
+                    'key': lambda f: f.bbox[1], #uniform(0,1),
                     'sizes': ['4px', '10px']}
         extra = {'fillsize': dynamic}
         self.kwargs.update(extra)
@@ -89,7 +96,7 @@ class TestOutlinePixelUnitsDynamic(BaseTestCases.DrawShapes):
         self.kwargs = self.kwargs.copy()
         from random import uniform
         dynamic = {'breaks': 'equal', 
-                    'key': lambda f: f.geometry['coordinates'][1], #uniform(0,1),
+                    'key': lambda f: f.bbox[1], #uniform(0,1),
                     'sizes': ['0.5px', '3px']}
         extra = {'fillsize': '{}px'.format(10),
                 'outlinewidth': dynamic}

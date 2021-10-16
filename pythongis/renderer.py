@@ -1100,14 +1100,24 @@ class VectorLayer:
                             else:
                                 return v,None
                         vals,units = zip(*[split_unit(v) for v in val["classvalues"]])
+                        if len(set(units)) > 1:
+                            raise Exception('All size strings must be specified with the same unit type, not: {}'.format(set(units)))
                         val["classvalues"] = vals
 
                     # for point symbols, convert from radius to areal sizes for more correct interpolation
-                    # TODO: now only circles, test and calc for other shapes too
                     if 'size' in key and 'Point' in self.data.type:
-                        shp = self.styleoptions.get('shape')
-                        if shp is None or shp == 'circle':
+                        shp = self.styleoptions.get('shape', 'circle')
+                        if shp == 'circle':
+                            # assumes non-elliptical circle for now
                             val["classvalues"] = [math.pi*(radius**2) for radius in val["classvalues"]]
+                        elif shp == 'box':
+                            # assumes square for now
+                            val["classvalues"] = [width**2 for width in val["classvalues"]]
+                        elif shp == 'triangle':
+                            # assumes equal angle triangle for now
+                            val["classvalues"] = [(math.sqrt(3)/4.0)*width**2 for width in val["classvalues"]]
+
+                        
 
                     # cache precalculated values in id dict
                     # more memory friendly alternative is to only calculate breakpoints
@@ -1119,19 +1129,28 @@ class VectorLayer:
                                                    notclassified=notclassified
                                                    )
 
-                    # convert from area back to radius for more correct visual comparisons
+                    # convert from area back to radius as expected by the renderer
                     # (sizes were converted from input radius to area for purposes of interpolation)
-                    # TODO: now only circles, test and calc for other shapes too
                     if 'size' in key and 'Point' in self.data.type:
-                        shp = self.styleoptions.get('shape')
-                        if shp is None or shp == 'circle':
+                        shp = self.styleoptions.get('shape', 'circle')
+                        if shp == 'circle':
+                            # assumes non-elliptical circle for now
                             classifier.classvalues_interp = [math.sqrt(area/math.pi) for area in classifier.classvalues_interp]
+                            self.styleoptions[key]['symbols'] = dict((id(f),classval) for f,classval in classifier)
+                        elif shp == 'box':
+                            # assumes square for now
+                            classifier.classvalues_interp = [math.sqrt(area) for area in classifier.classvalues_interp]
+                            self.styleoptions[key]['symbols'] = dict((id(f),classval) for f,classval in classifier)
+                        elif shp == 'triangle':
+                            # assumes equal angle triangle for now
+                            classifier.classvalues_interp = [math.sqrt((4*area)/math.sqrt(3)) for area in classifier.classvalues_interp]
                             self.styleoptions[key]['symbols'] = dict((id(f),classval) for f,classval in classifier)
 
                     # add back any unit specifiers
                     if 'size' in key or 'width' in key:
                         unit = units[0]
                         if unit:
+                            classifier.classvalues_interp = ['{}{}'.format(classval,unit) for classval in classifier.classvalues_interp]
                             self.styleoptions[key]['symbols'] = dict((fid,'{}{}'.format(classval,unit)) for fid,classval in self.styleoptions[key]['symbols'].items())
                     
                 elif hasattr(val, "__call__"):
@@ -2119,6 +2138,57 @@ class Legend:
         elif isinstance(layer, RasterLayer):
             raise Exception("Fillsize is not a possible legend entry for a raster layer")
 
+    def add_outlinewidths(self, layer, **override):
+        self._operations.append( (self._add_outlinewidths, layer, override) )
+
+    def _add_outlinewidths(self, layer, **override):
+        if isinstance(layer, VectorLayer):
+            # use layer's legendoptions, styleoptions, and possibly override (in that order)
+            options = dict(layer.styleoptions)
+            options.update(layer.legendoptions)
+            options.update(override)
+            #options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
+
+            # shape is set to a line
+            options.pop('shape', None)
+            shape = 'line'
+
+            # outlinecolor becomes the fillcolor of a line
+            options['fillcolor'] = options.pop('outlinecolor', None)
+            if isinstance(options['fillcolor'], dict):
+                del options['fillcolor'] # ignore dynamic color dict
+
+            # outlinewidth becomes the fillsize of a line
+            options['fillsize'] = options.pop('outlinewidth', None)
+
+            # don't render the line outline
+            options['outlinecolor'] = None
+            
+            if "outlinewidth" in layer.styleoptions and isinstance(layer.styleoptions["outlinewidth"], dict):
+                cls = layer.styleoptions["outlinewidth"]["classifier"]
+
+                # force legend type depending on classifier algorithm
+                if cls.algo == "unique": options["valuetype"] = "categorical"
+                elif cls.algo == "proportional": options["valuetype"] = "proportional"
+
+                if options.get("valuetype") == "proportional":
+                    # switch, uses classvalues as breaks
+                    breaks = cls.breaks
+                    classvalues = cls.classvalues_interp
+                else:
+                    breaks = cls.breaks
+                    classvalues = cls.classvalues_interp
+                            
+                #print options
+                self._legend.add_fillsizes(shape, breaks, classvalues, **options)
+
+            else:
+                # add as static symbol if none of the dynamic ones
+                self._add_single_symbol(layer, shape=shape, **options)
+
+        elif isinstance(layer, RasterLayer):
+            raise Exception("Outlinewidth is not a possible legend entry for a raster layer")
+
     def add_single_symbol(self, layer, **override):
         self._operations.append( (self._add_single_symbol, layer, override) )
 
@@ -2177,6 +2247,15 @@ class Legend:
                 if "fillsize" in layer.styleoptions and isinstance(layer.styleoptions["fillsize"], dict):
                     # is dynamic and should be highlighted specially
                     self._add_fillsizes(layer, **layer.legendoptions)
+                    anydynamic = True
+                if "outlinecolor" in layer.styleoptions and isinstance(layer.styleoptions["outlinecolor"], dict):
+                    # is dynamic and should be highlighted specially
+                    #print 999,layer,layer.legendoptions
+                    self._add_outlinecolors(layer, **layer.legendoptions)
+                    anydynamic = True
+                if "outlinewidth" in layer.styleoptions and isinstance(layer.styleoptions["outlinewidth"], dict):
+                    # is dynamic and should be highlighted specially
+                    self._add_outlinewidths(layer, **layer.legendoptions)
                     anydynamic = True
                     
                 # add as static symbol if none of the dynamic ones
