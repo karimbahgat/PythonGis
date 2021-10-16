@@ -8,6 +8,8 @@ pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 
 pointdata = pg.VectorData('data/ne_10m_populated_places_simple.shp',
                             encoding='latin')
+linedata = pg.VectorData('data/ne_10m_railroads.shp',
+                            encoding='latin')
 polygondata = pg.VectorData('data/ne_10m_admin_0_countries.shp',
                             encoding='latin')
 
@@ -53,6 +55,12 @@ class BaseTestCases:
             print(self.kwargs)
             self.map.add_layer(polygondata, **self.kwargs)
             self.save_map('polygon')
+
+        def test_line(self):
+            self.create_map()
+            print(self.kwargs)
+            self.map.add_layer(linedata, **self.kwargs)
+            self.save_map('line')
 
 # px
 
