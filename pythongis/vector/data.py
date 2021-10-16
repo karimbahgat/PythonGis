@@ -1190,17 +1190,43 @@ class VectorData:
         """Creates spatial index to allow quick overlap search methods.
         If features are changed, added, or dropped, the index must be created again.
         """
-        type = type or DEFAULT_SPATIAL_INDEX
-        if type == 'rtree':
-            self.spindex = spindex.Rtree(backend=backend, **kwargs)
-        elif type == 'quadtree':
-            self.spindex = spindex.QuadTree(backend=backend, bbox=self.bbox, **kwargs)
+        # if no preference, try the default
+        if type is None:
+            try:
+                self.create_spatial_index(type=DEFAULT_SPATIAL_INDEX, **kwargs)
+            except ImportError:
+                pass
+
+        # otherwise try the preferred one
         else:
-            raise Exception('No such spatial index type: {}'.format(type))
+            try:
+                if type == 'rtree':
+                    self.spindex = spindex.Rtree(backend=backend, **kwargs)
+                elif type == 'quadtree':
+                    self.spindex = spindex.QuadTree(backend=backend, bbox=self.bbox, **kwargs)
+                else:
+                    raise Exception('No such spatial index type: {}'.format(type))
+            except ImportError:
+                pass
+
+        # if didn't work, try all and use first one that works
+        if not hasattr(self, 'spindex'):
+            for type in ['rtree','quadtree']:
+                try:
+                    if type == 'rtree':
+                        self.spindex = spindex.Rtree(backend=backend, **kwargs)
+                    elif type == 'quadtree':
+                        self.spindex = spindex.QuadTree(backend=backend, bbox=self.bbox, **kwargs)
+                    else:
+                        raise Exception('No such spatial index type: {}'.format(type))
+                except ImportError:
+                    pass
             
-        for feat in self:
-            if feat.geometry:
-                self.spindex.insert(feat.id, feat.bbox)
+        # populate the spindex
+        if hasattr(self, 'spindex'):
+            for feat in self:
+                if feat.geometry:
+                    self.spindex.insert(feat.id, feat.bbox)
    
     def quick_overlap(self, bbox):
         """
