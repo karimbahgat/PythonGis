@@ -39,7 +39,7 @@ def to_file(bands, meta, filepath, **kwargs):
             # ...in the world file from the usual affine a,b,c,d,e,f
             # ...so rearranging their sequence
             xscale,xskew,xoff,yskew,yscale,yoff = geotrans
-            string = '\n'.join((bytes(val) for val in [xscale,yskew,xskew,yscale,xoff,yoff]))
+            string = '\n'.join((str(val) for val in [xscale,yskew,xskew,yscale,xoff,yoff]))
             writer.write( string )
 
     def create_prj_file(filepath, crs):
@@ -119,7 +119,7 @@ def to_file(bands, meta, filepath, **kwargs):
 
         # nodata
         if meta.get("nodatavals"):
-            tags[42113] = bytes(meta["nodatavals"][0]) # TODO: only temp hack to use nodataval of first band
+            tags[42113] = str(meta["nodatavals"][0]) # TODO: only temp hack to use nodataval of first band
             tags.tagtype[42113] = 2 #ascii dtype
             
         # finally save the file using tiffmeta headers

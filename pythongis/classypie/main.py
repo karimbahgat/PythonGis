@@ -66,7 +66,7 @@ class Classifier(object):
         
         self.items = items
         
-        if isinstance(breaks, bytes):
+        if isinstance(breaks, str):
             algo = breaks
             breaks = None
             
@@ -214,7 +214,7 @@ def find_class(value, breaks):
     prevbrk = breaks[0]
     classnum = 1
     for nextbrk in breaks[1:]:
-        if eval(bytes(prevbrk)) <= eval(bytes(value)) <= eval(bytes(nextbrk)):
+        if eval(str(prevbrk)) <= eval(str(value)) <= eval(str(nextbrk)):
             return classnum, (prevbrk,nextbrk)
         prevbrk = nextbrk
         classnum += 1
@@ -439,7 +439,7 @@ def split(items, breaks, key=None, exclude=None, minval=None, maxval=None, **kwa
     values = [keywrap(item) for item in items]
 
     # if not custom specified, get break values from algorithm name
-    if isinstance(breaks, bytes):
+    if isinstance(breaks, str):
         func = _breaks.__dict__[breaks]
         breaks = func(values, **kwargs)
     else:
@@ -454,37 +454,37 @@ def split(items, breaks, key=None, exclude=None, minval=None, maxval=None, **kwa
     def find_class(item, loopdict=loopdict):
         val = keywrap(item)
         
-##        while eval(bytes(val)) > eval(bytes(loopdict["nextbrk"])):
+##        while eval(str(val)) > eval(str(loopdict["nextbrk"])):
 ##            loopdict["prevbrk"] = loopdict["nextbrk"]
 ##            loopdict["nextbrk"] = next(breaks_gen)
-##        if eval(bytes(loopdict["prevbrk"])) <= eval(bytes(val)) <= eval(bytes(loopdict["nextbrk"])):
+##        if eval(str(loopdict["prevbrk"])) <= eval(str(val)) <= eval(str(loopdict["nextbrk"])):
 ##            return loopdict["prevbrk"],loopdict["nextbrk"]
         
-##        if eval(bytes(val)) < loopdict["prevbrk"]:
+##        if eval(str(val)) < loopdict["prevbrk"]:
 ##            # value lower than first class
 ##            return None
 ##        else:
-##            while not (eval(bytes(loopdict["prevbrk"])) <= eval(bytes(val)) <= eval(bytes(loopdict["nextbrk"]))):
-##                print eval(bytes(loopdict["prevbrk"])) , eval(bytes(val)) , eval(bytes(loopdict["nextbrk"]))
+##            while not (eval(str(loopdict["prevbrk"])) <= eval(str(val)) <= eval(str(loopdict["nextbrk"]))):
+##                print eval(str(loopdict["prevbrk"])) , eval(str(val)) , eval(str(loopdict["nextbrk"]))
 ##                # increment breaks until value is between
 ##                loopdict["prevbrk"] = loopdict["nextbrk"]
 ##                loopdict["nextbrk"] = next(breaks_gen, None)
 ##                if loopdict["nextbrk"] == None:
 ##                    return None
 ##            # supposedly in between, so test and return class range
-##            if eval(bytes(loopdict["prevbrk"])) <= eval(bytes(val)) < eval(bytes(loopdict["nextbrk"])):
+##            if eval(str(loopdict["prevbrk"])) <= eval(str(val)) < eval(str(loopdict["nextbrk"])):
 ##                return loopdict["prevbrk"],loopdict["nextbrk"]
 
         prevbrk = breaks[0]
         for i,nextbrk in enumerate(breaks[1:]):
             ###print val,i+1,len(breaks)-1
-            if eval(bytes(val)) < eval(bytes(prevbrk)):
+            if eval(str(val)) < eval(str(prevbrk)):
                 return None
-            elif eval(bytes(prevbrk)) <= eval(bytes(val)) < eval(bytes(nextbrk)):
+            elif eval(str(prevbrk)) <= eval(str(val)) < eval(str(nextbrk)):
                 return prevbrk,nextbrk
-            elif eval(bytes(prevbrk)) == eval(bytes(val)) == eval(bytes(nextbrk)):
+            elif eval(str(prevbrk)) == eval(str(val)) == eval(str(nextbrk)):
                 return prevbrk,nextbrk
-            elif i+1==len(breaks)-1 and eval(bytes(val)) <= eval(bytes(nextbrk)):
+            elif i+1==len(breaks)-1 and eval(str(val)) <= eval(str(nextbrk)):
                 return prevbrk,nextbrk
             prevbrk = nextbrk
         else:
