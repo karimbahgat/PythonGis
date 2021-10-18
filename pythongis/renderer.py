@@ -1423,7 +1423,7 @@ class VectorLayer:
                     #print 'text post fbox',feat.bbox, feat.get_shapely().centroid.coords[0]
                 
                 # get symbols
-                rendict = dict()
+                rendict = self.styleoptions.copy() #dict()
                 if "shape" in self.styleoptions: rendict["shape"] = self.styleoptions["shape"]
                 for key in "fillcolor fillopacity fillsize outlinecolor outlinewidth".split():
                     if key in self.styleoptions:
@@ -2025,8 +2025,9 @@ class Legend:
         self._operations.append( (self._add_fillcolors, layer, override) )
 
     def _add_fillcolors(self, layer, **override):
-        # use layer's legendoptions and possibly override
-        options = dict(layer.legendoptions)
+        # use layer's legendoptions, styleoptions, and possibly override (in that order)
+        options = dict(layer.styleoptions)
+        options.update(layer.legendoptions)
         options.update(override)
             
         if isinstance(layer, VectorLayer):
@@ -2057,14 +2058,12 @@ class Legend:
                     breaks = cls.breaks
                     classvalues = cls.classvalues_interp
 
-                # add any other nonvarying layer options
-                if options.get("valuetype") != "proportional":
-                    # except for gradient bar shouldnt mimic the symbol, only the color... 
-                    for k in "fillsize outlinecolor outlinewidth".split():
-                        if k not in options and k in layer.styleoptions:
-                            v = layer.styleoptions[k]
-                            if not isinstance(v, dict):
-                                options[k] = v
+                # ignore any dynamic layer options
+                for k in "fillcolor fillsize outlinecolor outlinewidth".split():
+                    v = options.get(k, None)
+                    #print k,v,type(v)
+                    if isinstance(v, dict):
+                        del options[k]
 
                 #print options
                 self._legend.add_fillcolors(shape, breaks, classvalues, **options)
@@ -2092,10 +2091,10 @@ class Legend:
 
     def _add_fillsizes(self, layer, **override):
         if isinstance(layer, VectorLayer):
-            # use layer's legendoptions and possibly override
-            options = dict(layer.legendoptions)
+            # use layer's legendoptions, styleoptions, and possibly override (in that order)
+            options = dict(layer.styleoptions)
+            options.update(layer.legendoptions)
             options.update(override)
-            #options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
 
             shape = options.pop("shape", None)
             shape = shape or layer.styleoptions.get("shape")
@@ -2117,16 +2116,12 @@ class Legend:
                     breaks = cls.breaks
                     classvalues = cls.classvalues_interp
                 
-                # add any other nonvarying layer options
-                #print 9999
-                #print options
-                for k in "fillcolor outlinecolor outlinewidth".split():
-                    #print k
-                    if k not in options and k in layer.styleoptions:
-                        v = layer.styleoptions[k]
-                        #print k,v,type(v)
-                        if not isinstance(v, dict):
-                            options[k] = v
+                # ignore any dynamic layer options
+                for k in "fillcolor fillsize outlinecolor outlinewidth".split():
+                    v = options.get(k, None)
+                    #print k,v,type(v)
+                    if isinstance(v, dict):
+                        del options[k]
                             
                 #print options
                 self._legend.add_fillsizes(shape, breaks, classvalues, **options)
@@ -2147,7 +2142,6 @@ class Legend:
             options = dict(layer.styleoptions)
             options.update(layer.legendoptions)
             options.update(override)
-            #options["fillcolor"] = options.get("fillcolor") # so that if there is no fillcolor, should use empty sizes
 
             # shape is set to a line
             options.pop('shape', None)
@@ -2178,6 +2172,13 @@ class Legend:
                 else:
                     breaks = cls.breaks
                     classvalues = cls.classvalues_interp
+
+                # ignore any dynamic layer options
+                for k in "fillcolor fillsize outlinecolor outlinewidth".split():
+                    v = options.get(k, None)
+                    #print k,v,type(v)
+                    if isinstance(v, dict):
+                        del options[k]
                             
                 #print options
                 self._legend.add_fillsizes(shape, breaks, classvalues, **options)

@@ -38,6 +38,14 @@ class BaseTestCases:
             self.map.add_layer(pointdata, **self.kwargs)
             self.save_map('circle')
 
+        def test_pie(self):
+            self.create_map()
+            print(self.kwargs)
+            self.map.add_layer(pointdata, shape='pie', 
+                            startangle=0, endangle=110,
+                            **self.kwargs)
+            self.save_map('pie')
+
         def test_box(self):
             self.create_map()
             print(self.kwargs)
