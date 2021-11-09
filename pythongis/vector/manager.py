@@ -829,14 +829,11 @@ def reproject(data, tocrs):
         tocrs = pycrs.parse.from_unknown_text(tocrs)
 
     # create pyproj objs
-    fromproj = pyproj.Proj(fromcrs.to_proj4())
-    toproj = pyproj.Proj(tocrs.to_proj4())
+    _transformer = pyproj.Transformer.from_crs(fromcrs.to_proj4(), tocrs.to_proj4())
 
     def _project(points):
         xs,ys = zip(*points)
-        xs,ys = pyproj.transform(fromproj,
-                                 toproj,
-                                 xs, ys)
+        xs,ys = _transformer.transform(xs, ys)
         newpoints = list(zip(xs, ys))
         return newpoints
 

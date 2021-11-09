@@ -354,7 +354,7 @@ def reproject(raster, tocrs, resample="nearest", **rasterdef):
         tul_x, tlr_x = min(tul_x, tlr_x), max(tul_x, tlr_x)
         tul_y, tlr_y = min(tul_y, tlr_y), max(tul_y, tlr_y)
         targetbox = (tul_x,tul_y,tlr_x,tlr_y)
-        targetbox = map(int, targetbox)
+        targetbox = list(map(int, targetbox))
         #print 'target', targetbox
         
         # define source quad corners

@@ -561,9 +561,9 @@ def distance(data, **rasterdef):
     import rtree
     spindex = rtree.index.Index()
     
-    outlinepoints = [Point(*outrast.cell_to_geo(*px)) for px in outlinepixels]
+    outlinepoints = [outrast.cell_to_geo(*px) for px in outlinepixels]
     for i,p in enumerate(outlinepoints):
-        bbox = p.bounds 
+        bbox = list(p) + list(p)
         spindex.insert(i, bbox)
 
     for cell in fillband:
@@ -571,8 +571,9 @@ def distance(data, **rasterdef):
             # only calculate where vector is absent
             bbox = [cell.x, cell.y, cell.x, cell.y]
             nearestid = next(spindex.nearest(bbox, num_results=1))
-            point = Point(cell.x,cell.y)
-            dist = point.distance(outlinepoints[nearestid])
+            point = cell.x,cell.y
+            otherpoint = outlinepoints[nearestid]
+            dist = math.hypot(point[0]-otherpoint[0], point[1]-otherpoint[1])
             outband.set(cell.col, cell.row, dist)
 
     # ALT5: each pixel to reconstructed linestring of rasterized edge pixels, superfast if can reconstruct

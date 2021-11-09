@@ -179,13 +179,16 @@ def get_crs_transformer(fromcrs, tocrs):
     
     if fromcrs != tocrs:
         import pyproj
-        _transformer = pyproj.Transformer.from_crs(fromcrs, tocrs)
+        fromcrs = pyproj.Proj(fromcrs)
+        tocrs = pyproj.Proj(tocrs)
         def _isvalid(p):
             x,y = p
             return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
         def _project(points):
             xs,ys = zip(*points)
-            xs,ys = _transformer.transform(xs, ys)
+            xs,ys = pyproj.transform(fromcrs,
+                                     tocrs,
+                                     xs, ys)
             newpoints = list(zip(xs, ys))
             newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
             return newpoints
@@ -605,101 +608,37 @@ class Map:
         legend = Legend(map=self, **legendoptions) # legend is directly tied to the layers in this map
         return legend
 
-    def add_legend(self, legend=None, **pasteoptions):
+    def add_legend(self, legend=None, **placement):
         # legend can be either existing Legend instance or legendoptions dict
         self.changed = True
         if not isinstance(legend, Legend):
             legendoptions = legend or {}
             legend = self.get_legend(**legendoptions)
-        legend.pasteoptions.update(pasteoptions)
+        legend.placement.update(placement)
         self.foregroundgroup.add_layer(legend)
         return legend
 
     # Drawing
 
-    def render_one(self, layer, antialias=True, update_draworder=True):
-        # WARNING: deprecated, to be removed
-        self.render(layer, antialias, update_draworder)
-
-    def render_all(self, antialias=True):
-        # WARNING: deprecated, to be removed
-        self.render(antialias=antialias)
-
-    def render(self, layer=None, antialias=True, update_draworder=True):
-        if not self.drawer: self._create_drawer()
-
-        if layer:
-            # render a single layer
-            if layer.visible: 
-                layer.render(width=self.drawer.width,
-                             height=self.drawer.height,
-                             bbox=self.drawer.coordspace_bbox,
-                             antialias=antialias,
-                             crs=self.crs)
-                layer.render_text(width=self.drawer.width,
-                                 height=self.drawer.height,
-                                 bbox=self.drawer.coordspace_bbox,
-                                 crs=self.crs,
-                                 default_textoptions=self.textoptions)
-        else:
-            # render all
-            #import time
-            #t=time.time()            
-            for layer in self.backgroundgroup:
-                layer.render(self) # each layer needs to know which map to draw to
-            
-            for layer in self.layers:
-                self.render(layer, antialias=antialias, update_draworder=False)
-
-            for layer in self.foregroundgroup:
-                layer.render(self) # each layer needs to know which map to draw to
-            #print "# rendall",time.time()-t
-                
-            self.changed = False
-
-        if update_draworder:
-            import time
-            t=time.time()
-            self.update_draworder()
-            print("# draword",time.time()-t)
-
-    def update_draworder(self):
+    def render(self):
+        '''Render background, layers, and foreground onto a single rendered image.'''
+        #import time
+        #t = time.time()
+        #print('create drawer')
         if self.drawer: self.drawer.clear()
-        else: self.drawer = self._create_drawer()
+        else: self._create_drawer()
 
-        # paste the background decorations
-        for layer in self.backgroundgroup:
-            if layer.img:
-                self.drawer.paste(layer.img, **layer.pasteoptions)
+        #print('render background')
+        self.backgroundgroup.render(self)
+        #print('render layers')
+        self.layers.render(self)
+        #print('render foreground')
+        self.foregroundgroup.render(self)
 
-        # paste the map layers
-        for layer in self.layers:
-            if layer.visible and layer.img:
-                self.drawer.paste(layer.img)
-
-        # paste the map text/label layers
-        for layer in self.layers:
-            if layer.visible and layer.img_text:
-                self.drawer.paste(layer.img_text)
-
-        # paste the foreground decorations
-        for layer in self.foregroundgroup:
-            if layer.img:
-                pasteoptions = layer.pasteoptions.copy()
-                if isinstance(layer, Title):
-                    # since title is rendered on separate img then pasted,
-                    # some titleoptions needs to be passed to pasteoptions
-                    # instead of the rendering method
-                    extraargs = dict([(k,self.titleoptions[k]) for k in ["xy","anchor"] if k in self.titleoptions])
-                    pasteoptions.update(extraargs)
-##                elif isinstance(layer, Text):
-##                    # same for text
-##                    extraargs = dict([(k,layer.textoptions[k]) for k in ["xy","anchor"] if k in layer.textoptions])
-##                    pasteoptions.update(extraargs)
-                self.drawer.paste(layer.img, **pasteoptions)
-
+        #print('get image')
         self.layers.changed = False
         self.img = self.drawer.get_image()
+        #print('total time', time.time()-t)
 
     def get_tkimage(self):
         # Special image format needed by Tkinter to display it in the GUI
@@ -734,7 +673,7 @@ class Map:
 
     def save(self, savepath, meta=False, **kwargs):
         if not self.img:
-            self.render_all(antialias=True) # antialias
+            self.render()
         if meta:
             # save image + affine file + prj file if necessary (as if a georeferenced raster)
             r = RasterData(image=self.img, crs=self.crs) 
@@ -843,6 +782,27 @@ class LayerGroup:
 
     def get_position(self, layer):
         return self._layers.index(layer)
+
+    def render(self, map):
+        '''Render each layer in the layergroup onto a Map's drawer'.'''
+        for layer in self:
+            if hasattr(layer, 'visible'):
+                if layer.visible:
+                    layer.render(map)
+            else:
+                layer.render(map)
+
+    def render_text(self, map):
+        '''Render the text of each layer in the layergroup onto a Map's drawer'.'''
+        for layer in self:
+            if hasattr(layer, 'render_text'):
+                if hasattr(layer, 'visible'):
+                    if layer.visible:
+                        layer.render_text(map)
+                else:
+                    layer.render(map)
+
+
 
 
 
@@ -1351,11 +1311,14 @@ class VectorLayer:
     def add_text_effect(self, effect, **kwargs):
         raise NotImplementedError
 
-    def render(self, width, height, bbox=None, crs=None, antialias=True):
-        '''
-        - bbox: bounding box of the coordsys to be rendered (defaults to data bbox). 
-        - crs: if specified, determines the coordsys to be renderered (defaults to data crs). 
-        '''
+    def render(self, map):
+        '''Render the layer onto a Map instance's drawer.'''
+        #- bbox: bounding box of the coordsys to be rendered (defaults to data bbox). 
+        #- crs: if specified, determines the coordsys to be renderered (defaults to data crs). 
+        width,height = map.width, map.height
+        bbox = map.drawer.coordspace_bbox
+        crs = map.crs
+        drawer = map.drawer
 
         # normal way
         if self.has_geometry():
@@ -1367,28 +1330,6 @@ class VectorLayer:
                 crs = pycrs.parse.from_unknown_text(crs)
             _transform = get_crs_transformer(self.data.crs, crs)
 
-            # unless specified, bbox is taken from the data and converted to the crs if necessary
-            if not bbox:
-                bbox = self.bbox
-
-                # determine map space by projecting data bounds
-                if _transform:
-                    bbox = reproject_bbox(bbox, _transform)
-                    if not bbox:
-                        # data extent is out of bounds for map crs, exit early
-                        self.img = None
-                        return
-
-            # create the drawer within the bbox coordsys
-            drawer = pyagg.Canvas(width, height, background=None)
-            drawer.custom_space(*bbox, lock_ratio=True)
-
-            if not antialias:
-                drawer.drawer.setantialias(False)
-
-            # update the bbox to the calculated drawer bbox (slightly different due to the aspect ratio of the canvas size)
-            bbox = drawer.coordspace_bbox
-
             # get features inside map extent
             if _transform:
                 # transform from projected map space back to data coordinates
@@ -1396,7 +1337,6 @@ class VectorLayer:
                 bbox = reproject_bbox(bbox, _itransform)
                 if not bbox:
                     # map extent is out of bounds for data crs, exit early
-                    self.img = None
                     return
                     
             features = self.features(bbox=bbox)
@@ -1448,7 +1388,8 @@ class VectorLayer:
 
             # flush
             print("internal",time.time()-t)
-            self.img = drawer.get_image()
+
+            # BELOW WONT WORK ANYMORE
 
             # transparency
             if self.transparency:
@@ -1464,10 +1405,7 @@ class VectorLayer:
             for eff in self.effects:
                 self.img = eff(self)
 
-        else:
-            self.img = None
-
-    def render_text(self, width, height, bbox=None, crs=None, antialias=True, default_textoptions=None):
+    def _render_text(self, width, height, bbox=None, crs=None, antialias=True, default_textoptions=None):
         
         if self.styleoptions.get("text") and self.has_geometry():
             import time
@@ -1860,7 +1798,14 @@ class RasterLayer:
     def is_empty(self):
         return False # for now
 
-    def render(self, resampling="nearest", antialias=True, crs=None, **georef):
+    def render(self, map): 
+        '''Render the layer onto a Map instance's drawer.'''
+        resampling = "nearest"
+        drawer = map.drawer
+        crs = map.crs
+        georef = {'width':map.width, 'height':map.height,
+                    'bbox':map.drawer.coordspace_bbox}
+                    
         # position in space
 
         # get projection transformer (only if specified and different)
@@ -1874,19 +1819,13 @@ class RasterLayer:
                 rendered = self.data.manage.reproject(crs, resampling, **georef)
             # out of bounds
             except:
-                self.img = None
                 return
         else:
-            # get bbox from data if not specified
-            if "bbox" not in georef:
-                georef["bbox"] = self.data.bbox
-
             # normal affine resample
             try:
                 rendered = self.data.resample(method=resampling, **georef)
             except:
                 # out of bounds
-                self.img = None
                 return
 
         # TODO: binary 1bit rasters dont show correctly
@@ -1982,8 +1921,10 @@ class RasterLayer:
         #img.save("postalph.png")
         # ...
 
-        # final
-        self.img = img
+        # finally paste onto map drawer
+        drawer.paste(img)
+
+        # BELOW WONT WORK ANYMORE
         
         # transparency
         if self.transparency:
@@ -2003,7 +1944,7 @@ class RasterLayer:
         for eff in self.effects:
             self.img = eff(self)
 
-    def render_text(self, resampling="nearest", crs=None, **georef):
+    def _render_text(self, resampling="nearest", crs=None, **georef):
         self.img_text = None
 
 
@@ -2013,7 +1954,7 @@ class Legend:
         self.layers = layers or [] # if set, ties the legend specifically to the given layers
         self.img = None
         self.options = options
-        self.pasteoptions = dict(xy=("2%w","98%h"), anchor="sw")
+        self.placement = dict(xy=("2%w","98%h"), anchor="sw")
         self._operations = []
 
         self.autobuild = autobuild # IMPORTANT: to be removed! currently has no effect
@@ -2281,18 +2222,17 @@ class Legend:
         # render it
         rendered = self._legend.render()
         self.img = rendered.get_image()
+        map.drawer.paste(self.img, **self.placement)
 
 
 
-class Background:
-    def __init__(self):
-        self.img = None
-        self.pasteoptions = dict()
-
+class Background(object):
     def render(self, map):
         if map.background:
+            #if isinstance(map.background, (tuple,str)):
+            # solid background
             canv = pyagg.Canvas(map.drawer.width, map.drawer.height, map.background)
-            self.img = canv.get_image()
+            map.drawer.paste(canv)
 
 
 
@@ -2320,26 +2260,33 @@ class Background:
 
 
 
-class Title:
+class Title(object):
     def __init__(self):
-        self.img = None
-        self.pasteoptions = dict(xy=("50%w","1%h"), anchor="n")
+        self.options = dict(textsize="3%w", padding=0.3,
+                            # boxoptions
+                            fillcolor='white',
+                            outlinecolor='black',
+                            outlinewidth='0.5%min')
+        self.placement = dict(xy=("50%w","1%h"), anchor="n")
 
     def render(self, map):
         if map.title:
             # since title is rendered on separate img then pasted,
             # some titleoptions needs to be passed to pasteoptions
             # instead of the rendering method
-            titleoptions = dict(textsize="3%w", padding=0.4) # default
+            titleoptions = self.options.copy()
+            titleoptions.update(self.placement.copy())
             titleoptions.update(map.titleoptions.copy())
-            titleoptions.pop("xy", None)
-            titleoptions.pop("anchor", None)
-            boxoptions = dict(fillcolor=titleoptions.pop('fillcolor','white'),
-                              outlinecolor=titleoptions.pop('outlinecolor','black'),
-                              outlinewidth=titleoptions.pop('outlinewidth','0.3%min'),
+            placement = dict(xy=titleoptions.pop("xy", None),
+                            bbox=titleoptions.pop("bbox", None),
+                            anchor=titleoptions.pop("anchor", None),
+                            )
+            boxoptions = dict(fillcolor=titleoptions.pop('fillcolor',None),
+                              outlinecolor=titleoptions.pop('outlinecolor',None),
+                              outlinewidth=titleoptions.pop('outlinewidth',None),
                               )
             rendered = pyagg.legend.BaseGroup(refcanvas=map.drawer, title=map.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
-            self.img = rendered.get_image()
+            map.drawer.paste(rendered, **placement)
 
 
 
