@@ -88,10 +88,15 @@ def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
     # if already rgb tuple just return
     if isinstance(basecolor, (tuple,list)):
         rgb = [v / 255.0 for v in basecolor[:3]]
+        kwargs = {}
+        if intensity != None:
+            kwargs['saturation'] = intensity
+        if brightness != None:
+            kwargs['luminance'] = brightness
         if len(basecolor) == 3:
-            rgba = list(colour.Color(rgb=rgb, saturation=intensity, luminance=brightness).rgb) + [opacity or 255]
+            rgba = list(colour.Color(rgb=rgb, **kwargs).rgb) + [opacity or 255]
         elif len(basecolor) == 4:
-            rgba = list(colour.Color(rgb=rgb, saturation=intensity, luminance=brightness).rgb) + [opacity or basecolor[3]]
+            rgba = list(colour.Color(rgb=rgb, **kwargs).rgb) + [opacity or basecolor[3]]
         rgba = [int(round(v * 255)) for v in rgba[:3]] + [rgba[3]]
         return tuple(rgba)
     

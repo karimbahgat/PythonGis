@@ -71,7 +71,7 @@ def from_file(filepath, encoding="utf8", encoding_errors="strict", crs=None, **k
         # load projection string from .prj file if exists
         if not crs:
             if os.path.lexists(filepath[:-4] + ".prj"):
-                crs = open(filepath[:-4] + ".prj", "r").read()
+                crs = open(filepath[:-4] + ".prj", "r", encoding=encoding, errors=encoding_errors).read()
             else: crs = None
 
     # geojson file
