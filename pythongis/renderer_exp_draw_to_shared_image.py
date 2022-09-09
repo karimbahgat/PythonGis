@@ -88,10 +88,16 @@ def rgb(basecolor, intensity=None, brightness=None, opacity=None, style=None):
     # if already rgb tuple just return
     if isinstance(basecolor, (tuple,list)):
         rgb = [v / 255.0 for v in basecolor[:3]]
+        kwargs = {}
+        if intensity != None:
+            kwargs['saturation'] = intensity
+        if brightness != None:
+            kwargs['luminance'] = brightness
+
         if len(basecolor) == 3:
-            rgba = list(colour.Color(rgb=rgb, saturation=intensity, luminance=brightness).rgb) + [opacity or 255]
+            rgba = list(colour.Color(rgb=rgb, **kwargs).rgb) + [opacity or 255]
         elif len(basecolor) == 4:
-            rgba = list(colour.Color(rgb=rgb, saturation=intensity, luminance=brightness).rgb) + [opacity or basecolor[3]]
+            rgba = list(colour.Color(rgb=rgb, **kwargs).rgb) + [opacity or basecolor[3]]
         rgba = [int(round(v * 255)) for v in rgba[:3]] + [rgba[3]]
         return tuple(rgba)
     
@@ -179,16 +185,13 @@ def get_crs_transformer(fromcrs, tocrs):
     
     if fromcrs != tocrs:
         import pyproj
-        fromcrs = pyproj.Proj(fromcrs)
-        tocrs = pyproj.Proj(tocrs)
+        _transformer = pyproj.Transformer.from_crs(fromcrs, tocrs)
         def _isvalid(p):
             x,y = p
             return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
         def _project(points):
             xs,ys = zip(*points)
-            xs,ys = pyproj.transform(fromcrs,
-                                     tocrs,
-                                     xs, ys)
+            xs,ys = _transformer.transform(xs, ys)
             newpoints = list(zip(xs, ys))
             newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
             return newpoints
@@ -617,6 +620,21 @@ class Map:
         legend.placement.update(placement)
         self.foregroundgroup.add_layer(legend)
         return legend
+
+    def get_scalebar(self, **options):
+        options = options or dict()
+        scalebar = ScaleBar(**options) 
+        return scalebar
+
+    def add_scalebar(self, scalebar=None, **placement):
+        # scalebar can be either existing ScaleBar instance or scalebar options dict
+        self.changed = True
+        if not isinstance(scalebar, ScaleBar):
+            options = scalebar or {}
+            scalebar = self.get_scalebar(**options)
+        scalebar.placement.update(placement)
+        self.foregroundgroup.add_layer(scalebar)
+        return scalebar
 
     # Drawing
 
@@ -2287,6 +2305,58 @@ class Title(object):
                               )
             rendered = pyagg.legend.BaseGroup(refcanvas=map.drawer, title=map.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
             map.drawer.paste(rendered, **placement)
+
+
+
+class ScaleBar:
+    def __init__(self, **options):
+        '''
+        - length: the scalebar length as a fraction of map width
+        - symboloptions: options for rendering the scalebar line itself (eg fillcolor, direction)
+        - labeloptions: options for the text displaying the length of the scalebar (eg textcolor, side)
+        - boxoptions: options for the background box (eg fillcolor, outlinecolor, default is none)
+        '''
+        self.img = None
+        self.options = {'length':0.15} # fraction of map width
+        self.options.update(options)
+        self.placement = dict(xy=("50%w","98%h"), anchor="s")
+
+    def render(self, map):
+        from .vector._helpers import _vincenty_distance
+        x1,y1,x2,y2 = map.bbox
+        xs = [x1,x2]
+        ys = [y1,y2]
+        xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+        # transform to geographic coord bbox
+        tocrs = pycrs.parse.from_proj4('+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef')
+        _transform = get_crs_transformer(map.crs, tocrs)
+        if _transform:
+            bbox = reproject_bbox([xmin,ymin,xmax,ymax], _transform)
+            if not bbox:
+                raise Exception('Could not reproject map crs bbox to geographic bbox, all coordinates were out of bounds (inf or nan)')
+            xmin,ymin,xmax,ymax = bbox
+        w = xmax-xmin
+        xmax = xmin + w * self.options['length']
+        km = _vincenty_distance((ymin,xmin), (ymin,xmax))
+        #desired_km = round(cur_km)
+        #ratio = desired_km/cur_km
+        #if ratio < 1: ratio = -1/ratio
+        #ratio = -ratio
+
+        label = '{:.0f} km'.format(km)
+        labeloptions = {'side':'n', 'padding':0.05}
+        boxoptions = {'fillcolor':None, 'outlinecolor':None}
+        symboloptions = {'fillwidth':'{}%w'.format(self.options['length']*100),
+                        'fillcolor':'black', 'outlinecolor':None,
+                        'direction':'e'}
+        labeloptions.update(self.options.get('labeloptions', {}))
+        boxoptions.update(self.options.get('boxoptions', {}))
+        symboloptions.update(self.options.get('symboloptions', {}))
+
+        # render it
+        rendered = pyagg.legend.Symbol('line', refcanvas=map.drawer, label=label, labeloptions=labeloptions, **symboloptions).render()
+        self.img = rendered.get_image()
+        map.drawer.paste(self.img, **self.placement)
 
 
 
