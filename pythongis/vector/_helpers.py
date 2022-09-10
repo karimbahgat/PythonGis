@@ -36,7 +36,8 @@ def _vincenty_distance(point1, point2, miles=False, a=6378137, b=6356752.314245,
     >>> vincenty(boston, newyork, miles=True)
     185.414657
     """
- 
+    # TODO: check that the function expects x,y, or if it should be y,x...
+
     # short-circuit coincident points
     if point1[0] == point2[0] and point1[1] == point2[1]:
         return 0.0

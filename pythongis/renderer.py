@@ -550,7 +550,7 @@ class Map:
                 if not bbox:
                     raise Exception('Could not reproject map crs bbox to geographic bbox, all coordinates were out of bounds (inf or nan)')
                 xmin,ymin,xmax,ymax = bbox
-            cur_km = _vincenty_distance((ymin,xmin), (ymin,xmax))
+            cur_km = _vincenty_distance((xmin,ymin), (xmax,ymin))
             ratio = desired_km/cur_km
             if ratio < 1: ratio = -1/ratio
             ratio = -ratio
@@ -2337,7 +2337,7 @@ class ScaleBar:
             xmin,ymin,xmax,ymax = bbox
         w = xmax-xmin
         xmax = xmin + w * self.options['length']
-        km = _vincenty_distance((ymin,xmin), (ymin,xmax))
+        km = _vincenty_distance((xmin,ymin), (xmax,ymin))
         #desired_km = round(cur_km)
         #ratio = desired_km/cur_km
         #if ratio < 1: ratio = -1/ratio
