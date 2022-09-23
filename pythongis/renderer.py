@@ -220,6 +220,8 @@ def reproject_bbox(bbox, transformer, sampling_freq=20):
 
 ###########
 
+# TODO: Probably delete Layout class or use with subclassing? 
+
 class Layout:
     def __init__(self, width, height, background="white", title="", titleoptions=None, *args, **kwargs):
 
@@ -650,6 +652,8 @@ class Map:
         self.backgroundgroup.render(self)
         #print('render layers')
         self.layers.render(self)
+        #print('render text')
+        self.layers.render_text(self)
         #print('render foreground')
         self.foregroundgroup.render(self)
 
@@ -818,7 +822,7 @@ class LayerGroup:
                     if layer.visible:
                         layer.render_text(map)
                 else:
-                    layer.render(map)
+                    layer.render_text(map)
 
 
 
@@ -1423,8 +1427,13 @@ class VectorLayer:
             for eff in self.effects:
                 self.img = eff(self)
 
-    def _render_text(self, width, height, bbox=None, crs=None, antialias=True, default_textoptions=None):
-        
+    def render_text(self, map):
+        '''Render the layer text onto a Map instance's drawer.'''
+        width,height = map.width, map.height
+        bbox = map.drawer.coordspace_bbox
+        crs = map.crs
+        drawer = map.drawer
+
         if self.styleoptions.get("text") and self.has_geometry():
             import time
             t=time.time()
@@ -1436,29 +1445,6 @@ class VectorLayer:
                 crs = pycrs.parse.from_unknown_text(crs)
             _transform = get_crs_transformer(self.data.crs, crs)
 
-            # unless specified, bbox is taken from the data and converted to the crs if necessary
-            if not bbox:
-                bbox = self.bbox
-
-                # determine map space by projecting data bounds
-                if _transform:
-                    bbox = reproject_bbox(bbox, _transform)
-                    if not bbox:
-                        # data extent is out of bounds for map crs, exit early
-                        self.img_text = None
-                        return
-
-            # create the drawer within the bbox coordsys
-            drawer = pyagg.Canvas(width, height, background=None)
-            drawer.textoptions.update(default_textoptions)
-            drawer.custom_space(*bbox, lock_ratio=True)
-
-            if not antialias:
-                drawer.drawer.setantialias(False)
-
-            # update the bbox to the calculated drawer bbox (slightly different due to the aspect ratio of the canvas size)
-            bbox = drawer.coordspace_bbox
-
             # get features inside map extent
             if _transform:
                 # transform from projected map space back to data coordinates
@@ -1466,7 +1452,6 @@ class VectorLayer:
                 bbox = reproject_bbox(bbox, _itransform)
                 if not bbox:
                     # map extent is out of bounds for data crs, exit early
-                    self.img_text = None
                     return
             features = self.features(bbox=bbox)
 
@@ -1545,12 +1530,11 @@ class VectorLayer:
 
                         elif hasattr(rendict["xy"], '__call__'):
                             rendict["xy"] = rendict["xy"](feat)
-                                
+                    
                     drawer.draw_text(text, **rendict)
 
             # flush
             print("internal text",time.time()-t)
-            self.img_text = drawer.get_image()
 
             # transparency
             if self.transparency:
@@ -1962,8 +1946,8 @@ class RasterLayer:
         for eff in self.effects:
             self.img = eff(self)
 
-    def _render_text(self, resampling="nearest", crs=None, **georef):
-        self.img_text = None
+    def render_text(self, map):
+        pass
 
 
 class Legend:
