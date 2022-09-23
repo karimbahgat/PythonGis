@@ -495,7 +495,7 @@ def distance(data, **rasterdef):
     if isinstance(data, RasterData):
         raise NotImplementedError("Distance tool requires vector data")
 
-    from shapely.geometry import Point, MultiPoint, LineString, asShape
+    from shapely.geometry import Point, MultiPoint, LineString
 
     outrast = RasterData(mode="float32", **rasterdef)
     outband = outrast.add_band() # make sure all values are set to 0 dist at outset
@@ -510,7 +510,7 @@ def distance(data, **rasterdef):
 ##        if cell.value == 0:
 ##            # only calculate where vector is absent
 ##            #print "calc..."
-##            point = Point(cell.x,cell.y) #asShape(cell.point)
+##            point = Point(cell.x,cell.y) #shape(cell.point)
 ##            dist = point.distance(geoms[0]) #min((point.distance(g) for g in geoms))
 ##            #print cell.col,cell.row,dist
 ##            outband.set(cell.col, cell.row, dist)

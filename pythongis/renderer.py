@@ -1440,6 +1440,14 @@ class VectorLayer:
 
             textkey = self.styleoptions["text"]
 
+            # get text options (experimental for drawing directly with aggdraw)
+            options = drawer._check_text_options(self.styleoptions["textoptions"])
+            options['textcolor'] = tuple([int(round(ch)) for ch in options['textcolor']])
+            fontlocation = pyagg.fonthelper.get_fontpath(options["font"])
+            import aggdraw
+            font = aggdraw.Font(color=options['textcolor'], file=fontlocation, size=options['textsize']) # opacity=...
+            drawer.drawer.settransform() # set draw transform to pixel to avoid warping the text
+
             # get on-the-fly projection transformer (only if specified and different)
             if isinstance(crs, basestring):
                 crs = pycrs.parse.from_unknown_text(crs)
@@ -1531,7 +1539,15 @@ class VectorLayer:
                         elif hasattr(rendict["xy"], '__call__'):
                             rendict["xy"] = rendict["xy"](feat)
                     
-                    drawer.draw_text(text, **rendict)
+                    # pyagg
+                    #drawer.draw_text(text, **rendict)
+
+                    # experimental version
+                    xy = drawer.coord2pixel(*rendict["xy"])
+                    drawer.drawer.text(xy, text, font)
+
+            # reset transform (experimental)
+            drawer.drawer.settransform(drawer.coordspace_transform)
 
             # flush
             print("internal text",time.time()-t)
@@ -1547,7 +1563,7 @@ class VectorLayer:
                 self.img_text.putalpha(a)
 
         else:
-            self.img_text = None
+            pass
 
 
 

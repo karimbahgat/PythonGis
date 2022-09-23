@@ -11,7 +11,7 @@ import warnings
 # import shapely geometry compatibility functions
 # ...and rename them for clarity
 import shapely
-from shapely.geometry import asShape as geojson2shapely
+from shapely.geometry import shape as geojson2shapely
 
 # import pycrs
 import pycrs

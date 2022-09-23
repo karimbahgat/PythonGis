@@ -922,7 +922,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
 
         # aggregate feats for each burned cell in mask
         from ..vector import sql
-        from shapely.geometry import asShape
+        from shapely.geometry import shape
         from shapely.prepared import prep
         from time import time
         
@@ -939,7 +939,7 @@ def rasterize(vectordata, valuekey=None, stat=None, priority=None, partial=None,
                 # single values have already been written, now only overwrite multis or partials
                 if multicell or partialcell:
                     cell = outband.get(x, y)
-                    cellgeom = asShape(cell.poly).centroid
+                    cellgeom = shape(cell.poly).centroid
                     
                     # get features in that cell
                     spindex = list(vectordata.quick_overlap(cellgeom.bounds))

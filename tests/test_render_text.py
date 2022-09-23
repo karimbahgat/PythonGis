@@ -18,7 +18,8 @@ class BaseTestCases:
     class DrawText(unittest.TestCase):
         width = 600
         height = 300
-        kwargs = {'fillcolor':'yellow', 'outlinecolor':'black'}
+        kwargs = {'fillcolor':'yellow', 'outlinecolor':'black',
+                'textoptions':{}}
         output_prefix = 'render_text'
 
         def create_map(self):
@@ -37,6 +38,14 @@ class BaseTestCases:
             self.map.add_layer(polygondata, **kwargs)
             self.save_map('countrynames')
 
+        def test_placenames(self):
+            self.create_map()
+            kwargs = self.kwargs.copy()
+            extra = {'text': lambda f: f['name']}
+            kwargs.update(extra)
+            self.map.add_layer(pointdata, **kwargs)
+            self.save_map('placenames')
+
 ### 
 
 class TestDefaultTextOptions(BaseTestCases.DrawText):
@@ -46,8 +55,17 @@ class TestDefaultTextOptions(BaseTestCases.DrawText):
         self.output_prefix += '_default_opts'
         self.kwargs = self.kwargs.copy()
         textopts = {'xy':'midpoint'}
-        extra = {'textoptions':textopts}
-        self.kwargs.update(extra)
+        self.kwargs['textoptions'] = textopts
+
+class TestSmallFont(BaseTestCases.DrawText):
+    
+    def __init__(self, *args, **kwargs):
+        super(BaseTestCases.DrawText, self).__init__(*args, **kwargs)
+        self.output_prefix += '_small_font'
+        self.kwargs = self.kwargs.copy()
+        textopts = {'xy':'midpoint', 
+                    'textsize':6}
+        self.kwargs['textoptions'] = textopts
 
 
 

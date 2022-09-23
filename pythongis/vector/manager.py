@@ -4,7 +4,7 @@ import warnings
 from .data import *
 
 import shapely, shapely.ops, shapely.geometry
-from shapely.geometry import asShape as geojson2shapely
+from shapely.geometry import shape as geojson2shapely
 from shapely.prepared import prep as supershapely
 
 import pycrs
