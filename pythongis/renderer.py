@@ -1434,6 +1434,84 @@ class VectorLayer:
         crs = map.crs
         drawer = map.drawer
 
+        def draw_textlines(drawer, textlines, font, pos, size, options):
+            # must get the pixel coords of the coordinate
+            # here only for y, because x is handled for each line depending on justify option below
+            x,y = xleft,ytop = pos
+            xwidth,yheight = size
+            
+            # wrap text into lines, and write each line
+            horizjustify = options["justify"].lower()
+            for textline,fontsize in textlines:
+                # horizontally justify the text relative to the bbox edges
+                fontwidth, fontheight = fontsize
+                if horizjustify == "center":
+                    x = int(xleft + xwidth/2.0 - fontwidth/2.0)
+                elif horizjustify == "right":
+                    x = xleft + xwidth - fontwidth
+                elif horizjustify == "left":
+                    x = xleft
+                # draw and increment downwards
+                drawer.drawer.text((x,y), textline, font)
+                y += fontheight
+
+        def anchor_offset(x, y, anchor, size):
+            # update to post-rotate anchor
+            itemwidth,itemheight = size
+            if anchor == "center":
+                x = int(x - itemwidth/2.0)
+                y = int(y - itemheight/2.0)
+            else:
+                x = int(x - itemwidth/2.0)
+                y = int(y - itemheight/2.0)
+                if "n" in anchor:
+                    y = int(y + itemheight/2.0)
+                elif "s" in anchor:
+                    y = int(y - itemheight/2.0)
+                if "e" in anchor:
+                    x = int(x - itemwidth/2.0)
+                elif "w" in anchor:
+                    x = int(x + itemwidth/2.0)
+            return x,y
+
+        def draw_text(drawer, text, font, options):
+            x,y = drawer.coord2pixel(*options["xy"])
+
+            # offset
+            xoffset,yoffset = options.get("xoffset"),options.get("yoffset")
+            if xoffset or yoffset:
+                x,y = xorig,yorig = drawer._offset_xy((x,y), xoffset, yoffset)
+
+            # determine singleline or multiline text
+            textlines = text.split("\n")
+
+            if len(textlines) > 1:
+                # multiline
+                # get combined textline dimensions
+                fontsizes = [drawer.drawer.textsize(line, font) for line in textlines]
+                widths,heights = zip(*fontsizes)
+                maxwidth, maxheight = max(widths),sum(heights)
+
+                # apply anchor
+                textanchor = options["anchor"].lower()
+                x,y = anchor_offset(x, y, textanchor, (maxwidth,maxheight))
+
+                # draw
+                textlines = list(zip(textlines, fontsizes))
+                draw_textlines(drawer, textlines, font, (x,y), (maxwidth,maxheight), options)
+
+            else:
+                # singleline
+                line = textlines[0]
+                fontwidth,fontheight = drawer.drawer.textsize(line, font)
+
+                # apply anchor
+                textanchor = options["anchor"].lower()
+                x,y = anchor_offset(x, y, textanchor, (fontwidth,fontheight))
+
+                # draw
+                drawer.drawer.text((x,y), text, font)
+
         if self.styleoptions.get("text") and self.has_geometry():
             import time
             t=time.time()
@@ -1543,8 +1621,8 @@ class VectorLayer:
                     #drawer.draw_text(text, **rendict)
 
                     # experimental version
-                    xy = drawer.coord2pixel(*rendict["xy"])
-                    drawer.drawer.text(xy, text, font)
+                    options.update(rendict)
+                    draw_text(drawer, text, font, options)
 
             # reset transform (experimental)
             drawer.drawer.settransform(drawer.coordspace_transform)
