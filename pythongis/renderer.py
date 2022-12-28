@@ -855,127 +855,6 @@ class ForegroundLayerGroup(LayerGroup):
 
 
 
-""" def initSharedData(datadict):
-    print('initfunc')
-    global sharedData
-    sharedData = datadict
-
-def parallel_vecrend(features, width, height, bbox, styleoptions, antialias=True):
-
-    import time
-    t=time.time()
-
-    print 'hello'
-
-    #self = sharedData['data']
-    
-    drawer = pyagg.Canvas(width, height, background=None)
-    drawer.custom_space(*bbox, lock_ratio=True)
-
-    #features = self.features(bbox=bbox)
-
-    # custom draworder (sortorder is only used with sortkey)
-    if "sortkey" in styleoptions:
-        features = sorted(features, key=styleoptions["sortkey"],
-                          reverse=styleoptions["sortorder"].lower() == "decr")
-
-    # prep PIL if non-antialias polygon
-    if 1: #not antialias and "Polygon" in self.data.type:
-        #print "preint",time.time()-t
-        import time
-        t=time.time()
-        img = PIL.Image.new("RGBA", (width,height), None)
-        PIL_drawer = PIL.ImageDraw.Draw(img)   #self.PIL_drawer
-
-    # for each
-    for row,geometry in features:
-        
-        # get symbols
-        rendict = dict()
-        if "shape" in styleoptions: rendict["shape"] = styleoptions["shape"]
-        for key in "fillcolor fillsize outlinecolor outlinewidth".split():
-            if key in styleoptions:
-                val = styleoptions[key]
-                if isinstance(val, dict):
-                    # lookup self in precomputed symboldict
-                    fid = id(feat)
-                    if fid in val["symbols"]:
-                        rendict[key] = val["symbols"][fid]
-                    else:
-                        rendict[key] = val["notclassified"]
-                elif hasattr(val, "__call__"):
-                    rendict[key] = val(feat)
-                else:
-                    rendict[key] = val
-
-        # draw
-
-        # fast PIL Approach for non-antialias polygons
-        if not antialias and "Polygon" in geometry["type"]:
-
-            if "Multi" in geometry["type"]:
-                geoms = geometry["coordinates"]
-            else:
-                geoms = [geometry["coordinates"]]
-
-            fill = tuple((int(c) for c in rendict["fillcolor"])) if rendict.get("fillcolor") else None
-            outline = tuple((int(c) for c in rendict["outlinecolor"])) if rendict.get("outlinecolor") else None
-            
-            for poly in geoms:
-                coords = poly[0]
-                if len(poly) > 1:
-                    holes = poly[1:0]
-                else:
-                    holes = []
-
-                # first exterior
-                path = PIL.ImagePath.Path([tuple(p) for p in coords])
-                path.transform(drawer.coordspace_transform)
-                #print "draw",str(path.tolist())[:300]
-                path.compact(1)
-                #print "draw",str(path.tolist())[:100]
-                if len(path) > 1:
-                    PIL_drawer.polygon(path, fill, None)
-                    PIL_drawer.line(path, outline, 1)
-
-                # then holes
-                for hole in holes:
-                    path = PIL.ImagePath.Path([tuple(p) for p in hole])
-                    path.transform(drawer.coordspace_transform)
-                    path.compact(1)
-                    if len(path) > 1:
-                        PIL_drawer.polygon(path, (0,0,0,0), None)
-                        PIL_drawer.line(path, outline, 1)
-
-        else:
-            # high qual geojson
-            drawer.draw_geojson(geometry, **rendict)
-
-    # flush
-    print "internal",time.time()-t
-    if 1: #not antialias and "Polygon" in self.data.type:
-        img = img
-    else:
-        img = drawer.get_image()
-
-##    # transparency
-##    if self.transparency:
-##        opac = 256 - int(256*(self.transparency/100.0))
-##        
-##        r,g,b,a = self.img.split()
-##        a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-##        self.img.putalpha(a)
-##        
-##    # effects
-##    for eff in self.effects:
-##        self.img = eff(self)
-
-    #img.show()
-
-    return None """
-
-
-
 
 class VectorLayer:
     def __init__(self, data, legendoptions=None, legend=True, datafilter=None, transparency=0, flipy=True, **options):
@@ -998,8 +877,6 @@ class VectorLayer:
         self.flipy = flipy
         self.img = None
         self.img_text = None
-
-        self.effects = []
 
         self.legendoptions = legendoptions or dict(title='Vector Layer')
         self.legend = legend
@@ -1235,104 +1112,6 @@ class VectorLayer:
             for feat in features:
                 yield feat
 
-    def add_effect(self, effect, **kwargs):
-        
-        if isinstance(effect, basestring):
-
-            if effect == "shadow":
-                def effect(lyr):
-                    _,a = lyr.img.convert('LA').split()
-                    opacity = kwargs.get('opacity', 0.777) # dark/strong shadow
-                    a = a.point(lambda v: v*opacity) 
-                    binary = PIL.Image.new('L', lyr.img.size, 0) # black
-                    binary.putalpha(a)
-                    drawer = pyagg.canvas.from_image(binary)
-                    #binary = lyr.img.point(lambda v: 255 if v > 0 else 0)
-                    #drawer = pyagg.canvas.from_image(binary)
-                    #drawer.replace_color((255,255,255,255), kwargs.get("color", (115,115,115,155)))
-                    drawer.move(kwargs.get("xdist"), kwargs.get("ydist"))
-                    drawer.paste(lyr.img)
-                    img = drawer.get_image()
-                    return img
-
-            elif effect == "glow":
-
-                def effect(lyr):
-                    import PIL, PIL.ImageMorph
-
-                    _,a = lyr.img.convert('LA').split()
-                    binary = a.point(lambda v: 255 if v > 0 else 0)
-                    #binary.show()
-                    
-                    color = kwargs.get("color")
-                    if isinstance(color, list):
-                        # use gradient to set range of colors via incremental grow/shrink
-                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        grad = pyagg.canvas.Gradient(color)
-                        for col in grad.interp(kwargs.get("size")):
-                            col = tuple(col)
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
-                            _,edge = PIL.ImageMorph.MorphOp(op_name="edge").apply(binary)
-                            if len(col) == 4:
-                                edge = edge.point(lambda v: col[3] if v == 255 else 0)
-                            newimg.paste(col[:3], (0,0), mask=edge)
-                        newimg.paste(lyr.img, (0,0), mask=lyr.img)
-                    else:
-                        # entire area same color
-                        for _ in range(kwargs.get("size")):
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
-                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        newimg.paste(color, (0,0), mask=binary)
-                        newimg.paste(lyr.img, (0,0), mask=lyr.img)
-                        
-                    return newimg
-                
-            elif effect == "inner":
-                # TODO: gets affected by previous effects, somehow only get original rendered image
-                # TODO: should do inner type on each feature, not the entire layer.
-                # OR: effect for entire layer, and separate for each feature via styleoptions...?
-                # TODO: canvas edge should not be counted...
-                # TODO: transp gradient not working, sees through even original layer...
-
-                # WARNING: DOESNT REALLY WORK CORRECTLY...
-                    
-                def effect(lyr):
-                    import PIL, PIL.ImageMorph
-                    
-                    _,a = lyr.img.convert('LA').split()
-                    binary = a.point(lambda v: 255 if v > 0 else 0)
-                    #binary.show()
-                    
-                    color = kwargs.get("color")
-                    if isinstance(color, list):
-                        # use gradient to set range of colors via incremental grow/shrink
-                        newimg = lyr.img.copy()
-                        grad = pyagg.canvas.Gradient(color)
-                        for col in grad.interp(kwargs.get("size")):
-                            col = tuple(col)
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
-                            _,edge = PIL.ImageMorph.MorphOp(op_name="edge").apply(binary)
-                            if len(col) == 4:
-                                edge = edge.point(lambda v: col[3] if v == 255 else 0)
-                            newimg.paste(col[:3], (0,0), mask=edge)
-                    else:
-                        # entire area same color
-                        for _ in range(kwargs.get("size")):
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
-                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        newimg.paste(color, (0,0), mask=lyr.img)
-                        newimg.paste(lyr.img, (0,0), mask=binary)
-                        
-                    return newimg
-                
-            else:
-                raise Exception("Not a valid effect")
-        
-        self.effects.append(effect)
-
-    def add_text_effect(self, effect, **kwargs):
-        raise NotImplementedError
-
     def render(self, map):
         '''Render the layer onto a Map instance's drawer.'''
         #- bbox: bounding box of the coordsys to be rendered (defaults to data bbox). 
@@ -1422,13 +1201,14 @@ class VectorLayer:
                 #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
                 a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
                 self.img.putalpha(a)
-                
-            # effects
-            for eff in self.effects:
-                self.img = eff(self)
 
     def render_text(self, map):
         '''Render the layer text onto a Map instance's drawer.'''
+        # TODO: 
+        # - autofit inside bbox arg
+        # - support text rotate
+        # - maybe allow rectangle background color and border
+
         width,height = map.width, map.height
         bbox = map.drawer.coordspace_bbox
         crs = map.crs
@@ -1662,8 +1442,6 @@ class RasterLayer:
 
         # TODO: allow setting the crs...
 
-        self.effects = []
-
         self.legendoptions = legendoptions or dict(title='Raster Layer')
         self.legend = legend
 
@@ -1795,101 +1573,6 @@ class RasterLayer:
     @property
     def bbox(self):
         return self.data.bbox
-
-    def add_effect(self, effect, **kwargs):
-        
-        if isinstance(effect, basestring):
-
-            if effect == "shadow":
-                def effect(lyr):
-                    _,a = lyr.img.convert('LA').split()
-                    opacity = kwargs.get('opacity', 0.777) # dark/strong shadow
-                    a = a.point(lambda v: v*opacity) 
-                    binary = PIL.Image.new('L', lyr.img.size, 0) # black
-                    binary.putalpha(a)
-                    drawer = pyagg.canvas.from_image(binary)
-                    #binary = lyr.img.point(lambda v: 255 if v > 0 else 0)
-                    #drawer = pyagg.canvas.from_image(binary)
-                    #drawer.replace_color((255,255,255,255), kwargs.get("color", (115,115,115,155)))
-                    drawer.move(kwargs.get("xdist"), kwargs.get("ydist"))
-                    drawer.paste(lyr.img)
-                    img = drawer.get_image()
-                    return img
-
-            elif effect == "glow":
-
-                def effect(lyr):
-                    import PIL, PIL.ImageMorph
-
-                    _,a = lyr.img.convert('LA').split()
-                    binary = a.point(lambda v: 255 if v > 0 else 0)
-                    #binary.show()
-                    
-                    color = kwargs.get("color")
-                    if isinstance(color, list):
-                        # use gradient to set range of colors via incremental grow/shrink
-                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        grad = pyagg.canvas.Gradient(color)
-                        for col in grad.interp(kwargs.get("size")):
-                            col = tuple(col)
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
-                            _,edge = PIL.ImageMorph.MorphOp(op_name="edge").apply(binary)
-                            if len(col) == 4:
-                                edge = edge.point(lambda v: col[3] if v == 255 else 0)
-                            newimg.paste(col[:3], (0,0), mask=edge)
-                        newimg.paste(lyr.img, (0,0), mask=lyr.img)
-                    else:
-                        # entire area same color
-                        for _ in range(kwargs.get("size")):
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="dilation8").apply(binary)
-                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        newimg.paste(color, (0,0), mask=binary)
-                        newimg.paste(lyr.img, (0,0), mask=lyr.img)
-                        
-                    return newimg
-                
-            elif effect == "inner":
-                # TODO: gets affected by previous effects, somehow only get original rendered image
-                # TODO: should do inner type on each feature, not the entire layer.
-                # OR: effect for entire layer, and separate for each feature via styleoptions...?
-                # TODO: canvas edge should not be counted...
-                # TODO: transp gradient not working, sees through even original layer...
-
-                # WARNING: DOESNT REALLY WORK CORRECTLY...
-                    
-                def effect(lyr):
-                    import PIL, PIL.ImageMorph
-                    
-                    _,a = lyr.img.convert('LA').split()
-                    binary = a.point(lambda v: 255 if v > 0 else 0)
-                    #binary.show()
-                    
-                    color = kwargs.get("color")
-                    if isinstance(color, list):
-                        # use gradient to set range of colors via incremental grow/shrink
-                        newimg = lyr.img.copy()
-                        grad = pyagg.canvas.Gradient(color)
-                        for col in grad.interp(kwargs.get("size")):
-                            col = tuple(col)
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
-                            _,edge = PIL.ImageMorph.MorphOp(op_name="edge").apply(binary)
-                            if len(col) == 4:
-                                edge = edge.point(lambda v: col[3] if v == 255 else 0)
-                            newimg.paste(col[:3], (0,0), mask=edge)
-                    else:
-                        # entire area same color
-                        for _ in range(kwargs.get("size")):
-                            _,binary = PIL.ImageMorph.MorphOp(op_name="erosion8").apply(binary)
-                        newimg = PIL.Image.new("RGBA", lyr.img.size, (0,0,0,0))
-                        newimg.paste(color, (0,0), mask=lyr.img)
-                        newimg.paste(lyr.img, (0,0), mask=binary)
-                        
-                    return newimg
-                
-            else:
-                raise Exception("Not a valid effect")
-        
-        self.effects.append(effect)
 
     def is_empty(self):
         return False # for now
@@ -2035,10 +1718,6 @@ class RasterLayer:
             #print a, a.getextrema()
             self.img.putalpha(a)
             #self.img = PIL.Image.merge('RGBA', [r,g,b,a])
-
-        # effects
-        for eff in self.effects:
-            self.img = eff(self)
 
     def render_text(self, map):
         pass
