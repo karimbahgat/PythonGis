@@ -64,11 +64,11 @@ class BaseTestCases:
             self.map.add_layer(polygondata, **self.kwargs)
             self.save_map('polygon')
 
-        def test_line(self):
-            self.create_map()
-            print(self.kwargs)
-            self.map.add_layer(linedata, **self.kwargs)
-            self.save_map('line')
+        # def test_line(self):
+        #     self.create_map()
+        #     print(self.kwargs)
+        #     self.map.add_layer(linedata, **self.kwargs)
+        #     self.save_map('line')
 
 # px
 

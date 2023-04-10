@@ -382,10 +382,10 @@ class Map:
         self.img = None
         self.changed = True
 
-        #self.drawer = pyagg.Canvas(self.width, self.height, (111,111,111))
-        #self.drawer.geographic_space()
-
     def _create_drawer(self):
+        '''Creates .drawer used for temporary drawing of individual layers (backbuffer)
+        and .img onto which the contents of the drawer are transferred in order to create
+        the final map image (frontbuffer)'''
         # get coordspace bbox aspect ratio of all layers
         autosize = not self.width or not self.height
         if self.width and self.height:
@@ -427,6 +427,9 @@ class Map:
 
         self.drawer.custom_space(xmin, ymax, xmax, ymin, lock_ratio=True) # assume inverted y axis.....
 
+        # create empty image (final map front buffer) based on the initialized drawer dimensions
+        self.img = self.drawer.img.copy()
+
     def copy(self):
         dupl = Map(self.width, self.height, background=self.background, layers=self.layers.copy(),
                    title=self.title, titleoptions=self.titleoptions, textoptions=self.textoptions,
@@ -445,33 +448,46 @@ class Map:
 
     def offset(self, xmove, ymove, geographic=False):
         if not self.drawer: self._create_drawer()
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+        # move
         if geographic:
             raise NotImplementedError('Offsetting map by geographic coords not yet implemented')
         self.drawer.move(xmove, ymove)
         #self.zooms.append(func)
         self.changed = True
-        if self.img:
-            self.img = self.drawer.get_image()
+        # copy back to front buffer
+        self.img.paste(self.drawer.img)
 
     def resize(self, width, height):
         self.width = width
         self.height = height
         if not self.drawer: self._create_drawer()
-        self.changed = True
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+        # resize
         self.drawer.resize(width, height, lock_ratio=True)
-        if self.img:
-            self.img = self.drawer.get_image()
+        self.changed = True
+        # copy back to front buffer
+        self.img = self.drawer.img.copy()
 
     def crop(self, xmin, ymin, xmax, ymax, geographic=False):
         if not self.drawer: self._create_drawer()
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+        # crop
         if geographic:
             raise NotImplementedError('Cropping map by geographic coords not yet implemented')
-        self.changed = True
         self.drawer.crop(xmin,ymin,xmax,ymax)
+        self.changed = True
+        # update dims
         self.width = self.drawer.width
         self.height = self.drawer.height
-        if self.img:
-            self.img = self.drawer.get_image()
+        # copy back to front buffer
+        self.img = self.drawer.img.copy()
 
     # Zooming
 
@@ -482,6 +498,7 @@ class Map:
 
     def zoom_auto(self):
         if not self.drawer: self._create_drawer()
+        # zoom
         bbox = self.layers.bbox(self.crs)
         self.zoom_bbox(*bbox)
         #self.zooms.append(func)
@@ -504,6 +521,10 @@ class Map:
 
         #print 'zoom bbox', xmin, ymin, xmax, ymax
 
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+
         # perform zoom
         if self.width and self.height:
             # predetermined map size will honor the aspect ratio
@@ -514,29 +535,42 @@ class Map:
             
         #self.zooms.append(func)
         self.changed = True
-        if self.img:
-            self.img = self.drawer.get_image()
+
+        # copy back to front buffer
+        self.img.paste(self.drawer.img)
 
     def zoom_in(self, factor, center=None):
         if not self.drawer: self._create_drawer()
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+        # zoom
         self.drawer.zoom_in(factor, center=center)
         #func = lambda: self.drawer.zoom_in(factor, center=center)
         #self.zooms.append(func)
         self.changed = True
-        if self.img:
-            self.img = self.drawer.get_image()
+        # copy back to front buffer
+        self.img.paste(self.drawer.img)
 
     def zoom_out(self, factor, center=None):
         if not self.drawer: self._create_drawer()
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+        # zoom
         self.drawer.zoom_out(factor, center=center)
         #func = lambda: self.drawer.zoom_out(factor, center=center)
         #self.zooms.append(func)
         self.changed = True
-        if self.img:
-            self.img = self.drawer.get_image()
+        # copy back to front buffer
+        self.img.paste(self.drawer.img)
 
     def zoom_units(self, units, center=None, geographic=False):
         if not self.drawer: self._create_drawer()
+        # copy img front buffer over to drawer back buffer
+        self.drawer.img.paste(self.img)
+        self.drawer.update_drawer_img()
+        # zoom
         if geographic:
             from .vector._helpers import _vincenty_distance
             desired_km = units
@@ -563,8 +597,9 @@ class Map:
         #print _vincenty_distance((y1,x1), (y1,x1+self.drawer.coordspace_width))
         #self.zooms.append(func)
         self.changed = True
-        if self.img:
-            self.img = self.drawer.get_image()
+
+        # copy back to front buffer
+        self.img.paste(self.drawer.img)
 
     # Layers
 
@@ -583,30 +618,6 @@ class Map:
 
     def get_position(self, layer):
         return self.layers.get_position(layer)
-        
-##    def add_decoration(self, funcname, *args, **kwargs):
-##        # draws directly on an image the size of the map canvas, so no pasteoptions needed
-##        self.changed = True
-##        decor = Decoration(self, funcname, *args, **kwargs)
-##        decor.pasteoptions = dict() #xy=(0,0), anchor="nw")
-##        self.foreground.add_layer(decor)
-
-##    def add_grid(self, xinterval, yinterval, **kwargs):
-##        self.drawer.draw_grid(xinterval, yinterval, **kwargs)
-##
-##    def add_axis(self, axis, minval, maxval, intercept,
-##                  tickpos=None,
-##                  tickinterval=None, ticknum=5,
-##                  ticktype="tick", tickoptions={},
-##                  ticklabelformat=None, ticklabeloptions={},
-##                  noticks=False, noticklabels=False,
-##                  **kwargs):
-##        self.drawer.draw_axis(axis, minval, maxval, intercept,
-##                              tickpos=tickpos, tickinterval=tickinterval, ticknum=ticknum,
-##                              ticktype=ticktype, tickoptions=tickoptions,
-##                              ticklabelformat=ticklabelformat, ticklabeloptions=ticklabeloptions,
-##                              noticks=noticks, noticklabels=noticklabels,
-##                              **kwargs)
 
     def get_legend(self, **legendoptions):
         legendoptions = legendoptions or dict()
@@ -645,8 +656,7 @@ class Map:
         #import time
         #t = time.time()
         #print('create drawer')
-        if self.drawer: self.drawer.clear()
-        else: self._create_drawer()
+        if not self.drawer: self._create_drawer()
 
         #print('render background')
         self.backgroundgroup.render(self)
@@ -657,34 +667,13 @@ class Map:
         #print('render foreground')
         self.foregroundgroup.render(self)
 
-        #print('get image')
+        self.changed = False
         self.layers.changed = False
-        self.img = self.drawer.get_image()
-        #print('total time', time.time()-t)
 
     def get_tkimage(self):
         # Special image format needed by Tkinter to display it in the GUI
-        #return self.drawer.get_tkimage()
         import PIL, PIL.ImageTk
-        #img = PIL.Image.open("C:/Users/kimo/Desktop/best/2017-02-26 044.jpg")
         return PIL.ImageTk.PhotoImage(image=self.img)
-        
-##        if not hasattr(self, "_tkim"):
-##            print "new"
-##            import PIL.ImageTk
-##            self._tkim = PIL.ImageTk.PhotoImage(self.drawer.img)
-##        self._tkim.paste(self.drawer.img)
-##        return self._tkim
-        
-##        if not hasattr(self, "_tkim"):
-##            print "new"
-##            import Tkinter
-##            self._tkim = Tkinter.PhotoImage(self.drawer.img)
-##        dat = list(self.drawer.img.getdata())
-##        rows = (dat[self.drawer.width*i:self.drawer.width*(i+1)] for i in range(self.drawer.height))
-##        data = ('{' + ' '.join(("#%02x%02x%02x" % rgb[:3] for rgb in row)) + '}' for row in rows)
-##        self._tkim.put(' '.join(data))
-##        return self._tkim
 
     def view(self):
         mapp = self.copy() # ???
@@ -694,8 +683,10 @@ class Map:
         win.mainloop()
 
     def save(self, savepath, meta=False, **kwargs):
-        if not self.img:
+        # auto render if any changes to map or layers
+        if self.changed or self.layers.changed:
             self.render()
+        # save
         if meta:
             # save image + affine file + prj file if necessary (as if a georeferenced raster)
             r = RasterData(image=self.img, crs=self.crs) 
@@ -704,8 +695,8 @@ class Map:
         else:
             # save image only
             #self.drawer.save(savepath) # kwargs not currently supported in pyagg
-            self.drawer.drawer.flush()
-            self.drawer.img.save(savepath, **kwargs)
+            #self.drawer.drawer.flush()
+            self.img.save(savepath, **kwargs)
 
         
 
@@ -875,8 +866,6 @@ class VectorLayer:
         self.visible = True
         self.transparency = transparency
         self.flipy = flipy
-        self.img = None
-        self.img_text = None
 
         self.legendoptions = legendoptions or dict(title='Vector Layer')
         self.legend = legend
@@ -1075,8 +1064,6 @@ class VectorLayer:
     def copy(self):
         new = VectorLayer(self.data)
         new.visible = self.visible
-        new.img = self.img.copy() if self.img else None
-        new.img_text = self.img_text.copy() if self.img_text else None
 
         new.legendoptions = self.legendoptions
         new.legend = self.legend
@@ -1120,6 +1107,10 @@ class VectorLayer:
         bbox = map.drawer.coordspace_bbox
         crs = map.crs
         drawer = map.drawer
+
+        # clear the temporary draw buffer
+        drawer.img.paste((0,0,0,0), (0,0,width,height))
+        drawer.update_drawer_img()
 
         # normal way
         if self.has_geometry():
@@ -1188,19 +1179,25 @@ class VectorLayer:
                 drawer.draw_geojson(feat.geometry, **rendict)
 
             # flush
+            drawer.drawer.flush()
             print("internal",time.time()-t)
 
-            # BELOW WONT WORK ANYMORE
+            # copy results to front buffer
+            if False: #self.transparency:
+                # TODO: need to set alpha somehow... 
+                map.img.paste(drawer.img, None, drawer.img)
+            else:
+                map.img.paste(drawer.img, None, drawer.img)
 
-            # transparency
-            if self.transparency:
-                #opac = 256 - int(256*(self.transparency/100.0))
-                opac = 1 - self.transparency
+            # transparency OLD
+            # if self.transparency:
+            #     #opac = 256 - int(256*(self.transparency/100.0))
+            #     opac = 1 - self.transparency
                 
-                r,g,b,a = self.img.split()
-                #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-                a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-                self.img.putalpha(a)
+            #     r,g,b,a = self.img.split()
+            #     #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #     a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #     self.img.putalpha(a)
 
     def render_text(self, map):
         '''Render the layer text onto a Map instance's drawer.'''
@@ -1213,6 +1210,10 @@ class VectorLayer:
         bbox = map.drawer.coordspace_bbox
         crs = map.crs
         drawer = map.drawer
+
+        # clear the temporary draw buffer
+        drawer.img.paste((0,0,0,0), (0,0,width,height))
+        drawer.update_drawer_img()
 
         def draw_textlines(drawer, textlines, font, pos, size, options):
             # must get the pixel coords of the coordinate
@@ -1408,17 +1409,25 @@ class VectorLayer:
             drawer.drawer.settransform(drawer.coordspace_transform)
 
             # flush
+            drawer.drawer.flush()
             print("internal text",time.time()-t)
 
-            # transparency
-            if self.transparency:
-                #opac = 256 - int(256*(self.transparency/100.0))
-                opac = 1 - self.transparency
+            # copy results to front buffer
+            if False: #self.transparency:
+                # TODO: need to set alpha somehow... 
+                map.img.paste(drawer.img, None, drawer.img)
+            else:
+                map.img.paste(drawer.img, None, drawer.img)
+
+            # transparency OLD
+            # if self.transparency:
+            #     #opac = 256 - int(256*(self.transparency/100.0))
+            #     opac = 1 - self.transparency
                 
-                r,g,b,a = self.img_text.split()
-                #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-                a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-                self.img_text.putalpha(a)
+            #     r,g,b,a = self.img_text.split()
+            #     #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #     a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+            #     self.img_text.putalpha(a)
 
         else:
             pass
@@ -1437,8 +1446,6 @@ class RasterLayer:
         self.data = data
         self.visible = True
         self.transparency = transparency
-        self.img = None
-        self.img_text = None
 
         # TODO: allow setting the crs...
 
@@ -1700,24 +1707,26 @@ class RasterLayer:
         #img.save("postalph.png")
         # ...
 
-        # finally paste onto map drawer
-        drawer.paste(img)
+        # copy results to front buffer
+        if False: #self.transparency:
+            # TODO: need to set alpha somehow... 
+            map.img.paste(img, None, img)
+        else:
+            map.img.paste(img, None, img)
 
-        # BELOW WONT WORK ANYMORE
-        
-        # transparency
-        if self.transparency:
-            #opac = int(256*self.transparency)
-            #opac = 256 - int(256*self.transparency)
-            opac = 1 - self.transparency
+        # transparency OLD
+        # if self.transparency:
+        #     #opac = int(256*self.transparency)
+        #     #opac = 256 - int(256*self.transparency)
+        #     opac = 1 - self.transparency
             
-            r,g,b,a = self.img.split()
-            #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-            #a = PIL.ImageMath.eval('max(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-            a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
-            #print a, a.getextrema()
-            self.img.putalpha(a)
-            #self.img = PIL.Image.merge('RGBA', [r,g,b,a])
+        #     r,g,b,a = self.img.split()
+        #     #a = PIL.ImageMath.eval('min(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        #     #a = PIL.ImageMath.eval('max(alpha,opac)', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        #     a = PIL.ImageMath.eval('float(alpha) * opac', alpha=a, opac=opac).convert('L') # putalpha img must be 0 to make it transparent, so the nodata mask must be inverted
+        #     #print a, a.getextrema()
+        #     self.img.putalpha(a)
+        #     #self.img = PIL.Image.merge('RGBA', [r,g,b,a])
 
     def render_text(self, map):
         pass
@@ -1997,7 +2006,16 @@ class Legend:
         # render it
         rendered = self._legend.render()
         self.img = rendered.get_image()
+        # copy front buffer to back buffer
+        map.drawer.drawer.flush()
+        map.drawer.img.paste(map.img)
+        map.drawer.update_drawer_img()
+        # paste rendered image in correct location
         map.drawer.paste(self.img, **self.placement)
+        # copy back to front buffer
+        map.img.paste(map.drawer.img)
+
+        
 
 
 
@@ -2007,7 +2025,7 @@ class Background(object):
             #if isinstance(map.background, (tuple,str)):
             # solid background
             canv = pyagg.Canvas(map.drawer.width, map.drawer.height, map.background)
-            map.drawer.paste(canv)
+            map.img.paste(canv.img)
 
 
 
@@ -2061,7 +2079,15 @@ class Title(object):
                               outlinewidth=titleoptions.pop('outlinewidth',None),
                               )
             rendered = pyagg.legend.BaseGroup(refcanvas=map.drawer, title=map.title, titleoptions=titleoptions, **boxoptions).render() # pyagg label indeed implements a render method()
+
+            # copy front buffer to back buffer
+            map.drawer.drawer.flush()
+            map.drawer.img.paste(map.img)
+            map.drawer.update_drawer_img()
+            # paste rendered image in correct location
             map.drawer.paste(rendered, **placement)
+            # copy back to front buffer
+            map.img.paste(map.drawer.img)
 
 
 
@@ -2113,7 +2139,15 @@ class ScaleBar:
         # render it
         rendered = pyagg.legend.Symbol('line', refcanvas=map.drawer, label=label, labeloptions=labeloptions, **symboloptions).render()
         self.img = rendered.get_image()
+
+        # copy front buffer to back buffer
+        map.drawer.drawer.flush()
+        map.drawer.img.paste(map.img)
+        map.drawer.update_drawer_img()
+        # paste rendered image in correct location
         map.drawer.paste(self.img, **self.placement)
+        # copy back to front buffer
+        map.img.paste(map.drawer.img)
 
 
 
