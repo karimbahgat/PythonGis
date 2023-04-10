@@ -118,10 +118,14 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=
 
         for f in groupfeats:
             #print f
+            row = f.row + [None for _ in fieldmapping]
+            outfeat = out.add_feature(row, f.geometry)
+            
             try:
                 cropped = raster.manager.crop(valuedata, f.bbox)
             except:
                 continue
+            
             # TODO: only check overlapping tiles
             # TODO: how to calc stat on multiple overlapping tiles           
             fdata = VectorData()
@@ -140,8 +144,6 @@ def spatial_stats(groupbydata, valuedata, fieldmapping=[], keepall=True, subkey=
             del cropped
             #gc.collect()
             
-            row = f.row + [None for _ in fieldmapping]
-            outfeat = out.add_feature(row, f.geometry)
             for statfield,bandnum,outstat in fieldmapping:
                 stat = clipped.bands[bandnum].summarystats(outstat)[outstat]
                 outfeat[statfield] = stat
