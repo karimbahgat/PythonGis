@@ -239,7 +239,7 @@ def from_file(filepath, crs=None, **georef):
         def read_georef(raw_tags):
             # check tag definitions here
             info = dict()
-            if raw_tags.has_key(1025):
+            if 1025 in raw_tags:
                 # GTRasterTypeGeoKey, aka midpoint pixels vs topleft area pixels
                 if raw_tags.get(1025) == (1,):
                     # is area
@@ -247,7 +247,7 @@ def from_file(filepath, crs=None, **georef):
                 elif raw_tags.get(1025) == (2,):
                     # is point
                     info["cell_anchor"] = "nw"
-            if raw_tags.has_key(34264):
+            if 34264 in raw_tags:
                 # ModelTransformationTag, aka 4x4 transform coeffs...
                 [a,b,c,d,
                  e,f,g,h,
@@ -264,12 +264,12 @@ def from_file(filepath, crs=None, **georef):
                             yscale=yscale,
                             yoffset=yoff)
             else:
-                if raw_tags.has_key(33922):
+                if 33922 in raw_tags:
                     # ModelTiepointTag
                     x, y, z, geo_x, geo_y, geo_z = raw_tags.get(33922)
                     info["xy_cell"] = x,y
                     info["xy_geo"] = geo_x,geo_y
-                if raw_tags.has_key(33550):
+                if 33550 in raw_tags:
                     # ModelPixelScaleTag
                     scalex,scaley,scalez = raw_tags.get(33550)
                     info["cellwidth"] = scalex
@@ -289,10 +289,10 @@ def from_file(filepath, crs=None, **georef):
 
         def read_crs(raw_tags):
             crs = dict()
-            if raw_tags.get(34735):
+            if 34735 in raw_tags:
                 # GeoKeyDirectoryTag
                 crs["proj_params"] = raw_tags.get(34735)
-            if raw_tags.get(34737):
+            if 34737 in raw_tags:
                 # GeoAsciiParamsTag
                 crs["proj_name"] = raw_tags.get(34737)
             return crs
